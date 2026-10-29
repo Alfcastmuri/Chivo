@@ -1,6 +1,7 @@
 ## Novedades de GESTOR 0.7.0
 
-- **Mapa del disco al estilo WinDirStat** (Espacio): cada archivo es un rectángulo de su tamaño y del color de su tipo. Doble clic para entrar en una carpeta.
+- **Mapa del disco al estilo WinDirStat** (Espacio): cada archivo es un rectángulo de su tamaño, en colores planos y mates que salen de tu tema. Doble clic para entrar en una carpeta.
+- **Más de 670 extensiones en 23 tipos** (diseño, 3D y CAD, fuentes, libros, correo, bases de datos, subtítulos, certificados…) y en Personalizar → Tipos de archivo puedes añadir las tuyas, crear tipos nuevos o subir una lista.
 - **Línea de tiempo**: tus archivos día a día, como un diario, con lo que movió GESTOR y lo que moviste tú.
 - **Etiquetas y notas** en tus archivos («garantía», «impuestos»…). Se buscan en Buscar y siguen al archivo aunque se mueva.
 - **Lee fotos y PDF escaneados** con el OCR que ya trae Windows: los recibos fotografiados se ordenan igual que los PDF.
