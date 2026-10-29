@@ -43,7 +43,23 @@ def ignorar(ruta):
     if nucleo._ignorado(nombre, ["*.tmp", "*.crdownload", "*.part", "*.partial", "*.download", "desktop.ini",
                                  "thumbs.db", ".ds_store"]):
         return True
-    return any(p.lower() in _NO_ENTRAR for p in ruta.replace("\\", "/").split("/"))
+    # Solo cuentan las carpetas por debajo de la raíz vigilada: la propia raíz puede estar dentro de
+    # AppData (por ejemplo, una carpeta temporal) y no por eso hay que ignorar todo lo que contiene.
+    for raiz in _raices_cache():
+        if nucleo._dentro_de(ruta, raiz):
+            relativa = os.path.relpath(ruta, raiz)
+            return any(p.lower() in _NO_ENTRAR or p.startswith(".")
+                       for p in relativa.replace("\\", "/").split("/")[:-1])
+    return False
+
+
+_cache = {"t": 0, "raices": []}
+
+
+def _raices_cache():
+    if time.time() - _cache["t"] > 10:
+        _cache.update(t=time.time(), raices=raices())
+    return _cache["raices"]
 
 
 def progreso():
@@ -59,6 +75,7 @@ def _anotar_progreso(**cambios):
 def escanear(cancelado=lambda: False):
     """Recorre todas las carpetas del mapa. Anota el avance para la barra de progreso del panel."""
     lista = raices()
+    _cache.update(t=time.time(), raices=lista)
     inicio = time.time()
     previo = bd.contar_archivos()["archivos"]
     _anotar_progreso(estado="escaneando", inicio=inicio, fin=None, hechos=0, total_estimado=previo or None,
