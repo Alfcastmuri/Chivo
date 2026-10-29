@@ -158,6 +158,77 @@ input[type=color] { width: 44px; height: 32px; padding: 0; border: 1px solid var
   background: var(--texto); color: var(--panel); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; }
 .toast.on { opacity: 1; }
 code { font-family: Consolas, monospace; font-size: 12px; background: var(--fondo); padding: 1px 4px; border-radius: 4px; }
+/* ---------------- encabezado simplificado */
+header button > span { margin-left: 2px; }
+details.mas { position: relative; }
+details.mas summary { list-style: none; cursor: pointer; border: 1px solid var(--borde); border-radius: 6px; padding: 6px 12px; font-weight: 700; background: var(--panel); }
+details.mas summary::-webkit-details-marker { display: none; }
+details.mas .caja { position: absolute; right: 0; top: calc(100% + 6px); display: flex; flex-direction: column; gap: 4px; padding: 6px; min-width: 160px; z-index: 10; }
+details.mas .caja button { text-align: left; border-color: transparent; }
+@media (max-width: 700px) { header button > span { display: none; } }
+/* ---------------- procesos: barra de progreso y cronómetro */
+#procesos { position: fixed; right: 16px; bottom: 16px; width: 320px; max-width: calc(100vw - 32px); display: none; flex-direction: column; gap: 8px; z-index: 25; }
+#procesos.on { display: flex; }
+@media (max-width: 700px) { #procesos { right: 8px; left: 8px; bottom: 8px; width: auto; } .proc { padding: 8px 10px; } }
+.proc { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 20px rgba(0,0,0,.14); }
+.proc-cab { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.proc .reloj { font-variant-numeric: tabular-nums; color: var(--suave); white-space: nowrap; }
+.proc .barra { height: 8px; margin-bottom: 4px; }
+.proc .barra > div { transition: width .4s; }
+.proc.listo .barra > div { background: var(--ok); }
+.proc.mal .barra > div { background: var(--peligro); }
+.barra.indef > div { width: 35% !important; animation: indef 1.3s ease-in-out infinite; }
+@keyframes indef { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+.cuenta { font-variant-numeric: tabular-nums; }
+.qr { display: flex; gap: 14px; align-items: center; margin-top: 8px; }
+.qr-img svg { display: block; width: 150px; height: 150px; border-radius: 8px; }
+.mapa-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin: 4px 0 8px; border: 1px solid var(--borde); border-radius: 8px; background: var(--fondo); }
+/* ---------------- modo cuaderno */
+body.cuaderno {
+  --fondo: #ece4d3; --panel: #fffdf5; --texto: #22304d; --suave: #6b6f80; --borde: #d8cfbb;
+  --acento: #2453b8; --acento-texto: #ffffff; --acento-suave: #e3eafa; --sombra: 0 1px 0 #ddd3bd, 2px 4px 10px rgba(60,40,10,.08);
+  --renglon: #c9dcf0; --margen: #eba3a3;
+  background-color: var(--fondo);
+  background-image: radial-gradient(rgba(120,90,40,.06) 1px, transparent 1px);
+  background-size: 6px 6px;
+  color-scheme: light;
+}
+body.cuaderno h1, body.cuaderno h2, body.cuaderno .saludo, body.cuaderno .panelito > h3, body.cuaderno section > h3,
+body.cuaderno .tit-col, body.cuaderno nav.lateral .grupo-nav, body.cuaderno .proc-cab b {
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive; text-transform: none; letter-spacing: 0; }
+body.cuaderno .panelito > h3, body.cuaderno section > h3, body.cuaderno .tit-col { font-size: 15px; color: var(--texto); }
+body.cuaderno header { background: #fffdf5; border-bottom: 2px solid var(--margen); }
+body.cuaderno .caja, body.cuaderno .panelito {
+  border-radius: 3px; border-color: #e3dac5;
+  background-color: var(--panel);
+  background-image: linear-gradient(to right, transparent 28px, var(--margen) 28px, var(--margen) 30px, transparent 30px),
+    repeating-linear-gradient(to bottom, transparent 0 27px, var(--renglon) 27px 28px);
+  background-position: 0 0, 0 12px; background-attachment: local; }
+body.cuaderno .caja.editor, body.cuaderno .panelito { padding-left: 44px; }
+body.cuaderno .caja.lista { padding-left: 38px; }
+body.cuaderno .panelito { position: relative; }
+body.cuaderno .panelito::before { content: ""; position: absolute; top: -9px; left: 50%; width: 70px; height: 18px; margin-left: -35px;
+  background: rgba(250,220,120,.55); transform: rotate(-2deg); border-radius: 2px; }
+body.cuaderno .panelito:nth-child(3n+2)::before { background: rgba(160,210,240,.55); transform: rotate(2deg); }
+body.cuaderno .panelito:nth-child(3n)::before { background: rgba(240,170,190,.5); transform: rotate(-1deg); }
+body.cuaderno .cifras div { background: transparent; border: 1.5px dashed #c9bfa8; }
+body.cuaderno button { border-radius: 4px; }
+body.cuaderno button.prim { background: var(--acento); box-shadow: 1px 2px 0 #18397f; }
+body.cuaderno .etiqueta, body.cuaderno .chip.on { border-radius: 2px; }
+body.cuaderno .etiqueta.ambar { background: #fff1a8; color: #6a5300; }
+body.cuaderno .etiqueta.verde { background: #c9f2c7; color: #1c5a24; }
+body.cuaderno .etiqueta.rojo { background: #ffc9c9; color: #8a1f1f; }
+body.cuaderno nav.lateral { padding-left: 26px; background-image: radial-gradient(circle at 9px 50%, #9c917b 3.5px, #ece4d3 4.5px, transparent 5px);
+  background-size: 18px 26px; background-repeat: repeat-y; }
+body.cuaderno nav.lateral button { border-radius: 0 14px 14px 0; border-left: 4px solid transparent; }
+body.cuaderno nav.lateral button.on { background: #fffdf5; color: var(--acento); border-left-color: var(--margen); box-shadow: 1px 1px 0 #ddd3bd; }
+body.cuaderno .barra { background: #f1ead9; border: 1px solid #ddd3bd; }
+body.cuaderno .proc { border-radius: 3px; background-image: repeating-linear-gradient(to bottom, transparent 0 21px, var(--renglon) 21px 22px); }
+body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
+@media (max-width: 860px) {
+  body.cuaderno nav.lateral { background-image: none; padding-left: 10px; }
+  body.cuaderno .caja.editor, body.cuaderno .panelito { padding-left: 36px; }
+}
 </style>
 </head>
 <body>
@@ -165,10 +236,11 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   <h1>GESTOR <span class="ayuda" id="version" style="font-weight:400"></span></h1>
   <span class="espacio"></span>
   <span class="estado" id="estadoProg"></span>
+  <button id="btnCuaderno" title="Modo cuaderno: el panel como una libreta de papel">📓 <span>Cuaderno</span></button>
   <button id="btnPausaTodo" title="Pausa o reanuda todos los servicios automáticos">⏸ Pausar todo</button>
-  <button id="btnAjustes">Ajustes</button>
-  <button id="btnSalir">Salir</button>
-  <button id="btnCerrar">Cerrar panel</button>
+  <button id="btnAjustes">⚙ <span>Ajustes</span></button>
+  <details class="mas"><summary title="Más">⋯</summary><div class="caja">
+    <button id="btnSalir">Cerrar sesión</button><button id="btnCerrar">Cerrar panel</button></div></details>
 </header>
 <div class="banda" id="bandaDetenido">GESTOR está detenido: no ordena, no vigila y no muestra el icono. <button class="chico prim" id="btnEncender">Encender GESTOR</button></div>
 <div class="banda" id="bandaPausa">GESTOR está en pausa: no se ordenará nada automáticamente. <button class="chico" id="btnReanudar">Reanudar</button></div>
@@ -178,20 +250,18 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   <div class="grupo-nav">Organizar</div>
   <button data-vista="Servicios">Servicios</button>
   <button data-vista="Plantillas">Plantillas</button>
-  <button data-vista="Asistente">Asistente</button>
   <button data-vista="Raiz">Sacar a la raíz</button>
   <div class="grupo-nav">Encontrar</div>
   <button data-vista="Buscar">Buscar</button>
   <button data-vista="Duplicados">Duplicados</button>
   <button data-vista="Espacio">Espacio</button>
   <div class="grupo-nav">Proteger</div>
-  <button data-vista="Respaldo">Respaldo</button>
-  <button data-vista="Copias">Copias a USB</button>
+  <button data-vista="Respaldo">Respaldo y USB</button>
   <button data-vista="Papelera">Papelera</button>
   <div class="grupo-nav">Al día</div>
   <button data-vista="Vencimientos">Vencimientos</button>
   <button data-vista="Estadisticas">Estadísticas</button>
-  <div class="grupo-nav">Panel</div>
+  <div class="grupo-nav">Personalizar</div>
   <button data-vista="Colores">🎨 Colores</button>
 </nav>
 <div class="contenido">
@@ -210,11 +280,10 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <main class="vista simple" id="vistaBuscar"><div class="caja editor" id="buscar"></div></main>
 <main class="vista simple" id="vistaEspacio"><div class="caja editor" id="espacio"></div></main>
 <main class="vista simple" id="vistaVencimientos"><div class="caja editor" id="vencimientos"></div></main>
-<main class="vista simple" id="vistaRespaldo"><div class="caja editor" id="respaldo"></div></main>
+<main class="vista simple" id="vistaRespaldo"><div class="caja editor" id="respaldo"></div><div class="caja editor" id="copias"></div></main>
 <main class="vista simple" id="vistaAsistente"><div class="caja editor" id="asistente"></div></main>
 <main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
 <main class="vista simple" id="vistaPapelera"><div class="caja editor" id="papelera"></div></main>
-<main class="vista simple" id="vistaCopias"><div class="caja editor" id="copias"></div></main>
 <main class="vista simple" id="vistaColores"><div class="caja editor" id="colores"></div></main>
 <main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div></main>
 </div>
@@ -277,6 +346,7 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="procesos" aria-live="polite"></div>
 
 <script>
 const TOKEN = "__TOKEN__";
@@ -291,7 +361,11 @@ const $ = s => document.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 async function api(ruta, cuerpo = {}) {
-  const r = await fetch(ruta, { method: "POST", headers: { "Content-Type": "application/json", "X-Gestor-Token": TOKEN }, body: JSON.stringify(cuerpo) });
+  // Si la llamada tarda, se muestra su barra de progreso con cronómetro.
+  const espera = ruta === "/api/procesos" ? null : setTimeout(() => sondearProcesos(), 700);
+  let r;
+  try { r = await fetch(ruta, { method: "POST", headers: { "Content-Type": "application/json", "X-Gestor-Token": TOKEN }, body: JSON.stringify(cuerpo) }); }
+  finally { clearTimeout(espera); }
   const j = await r.json();
   if (r.status === 401) { sinGuardar = false; location.reload(); }
   if (!r.ok) throw new Error(j.error || "Error");
@@ -337,7 +411,7 @@ function pintarLista() {
     <div class="item ${actual && actual.id === s.id ? "sel" : ""}" data-id="${esc(s.id)}">
       <div class="nombre"><span class="punto ${s.activo ? "on" : ""}"></span>${esc(s.nombre || "Sin nombre")}${s.modo_prueba ? ` <span class="chip on" style="font-size:11px;padding:0 6px">prueba</span>` : ""}</div>
       <div class="meta">${esc(resumenHorario(s.horario))}</div>
-      <div class="meta">${s.activo ? (proxima ? "Próxima: " + esc(fechaBonita(proxima)) : "") : "Desactivado"}</div>
+      <div class="meta">${s.activo ? (proxima ? `Próxima: <span class="cuenta" title="${esc(fechaBonita(proxima))}" data-cuenta="${esc(proxima)}">${esc(fechaBonita(proxima))}</span>` : "") : "Desactivado"}</div>
       ${propuestas && propuestas.n ? `<div class="meta" style="color:var(--acento)"><b>${propuestas.n} cambios propuestos</b>: ábrelo para aprobarlos</div>` : ""}
       ${ultima ? `<div class="meta">Última: ${esc(fechaBonita(ultima))}${u ? ` · ${u.movidos} ${u.movidos === 1 ? "archivo" : "archivos"}${u.errores ? `, ${u.errores} con error` : ""}` : ""}</div>` : ""}
     </div>`).join("");
@@ -844,10 +918,12 @@ $("#pestanas").addEventListener("click", e => {
 });
 function mostrarVista(nombre) {
   vistaActual = nombre;
-  document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === nombre));
+  if (nombre === "Copias") nombre = "Respaldo";
+  const enMenu = { Asistente: "Plantillas" }[nombre] || nombre;
+  document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === enMenu));
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
-  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: pintarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: cargarRespaldo,
+  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: () => { cargarRespaldo(); cargarCopias(); },
      Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
      Copias: cargarCopias, Estadisticas: cargarEstadisticas }[nombre] || (() => { }))();
 }
@@ -934,7 +1010,7 @@ function pintarInicio() {
     <h3>Próximas ejecuciones <button class="chico ir" data-ir="Servicios">Servicios</button></h3>
     ${sv.con_errores.map(x => `<div class="renglon"><span class="etiqueta rojo">error</span><span class="txt"><b>${esc(x.nombre)}</b>: ${plural(x.errores, "archivo con error", "archivos con error")}</span>
       <button class="chico" data-servicio="${esc(x.id)}">Ver</button></div>`).join("")}
-    ${sv.proximas.length ? sv.proximas.map(x => `<div class="renglon"><span class="txt">${esc(x.nombre)}</span><span class="der">${esc(fechaBonita(x.proxima))}</span></div>`).join("")
+    ${sv.proximas.length ? sv.proximas.map(x => `<div class="renglon"><span class="txt">${esc(x.nombre)}</span><span class="der cuenta" title="${esc(fechaBonita(x.proxima))}" data-cuenta="${esc(x.proxima)}">${esc(fechaBonita(x.proxima))}</span></div>`).join("")
       : `<div class="ayuda">${sv.total ? "Ningún servicio activo con horario." : "Aún no tienes servicios."}</div>`}
     ${!sv.total ? `<div class="fila" style="margin-top:10px"><button class="prim" data-ir="Plantillas">Empezar con una plantilla</button></div>` : ""}
   </div>`;
@@ -1207,6 +1283,63 @@ $("#colores").addEventListener("input", e => {
     aplicarTema({ colores: col.propia, modo: (datos.ajustes.tema || {}).modo }); }
 });
 
+// ---------------------------------------------------------------- procesos y cronómetros
+let procs = { lista: [], desfase: 0, sondeo: null, cerrados: new Set() };
+async function sondearProcesos() {
+  clearTimeout(procs.sondeo);
+  try { const r = await api("/api/procesos"); procs.lista = r.procesos; procs.desfase = r.ahora * 1000 - Date.now(); pintarProcesos(); } catch (e) { }
+  const activos = procs.lista.some(p => p.estado === "en marcha");
+  procs.sondeo = setTimeout(sondearProcesos, document.hidden ? 15000 : activos ? 1000 : 4000);
+}
+const reloj = seg => {
+  seg = Math.max(0, Math.round(seg));
+  const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), x = seg % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0");
+};
+function pintarProcesos() {
+  const ahora = (Date.now() + procs.desfase) / 1000;
+  const html = procs.lista.filter(p => !p.fin || ahora - p.fin < 8 && !procs.cerrados.has(p.id)).map(p => {
+    const marcha = p.estado === "en marcha", trans = (p.fin || ahora) - (p.inicio || ahora);
+    const pct = p.total ? Math.min(100, 100 * p.hechos / p.total) : null;
+    const falta = marcha && pct > 3 && pct < 100 && trans > 3 ? trans * (100 - pct) / pct : null;
+    const detalle = !marcha ? (p.estado === "error" ? "Error: " + esc(p.error || "") : "✓ Terminado")
+      : esc(p.etapa || "Trabajando") + (p.total ? ` · ${p.hechos.toLocaleString("es")} de ${p.total.toLocaleString("es")} (${Math.floor(pct)} %)`
+        : p.hechos ? ` · ${p.hechos.toLocaleString("es")} archivos` : "") + (falta ? ` · faltan ~${reloj(falta)}` : "");
+    return `<div class="proc ${marcha ? "" : "listo"} ${p.estado === "error" ? "mal" : ""}" data-proc="${esc(p.id)}" title="${marcha ? "" : "Toca para cerrar"}">
+      <div class="proc-cab"><b>${esc(p.nombre)}</b><span class="reloj" title="Tiempo transcurrido">⏱ ${reloj(trans)}</span></div>
+      <div class="barra ${marcha && pct === null ? "indef" : ""}"><div style="width:${marcha ? (pct ?? 35) : 100}%"></div></div>
+      <div class="ayuda">${detalle}</div></div>`;
+  }).join("");
+  $("#procesos").innerHTML = html; $("#procesos").classList.toggle("on", !!html);
+}
+// Cuentas atrás: cualquier elemento con data-cuenta="2026-10-29T12:00:00" muestra cuánto falta.
+function actualizarCuentas() {
+  document.querySelectorAll("[data-cuenta]").forEach(el => {
+    const seg = (new Date(el.dataset.cuenta) - Date.now()) / 1000;
+    el.textContent = isNaN(seg) ? "" : seg <= 0 ? "ahora" : seg < 3600 ? "en " + reloj(seg)
+      : seg < 86400 ? `en ${Math.floor(seg / 3600)} h ${String(Math.floor(seg % 3600 / 60)).padStart(2, "0")} min` : fechaBonita(el.dataset.cuenta);
+  });
+}
+setInterval(() => { if (procs.lista.some(p => p.estado === "en marcha")) pintarProcesos(); actualizarCuentas(); }, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) sondearProcesos(); });
+$("#procesos").addEventListener("click", e => { const p = e.target.closest(".proc.listo"); if (p) { procs.cerrados.add(p.dataset.proc); pintarProcesos(); } });
+
+// ---------------------------------------------------------------- modo cuaderno
+function aplicarCuaderno(si) {
+  document.body.classList.toggle("cuaderno", !!si);
+  $("#btnCuaderno").title = si ? "Volver al modo normal" : "Modo cuaderno: el panel como una libreta de papel";
+  try { localStorage.setItem("gestorCuaderno", si ? "1" : ""); } catch (e) { }
+}
+try { if (localStorage.getItem("gestorCuaderno")) document.body.classList.add("cuaderno"); } catch (e) { }
+$("#btnCuaderno").onclick = async () => {
+  const si = !document.body.classList.contains("cuaderno");
+  aplicarCuaderno(si);
+  const tema = Object.assign({ paleta: CLASICO, modo: "auto", propias: [] }, datos.ajustes.tema || {}, { cuaderno: si });
+  datos.ajustes.tema = tema;
+  try { await guardarPreferencias({ tema }); } catch (e) { }
+};
+document.addEventListener("click", e => { const d = $("details.mas"); if (d && d.open && !d.contains(e.target)) d.open = false; });
+
 // ---------------------------------------------------------------- preferencias
 function pintarPreferencias() {
   const a = datos.ajustes;
@@ -1258,7 +1391,8 @@ $("#prefRed").onchange = async e => {
 async function pintarRed() {
   try {
     const r = await api("/api/red");
-    $("#redInfo").innerHTML = r.activo ? `En el celular, conectado al mismo Wi-Fi, abre <b><code>${esc(r.url)}</code></b> (tarda unos segundos en estar listo).` : "";
+    $("#redInfo").innerHTML = r.activo ? `<div class="qr">${r.qr ? `<div class="qr-img">${r.qr}</div>` : ""}<div>Apunta con la cámara del celular a este código
+      (conectado al mismo Wi-Fi) o abre <b><code>${esc(r.url)}</code></b>. Tarda unos segundos en estar listo.</div></div>` : "";
   } catch (e) { }
 }
 $("#prefPapelera").onchange = e => guardarPreferencias({ papelera: e.target.value });
@@ -1284,7 +1418,8 @@ async function pintarPlantillas(recargar) {
   }
   const docs = Object.values(plant.documentos || {});
   cont.innerHTML = `
-    <h2>Plantillas</h2>
+    <div class="fila" style="justify-content:space-between"><h2 style="margin:0">Plantillas</h2>
+      <button data-ir-asistente>🧭 Crear con el asistente</button></div>
     <p class="ayuda">Servicios listos para cada tipo de carpeta. Los documentos van a las carpetas que <b>ya tienes en Documentos</b>
       ${docs.length ? `(he encontrado: ${docs.map(d => esc(nombreCorto(d))).join(", ")})` : "(no encontré subcarpetas conocidas: lo que no encaje irá a una carpeta genérica dentro de Documentos)"}.
       Si hace falta crear una carpeta, siempre es dentro de Documentos. Cada servicio arranca <b>en modo prueba</b>: verás lo que haría y lo apruebas con un clic.</p>
@@ -1357,6 +1492,7 @@ $("#raiz").addEventListener("click", async e => {
 });
 $("#plantillas").addEventListener("click", async e => {
   const t = e.target;
+  if (t.dataset.irAsistente !== undefined) { mostrarVista("Asistente"); return; }
   try {
     if (t.id === "plRecargar") { plant.dias = +$("#plDias").value || 0; pintarPlantillas(true); }
     else if (t.dataset.plAbrir) { plant.abierta = plant.abierta === t.dataset.plAbrir ? null : t.dataset.plAbrir; pintarPlantillas(); }
@@ -1388,33 +1524,73 @@ $("#plantillas").addEventListener("change", e => {
 // ---------------------------------------------------------------- buscar
 let busqueda = { texto: "", res: null };
 function pintarBuscar() {
-  const r = busqueda.res;
-  const verbo = { mover: "Movido a", copiar: "Copiado a", renombrar: "Renombrado como", papelera: "Enviado a la papelera", archivar: "Archivado en" };
+  const r = busqueda.res, m = busqueda.mapa, a = busqueda.ahora;
+  const verbo = { mover: "Movido a", copiar: "Copiado a", renombrar: "Renombrado como", papelera: "Enviado a la papelera", archivar: "Archivado en", borrado: "Borrado" };
+  const prog = m && m.progreso || {};
   $("#buscar").innerHTML = `
-    <h2>¿A dónde fue mi archivo?</h2>
-    <p class="ayuda">Busca por nombre (el de antes o el nuevo) entre todo lo que GESTOR ha movido, renombrado o quitado.</p>
-    <div class="fila"><input type="text" id="bqTexto" value="${esc(busqueda.texto)}" placeholder="factura cfe, IMG_2024…" style="flex:1"><button class="prim" id="bqIr">Buscar</button></div>
-    ${r ? `<p class="ayuda">${r.total} resultados${r.total > r.resultados.length ? ` (se muestran ${r.resultados.length})` : ""}.</p>
-      <div class="resultado"><table><tr><th>Fecha</th><th>Archivo</th><th>Qué pasó</th><th></th></tr>
-      ${r.resultados.map(x => `<tr><td>${esc(fechaBonita(x.fecha))}<div class="ayuda">${esc(x.servicio)}</div></td>
+    <h2>Buscar un archivo</h2>
+    <p class="ayuda">Escribe parte del nombre. Te digo dónde está ahora y todo lo que le ha pasado (lo que movió GESTOR y lo que moviste tú).</p>
+    <div class="fila"><input type="text" id="bqTexto" value="${esc(busqueda.texto)}" placeholder="factura cfe, IMG_2024, contrato…" style="flex:1"><button class="prim" id="bqIr">Buscar</button></div>
+    ${m ? `<div class="mapa-estado">
+      <label><input type="checkbox" id="mapaActivo" ${m.activo ? "checked" : ""}> <b>Mapa de archivos</b></label>
+      <span class="ayuda">${m.activo ? (prog.estado === "escaneando" ? `Recorriendo tus carpetas… ${(prog.hechos || 0).toLocaleString("es")} archivos` :
+        `${m.archivos.toLocaleString("es")} archivos ubicados (${mb(m.bytes)})${prog.fin ? ` · repasado ${esc(fechaBonita(new Date(prog.fin * 1000).toISOString().slice(0, 16)))}` : ""} · se actualiza solo con cada cambio`) : "Desactivado: solo se busca en el historial."}</span>
+      ${m.activo ? `<button class="chico" id="mapaRepasar">Repasar ahora</button><button class="chico" id="mapaCarpetas">Carpetas (${m.raices.length})</button>` : ""}
+    </div>
+    ${busqueda.verCarpetas && m.activo ? `<div class="grupo-dup"><p class="ayuda" style="margin-top:0">Carpetas que vigila el mapa${m.carpetas.length ? "" : " (las de siempre: Documentos, Descargas, Escritorio, Imágenes, Vídeos y Música)"}:</p>
+      ${m.raices.map((c, i) => `<div class="carpeta"><span class="ruta">${esc(c)}</span>${m.carpetas.length ? `<button class="chico peligro" data-mapa-quitar="${i}">Quitar</button>` : ""}</div>`).join("")}
+      <button class="chico" id="mapaAnadir">+ Añadir carpeta o disco</button></div>` : ""}` : ""}
+    ${a ? `<section><h3>Dónde está ahora ${a.length ? `<span class="ayuda">(${a.length})</span>` : ""}</h3>
+      ${a.length ? `<div class="resultado" style="max-height:300px"><table>${a.map(x => `<tr><td><b>${esc(x.nombre)}</b><div class="ayuda">${esc(x.carpeta)}</div></td>
+        <td class="ayuda" style="white-space:nowrap">${mb(x.bytes || 0)}</td>
+        <td style="text-align:right">${x.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(x.ruta)}">Abrir carpeta</button>` : ""}</td></tr>`).join("")}</table></div>`
+        : `<p class="ayuda">${m && m.activo ? "No hay ningún archivo con ese nombre en las carpetas del mapa." : "Activa el mapa de archivos para saber dónde está cualquier archivo."}</p>`}</section>` : ""}
+    ${r ? `<section><h3>Historial ${r.total ? `<span class="ayuda">(${r.total})</span>` : ""}</h3>
+      ${r.resultados.length ? `<div class="resultado"><table><tr><th>Fecha</th><th>Archivo</th><th>Qué pasó</th><th></th></tr>
+      ${r.resultados.map(x => `<tr><td style="white-space:nowrap">${esc(fechaBonita(x.fecha))}<div class="ayuda">${x.quien === "tu" ? "👤 Tú" : esc(x.servicio)}</div></td>
         <td title="${esc(x.origen)}">${x.carpeta ? "📁 " : ""}${esc(nombreCorto(x.origen))}<div class="ayuda">${esc(x.origen)}</div></td>
         <td>${verbo[x.accion] || x.accion} ${x.destino ? `<code>${esc(x.destino)}</code>` : ""}${x.en_zip ? ` como <code>${esc(x.en_zip)}</code>` : ""}<div class="ayuda">${esc(x.estado)}</div></td>
-        <td>${x.existe ? `<button class="chico" data-abrir-ruta="${esc(x.destino)}">Abrir carpeta</button>` : x.accion === "papelera" && x.papelera_id ? `<button class="chico" data-ver-papelera>Ver papelera</button>` : ""}</td></tr>`).join("")}
-      </table></div>` : ""}`;
+        <td style="white-space:nowrap">${x.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(x.destino)}">Abrir carpeta</button>` : x.accion === "papelera" && x.papelera_id ? `<button class="chico" data-ver-papelera>Ver papelera</button>` : ""}</td></tr>`).join("")}
+      </table></div>` : `<p class="ayuda">Nada en el historial con ese nombre.</p>`}</section>` : ""}`;
   const i = $("#bqTexto"); i.focus(); i.setSelectionRange(i.value.length, i.value.length);
+  clearTimeout(busqueda.sondeo);
+  if (prog.estado === "escaneando" && vistaActual === "Buscar") busqueda.sondeo = setTimeout(cargarBuscar, 3000);
+}
+async function cargarBuscar() {
+  try { busqueda.mapa = await api("/api/mapa"); } catch (e) { }
+  if ((busqueda.mapa && busqueda.mapa.progreso || {}).estado === "escaneando") sondearProcesos();
+  pintarBuscar();
 }
 async function buscarAhora() {
   busqueda.texto = $("#bqTexto").value.trim();
-  busqueda.res = await api("/api/buscar", { texto: busqueda.texto });
+  const [h, m] = await Promise.all([api("/api/buscar", { texto: busqueda.texto }),
+    busqueda.mapa && busqueda.mapa.activo && busqueda.texto ? api("/api/mapa/buscar", { texto: busqueda.texto }) : Promise.resolve(null)]);
+  busqueda.res = h; busqueda.ahora = m ? m.archivos : (busqueda.texto ? [] : null);
   pintarBuscar();
+}
+async function guardarMapa(cambios) {
+  busqueda.mapa = await api("/api/mapa/guardar", cambios); pintarBuscar();
 }
 $("#buscar").addEventListener("click", async e => {
   const t = e.target;
   try {
     if (t.id === "bqIr") await buscarAhora();
+    else if (t.id === "mapaRepasar") { await api("/api/mapa/escanear"); aviso("Repasando tus carpetas…"); setTimeout(cargarBuscar, 800); setTimeout(sondearProcesos, 400); }
+    else if (t.id === "mapaCarpetas") { busqueda.verCarpetas = !busqueda.verCarpetas; pintarBuscar(); }
+    else if (t.id === "mapaAnadir") {
+      const res = await api("/api/elegir-carpeta", {});
+      if (res.carpeta) await guardarMapa({ carpetas: [...(busqueda.mapa.carpetas.length ? busqueda.mapa.carpetas : busqueda.mapa.raices), res.carpeta] });
+    } else if (t.dataset.mapaQuitar !== undefined) {
+      const c = [...busqueda.mapa.carpetas]; c.splice(+t.dataset.mapaQuitar, 1); await guardarMapa({ carpetas: c });
+    }
     else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
     else if (t.dataset.verPapelera !== undefined) mostrarVista("Papelera");
   } catch (err) { aviso("Error: " + err.message); }
+});
+$("#buscar").addEventListener("change", async e => {
+  if (e.target.id !== "mapaActivo") return;
+  if (!e.target.checked && !confirm("Se borrará el mapa de ubicaciones (el historial de movimientos se conserva). ¿Desactivar?")) { e.target.checked = true; return; }
+  try { await guardarMapa({ activo: e.target.checked }); aviso(e.target.checked ? "Mapa activado: recorriendo tus carpetas." : "Mapa desactivado."); } catch (err) { aviso("Error: " + err.message); }
 });
 $("#buscar").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "bqTexto") buscarAhora().catch(x => aviso(x.message)); });
 
@@ -1576,7 +1752,8 @@ async function pintarDuplicados() {
         ${est.carpetas.map((c, i) => `<tr><td title="${esc(c.a)}">${esc(c.a)}<div class="ayuda">${c.pct_a} % de sus archivos está en B</div></td>
           <td title="${esc(c.b)}">${esc(c.b)}<div class="ayuda">${c.pct_b} % de sus archivos está en A</div></td>
           <td style="white-space:nowrap">${c.archivos} archivos<div class="ayuda">${mb(c.bytes)}</div></td>
-          <td><button class="chico" data-dup-par="${i}" data-conservar="a">Conservar A</button> <button class="chico" data-dup-par="${i}" data-conservar="b">Conservar B</button></td></tr>`).join("")}
+          <td style="white-space:nowrap"><button class="chico" data-dup-par="${i}" data-conservar="a">Conservar A</button> <button class="chico" data-dup-par="${i}" data-conservar="b">Conservar B</button>
+            <div style="margin-top:4px"><button class="chico" data-combinar="${i}" data-en="a" title="Todo lo de B pasa a A; lo repetido se quita">Combinar en A</button> <button class="chico" data-combinar="${i}" data-en="b" title="Todo lo de A pasa a B; lo repetido se quita">Combinar en B</button></div></td></tr>`).join("")}
         </table></div></section>` : ""}
       <section><h3>${est.total_grupos} grupos de duplicados · ${mb(est.recuperable || 0)} recuperables</h3>
         ${grupos.length ? `<p class="ayuda">Se propone conservar el más antiguo de cada grupo (sin marcar). Lo marcado va a la papelera.</p>
@@ -1598,6 +1775,22 @@ $("#duplicados").addEventListener("click", async e => {
     else if (t.dataset.dupDisco) {
       if (!dupCarpetas.includes(t.dataset.dupDisco)) dupCarpetas.push(t.dataset.dupDisco);
       pintarDuplicados();
+    } else if (t.dataset.combinar !== undefined) {
+      const est = await api("/api/duplicados/estado"), c = est.carpetas[+t.dataset.combinar];
+      const [conservar, vaciar] = t.dataset.en === "a" ? [c.a, c.b] : [c.b, c.a];
+      t.disabled = true; t.textContent = "Mirando…";
+      const sim = await api("/api/duplicados/combinar", { conservar, vaciar, simular: true });
+      t.disabled = false; t.textContent = t.dataset.en === "a" ? "Combinar en A" : "Combinar en B";
+      if (!sim.ok) { aviso(sim.mensaje); return; }
+      const r = sim.resumen;
+      if (!confirm(`Combinar carpetas\n\nTodo lo de:\n${vaciar}\npasa a:\n${conservar}\n\n• ${r.mover} archivos se mueven${r.renombrados ? ` (${r.renombrados} con otro contenido quedan como «archivo (1)»)` : ""}\n• ${r.iguales} repetidos van a la papelera de GESTOR (${mb(r.bytes_liberados)})\n• Las carpetas que queden vacías se borran\n\nSe puede deshacer. ¿Continuar?`)) return;
+      const res = await api("/api/duplicados/combinar", { conservar, vaciar, simular: false });
+      if (!res.ok) { aviso(res.mensaje); return; }
+      aviso(`Combinadas: ${res.operaciones.length} archivos${res.errores.length ? `, ${res.errores.length} con error` : ""}.`);
+      $("#duplicados").insertAdjacentHTML("afterbegin", `<div class="aviso okmsg">Carpetas combinadas en <code>${esc(conservar)}</code>. <button class="chico" data-deshacer-combinar>Deshacer</button></div>`);
+    } else if (t.dataset.deshacerCombinar !== undefined) {
+      const res = await api("/api/deshacer", { id: "_combinar" });
+      aviso(res.ok ? `${res.devueltos} archivos devueltos a su sitio.` : res.mensaje); t.closest(".aviso").remove();
     } else if (t.dataset.dupPar !== undefined) {
       const est = await api("/api/duplicados/estado"), c = est.carpetas[+t.dataset.dupPar];
       const [conservar, quitar] = t.dataset.conservar === "a" ? [c.a, c.b] : [c.b, c.a];
@@ -1884,7 +2077,8 @@ $("#respaldo").addEventListener("click", async e => {
 
 (async () => {
   datos = await api("/api/inicio");
-  aplicarTema(datos.ajustes.tema);
+  aplicarTema(datos.ajustes.tema); aplicarCuaderno((datos.ajustes.tema || {}).cuaderno);
+  sondearProcesos();
   $("#version").textContent = "v" + (datos.version || "");
   if (datos.en_red) document.querySelectorAll("#btnCerrar, #ajGuardar, #ajQuitar").forEach(b => b.style.display = "none");
   pintarLista(); pintarProgramacion(); pintarPreferencias(); cargarAprendido();

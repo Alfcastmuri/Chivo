@@ -80,6 +80,7 @@ def respaldar(origen, destino, cancelado=lambda: False):
         subcarpetas[:] = [d for d in subcarpetas if not d.startswith((".", "$"))
                           and not nucleo._dentro_de(os.path.join(carpeta, d), destino)]
         relativa_carpeta = os.path.relpath(carpeta, origen)
+        nucleo.avance(sumar=len(archivos), etapa="Copiando " + relativa_carpeta.replace(".", "", 1)[:60])
         for nombre in archivos:
             if nucleo._ignorado(nombre, nucleo.IGNORAR_SIEMPRE):
                 continue
@@ -170,7 +171,8 @@ def ejecutar(r):
         if not os.path.isdir(raiz_destino):
             return {"ok": False, "mensaje": "El disco de destino no está conectado."}
         os.makedirs(r["destino"], exist_ok=True)
-        res = respaldar(r["origen"], r["destino"])
+        with nucleo.proceso("Respaldo " + (r.get("nombre") or "")):
+            res = respaldar(r["origen"], r["destino"])
         res["versiones_quitadas"] = purgar_versiones(r["destino"], r.get("dias_versiones", 90))
         est = nucleo.cargar_estado()
         est.setdefault("_respaldos", {})[r["id"]] = {

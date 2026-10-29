@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import aprendizaje
 import nucleo
 import plantillas
+import mapa
 import respaldo
 import vencimientos
 
@@ -123,7 +124,16 @@ def primera_vez():
     return not ajustes.get("asistente_visto") and not any(s.get("activo") for s in nucleo.cargar_servicios())
 
 
+# Llamadas que pueden tardar: se muestran con barra de progreso y cronómetro en el panel.
+PROCESOS_LARGOS = {"/api/simular": "Simulando", "/api/ejecutar": "Ordenando", "/api/aplanar/simular": "Sacar a la raíz (vista previa)",
+                   "/api/aplanar/ejecutar": "Sacando a la raíz", "/api/espacio": "Analizando espacio",
+                   "/api/duplicados/combinar": "Combinando carpetas", "/api/prueba/aprobar": "Aplicando cambios aprobados",
+                   "/api/copias/ejecutar": "Copia a USB", "/api/asistente/analizar": "Analizando carpeta",
+                   "/api/deshacer": "Deshaciendo", "/api/papelera/vaciar": "Vaciando papelera"}
 TRABAJOS = {}  # tareas largas en segundo plano: escanear vencimientos, respaldar...
+
+
+NOMBRES_TRABAJOS = {"vencimientos": "Buscando vencimientos", "respaldo": "Respaldo", "mapa": "Mapa de archivos"}
 
 
 def en_segundo_plano(nombre, funcion, *args):
@@ -133,7 +143,11 @@ def en_segundo_plano(nombre, funcion, *args):
 
     def trabajo():
         try:
-            TRABAJOS[nombre] = {"estado": "terminado", "resultado": funcion(*args)}
+            if nombre == "mapa":  # el mapa anota su propio avance
+                TRABAJOS[nombre] = {"estado": "terminado", "resultado": funcion(*args)}
+                return
+            with nucleo.proceso(NOMBRES_TRABAJOS.get(nombre.split("-")[0], nombre)):
+                TRABAJOS[nombre] = {"estado": "terminado", "resultado": funcion(*args)}
         except Exception as e:
             TRABAJOS[nombre] = {"estado": "error", "error": str(e)}
 
@@ -198,7 +212,22 @@ def limpiar_tema(t):
             propias.append({"nombre": str(p.get("nombre") or "Mi combinación")[:40], "colores": colores})
     return {"paleta": str(t.get("paleta") or "")[:60],
             "modo": t.get("modo") if t.get("modo") in ("auto", "claro", "oscuro") else "auto",
-            "propias": propias}
+            "propias": propias, "cuaderno": bool(t.get("cuaderno"))}
+
+
+def qr_svg(texto):
+    """Código QR en SVG (para abrir el panel en el celular apuntando con la cámara)."""
+    if not texto:
+        return ""
+    try:
+        import io
+        import segno
+    except ImportError:
+        return ""
+    salida = io.BytesIO()
+    segno.make(texto, error="m").save(salida, kind="svg", scale=6, border=2, dark="#111111", light="#ffffff",
+                                      xmldecl=False)
+    return salida.getvalue().decode()
 
 
 def ip_local():
@@ -229,6 +258,13 @@ def iniciar_duplicados(carpetas, min_kb):
 
     def trabajo():
         try:
+            with nucleo.proceso("Buscando duplicados"):
+                _trabajo()
+        except Exception as e:
+            TRABAJO_DUPLICADOS.update(estado="error", error=str(e))
+
+    def _trabajo():
+        if True:
             por_carpeta = {}
             grupos = nucleo.buscar_duplicados(carpetas, min_kb * 1024, progreso,
                                               lambda: TRABAJO_DUPLICADOS.get("cancelar"), por_carpeta)
@@ -237,8 +273,6 @@ def iniciar_duplicados(carpetas, min_kb):
             TRABAJO_DUPLICADOS.update(grupos=grupos[:500], total_grupos=len(grupos),
                                       recuperable=sum(g["recuperable"] for g in grupos),
                                       estado="cancelado" if TRABAJO_DUPLICADOS.get("cancelar") else "terminado")
-        except Exception as e:
-            TRABAJO_DUPLICADOS.update(estado="error", error=str(e))
 
     threading.Thread(target=trabajo, daemon=True).start()
     return {"ok": True}
@@ -343,6 +377,9 @@ class Manejador(BaseHTTPRequestHandler):
         ultima_actividad = time.time()
         try:
             datos = self._leer()
+            if ruta in PROCESOS_LARGOS:
+                with nucleo.proceso(PROCESOS_LARGOS[ruta]):
+                    return self._responder(200, self._api(ruta, datos))
             return self._responder(200, self._api(ruta, datos))
         except Exception as e:
             return self._responder(500, {"error": str(e)})
@@ -494,6 +531,32 @@ class Manejador(BaseHTTPRequestHandler):
                     rutas += en_quitar
                     total += g["bytes"] * len(en_quitar)
             return {"rutas": rutas, "bytes": total}
+        if ruta == "/api/duplicados/combinar":
+            return nucleo.combinar_carpetas(datos["conservar"], datos["vaciar"], simular=bool(datos.get("simular", True)))
+        if ruta == "/api/procesos":
+            return {"procesos": nucleo.procesos(), "ahora": time.time()}
+        if ruta == "/api/mapa":
+            return mapa.estado()
+        if ruta == "/api/mapa/guardar":
+            ajustes = nucleo.cargar_ajustes()
+            m = {**mapa.config(), **{k: v for k, v in datos.items() if k in ("activo", "carpetas")}}
+            m["carpetas"] = [str(c) for c in m.get("carpetas") or [] if c][:50]
+            ajustes["mapa_archivos"] = m
+            nucleo.guardar_ajustes(ajustes)
+            if not m["activo"]:
+                mapa.desactivar()
+            nucleo.lanzar_residente()
+            return mapa.estado()
+        if ruta == "/api/mapa/escanear":
+            return en_segundo_plano("mapa", mapa.escanear)
+        if ruta == "/api/mapa/buscar":
+            return {"archivos": mapa.buscar(datos.get("texto", ""))}
+        if ruta == "/api/historial":
+            filas = nucleo.bd.movimientos(datos.get("texto", ""), datos.get("desde"), datos.get("hasta"),
+                                          limite=int(datos.get("limite") or 300), recientes_primero=True)
+            return {"movimientos": filas, "total": nucleo.bd.total_movimientos()}
+        if ruta == "/api/qr":
+            return {"svg": qr_svg(datos.get("texto", ""))}
         if ruta == "/api/duplicados/cancelar":
             TRABAJO_DUPLICADOS["cancelar"] = True
             return {"ok": True}
@@ -588,8 +651,9 @@ class Manejador(BaseHTTPRequestHandler):
             r = next(x for x in respaldo.lista() if x["id"] == datos["id"])
             return {"ok": True, "ruta": respaldo.restaurar_version(r, datos["ruta"])}
         if ruta == "/api/red":
+            url = f"http://{ip_local()}:{PUERTO_RED}/"
             return {"activo": bool(nucleo.cargar_ajustes().get("acceso_red")), "hay_clave": hay_clave(),
-                    "url": f"http://{ip_local()}:{PUERTO_RED}/", "residente": nucleo.residente_activo()}
+                    "url": url, "qr": qr_svg(url), "residente": nucleo.residente_activo()}
         if ruta in ("/api/aplanar/simular", "/api/aplanar/ejecutar"):
             opciones = {k: datos[k] for k in ("nombre_con_carpeta", "borrar_vacias", "identicos") if k in datos}
             return nucleo.aplanar(datos.get("carpeta", ""), simular=ruta.endswith("simular"), **opciones)

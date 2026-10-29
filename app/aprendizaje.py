@@ -67,26 +67,9 @@ def carpeta_aprendible(ruta, documentos=None):
 
 def _hecho_por_gestor(ruta, minutos=20):
     """¿Lo movió GESTOR? Se mira el final del índice del buscador."""
-    limite = time.time() - minutos * 60
     objetivo = nucleo._norm(ruta)
-    try:
-        with open(nucleo.ARCHIVO_INDICE, "rb") as f:
-            f.seek(0, os.SEEK_END)
-            f.seek(max(0, f.tell() - 400_000))
-            lineas = f.read().decode("utf-8", "ignore").splitlines()[1:]
-    except OSError:
-        return False
-    import json
-    for linea in reversed(lineas):
-        try:
-            r = json.loads(linea)
-        except ValueError:
-            continue
-        if r["t"] < limite:
-            break
-        if r.get("d") and nucleo._norm(r["d"]) == objetivo:
-            return True
-    return False
+    return any(r.get("d") and nucleo._norm(r["d"]) == objetivo
+               for r in nucleo._leer_indice(time.time() - minutos * 60))
 
 
 def observar(ruta, origen=None):

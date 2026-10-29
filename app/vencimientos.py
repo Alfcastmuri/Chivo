@@ -140,6 +140,7 @@ def escanear(segundos=20, limite=30000):
             continue
         for carpeta, subcarpetas, nombres in os.walk(raiz):
             subcarpetas[:] = [s for s in subcarpetas if not s.startswith((".", "$"))]
+            nucleo.avance(sumar=len(nombres), etapa="Leyendo documentos")
             for n in nombres:
                 if os.path.splitext(n)[1].lower() not in EXT or nucleo._ignorado(n, nucleo.IGNORAR_SIEMPRE):
                     continue

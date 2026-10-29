@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -30,6 +30,9 @@ DATOS = os.environ.get("GESTOR_DATOS") or (
     else os.path.join(os.path.expanduser("~"), ".gestor"))
 os.makedirs(DATOS, exist_ok=True)
 
+import bd  # noqa: E402  (necesita DATOS)
+bd.iniciar(DATOS)
+
 ARCHIVO_SERVICIOS = os.path.join(DATOS, "servicios.json")
 ARCHIVO_ESTADO = os.path.join(DATOS, "estado.json")
 ARCHIVO_AJUSTES = os.path.join(DATOS, "ajustes.json")
@@ -37,7 +40,7 @@ ARCHIVO_BLOQUEO = os.path.join(DATOS, "motor.lock")
 ARCHIVO_ERRORES = os.path.join(DATOS, "errores.log")
 ARCHIVO_AVISOS = os.path.join(DATOS, "avisos.jsonl")
 CARPETA_REGISTRO = os.path.join(DATOS, "registro")
-MAX_REGISTROS_POR_SERVICIO = 50
+MAX_REGISTROS_POR_SERVICIO = 1000
 
 CATEGORIAS = {
     "Imágenes": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".heic", ".heif",
@@ -78,25 +81,54 @@ MAX_HECHOS = 5000
 
 # --------------------------------------------------------------------------- archivos JSON
 
+def _en_bd(ruta):
+    """Los .json de la carpeta de datos viven en la base de datos (gestor.db). La contraseña no: se
+    queda en credenciales.json para poder borrarla si se olvida."""
+    return ruta.endswith(".json") and os.path.basename(ruta) != "credenciales.json" \
+        and _norm(os.path.dirname(ruta)) == _norm(DATOS)
+
+
 def leer_json(ruta, por_defecto):
-    try:
-        with open(ruta, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return por_defecto
-    except (OSError, ValueError):
-        return por_defecto
+    if _en_bd(ruta):
+        return bd.leer(os.path.basename(ruta), por_defecto, archivo=ruta)
+    for _ in range(10):
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return por_defecto
+        except PermissionError:  # Windows o el antivirus lo tienen abierto: se espera un poco
+            time.sleep(0.3)
+        except (OSError, ValueError):
+            return por_defecto
+    return por_defecto
 
 
 def escribir_json(ruta, datos):
+    if _en_bd(ruta):
+        bd.escribir(os.path.basename(ruta), datos)
+        return
     temporal = ruta + ".tmp"
     with open(temporal, "w", encoding="utf-8") as f:
         json.dump(datos, f, ensure_ascii=False, indent=2)
     os.replace(temporal, ruta)
 
 
+def existe_json(ruta):
+    return bd.existe(os.path.basename(ruta), archivo=ruta) if _en_bd(ruta) else os.path.exists(ruta)
+
+
+def borrar_json(ruta):
+    if _en_bd(ruta):
+        bd.borrar(os.path.basename(ruta))
+    try:
+        os.remove(ruta)
+    except OSError:
+        pass
+
+
 def cargar_servicios():
-    if not os.path.exists(ARCHIVO_SERVICIOS):
+    if not existe_json(ARCHIVO_SERVICIOS):
         servicios = plantillas_iniciales()
         escribir_json(ARCHIVO_SERVICIOS, servicios)
         return servicios
@@ -117,12 +149,32 @@ def guardar_ajustes(ajustes):
     escribir_json(ARCHIVO_AJUSTES, ajustes)
 
 
+class _Estado(dict):
+    """El estado tal como se leyó: al guardar solo se escriben las partes que cambiaron, así dos
+    procesos (panel y motor) que guardan a la vez no se borran lo que el otro anotó."""
+    visto = None
+
+
 def cargar_estado():
-    return leer_json(ARCHIVO_ESTADO, {})
+    grupo = bd.leer_grupo("estado")
+    if not grupo:
+        antiguo = bd.leer("estado.json", None, archivo=ARCHIVO_ESTADO)
+        if isinstance(antiguo, dict) and antiguo:
+            bd.escribir_grupo("estado", antiguo)
+            bd.borrar("estado.json")
+            grupo = antiguo
+    e = _Estado(grupo)
+    e.visto = {k: json.dumps(v, sort_keys=True, ensure_ascii=False) for k, v in grupo.items()}
+    return e
 
 
 def guardar_estado(estado):
-    escribir_json(ARCHIVO_ESTADO, estado)
+    visto = getattr(estado, "visto", None) or {}
+    cambios = {k: v for k, v in estado.items() if visto.get(k) != json.dumps(v, sort_keys=True, ensure_ascii=False)}
+    quitar = [k for k in visto if k not in estado] if isinstance(estado, _Estado) else []
+    bd.escribir_grupo("estado", cambios, quitar)
+    if isinstance(estado, _Estado):
+        estado.visto = {k: json.dumps(v, sort_keys=True, ensure_ascii=False) for k, v in estado.items()}
 
 
 # --------------------------------------------------------------------------- carpetas de Windows
@@ -1153,6 +1205,7 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
             if servicio.get("subcarpetas"):
                 subcarpetas[:] = [d for d in subcarpetas if d.lower() != mantener]
             juntos = servicio.get("mover_hermanos", True)
+            avance(sumar=len(archivos), etapa="Revisando archivos")
             for grupo in _grupos(archivos, juntos):
                 listos = []
                 for nombre in grupo:
@@ -1545,7 +1598,9 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
     if simular:
         return {"simulado": True, "operaciones": plan, "avisos": avisos}
     hechas, errores = [], []
+    avance(hechos=0, total=len(plan), etapa="Moviendo archivos")
     for op in plan:
+        avance(sumar=1)
         try:
             aplicar(op)
             hechas.append(op)
@@ -1770,7 +1825,96 @@ class Bloqueo:
             pass
 
 
+# --------------------------------------------------------------------------- procesos (barra de progreso)
+
+import threading  # noqa: E402
+
+_hilo = threading.local()
+
+
+class proceso:
+    """Anota en la base de datos un proceso largo (nombre, avance, inicio) para que el panel muestre
+    su barra de progreso y su cronómetro, aunque lo esté haciendo el motor o el icono."""
+
+    def __init__(self, nombre):
+        self.nombre = nombre
+
+    def __enter__(self):
+        self.anterior = getattr(_hilo, "p", None)
+        if self.anterior:  # ya hay uno abierto en este hilo: se reutiliza
+            return self.anterior
+        self.p = {"id": nuevo_id(), "nombre": self.nombre, "inicio": time.time(), "hechos": 0, "total": None,
+                  "etapa": "", "estado": "en marcha", "fin": None, "pid": os.getpid(), "_guardado": 0}
+        _hilo.p = self.p
+        _guardar_proceso(self.p, forzar=True)
+        return self.p
+
+    def __exit__(self, tipo, valor, _):
+        if self.anterior:
+            return
+        self.p.update(estado="error" if tipo else "terminado", fin=time.time(),
+                      error=str(valor) if tipo else None)
+        _guardar_proceso(self.p, forzar=True)
+        _hilo.p = None
+
+
+def _guardar_proceso(p, forzar=False):
+    ahora = time.time()
+    if not forzar and ahora - p["_guardado"] < 0.5:
+        return
+    p["_guardado"] = ahora
+    try:
+        bd.escribir("proceso:" + p["id"], {k: v for k, v in p.items() if k != "_guardado"})
+    except Exception:
+        pass
+
+
+def avance(hechos=None, total=None, etapa=None, sumar=0):
+    """Lo llaman los bucles largos. Si no hay un proceso abierto en este hilo, no hace nada."""
+    p = getattr(_hilo, "p", None)
+    if not p:
+        return
+    if hechos is not None:
+        p["hechos"] = hechos
+    p["hechos"] += sumar
+    if total is not None:
+        p["total"] = total
+    if etapa is not None and etapa != p["etapa"]:
+        p["etapa"] = etapa
+        _guardar_proceso(p, forzar=True)
+    _guardar_proceso(p)
+
+
+def procesos():
+    """Los procesos en marcha y los terminados hace menos de un minuto."""
+    ahora = time.time()
+    salida, viejos = [], []
+    for k, p in bd.leer_grupo("proceso").items():
+        if p.get("fin") and ahora - p["fin"] > 60 or not p.get("fin") and ahora - p.get("inicio", 0) > 12 * 3600:
+            viejos.append(k)
+        else:
+            salida.append(p)
+    try:
+        import mapa
+        m = mapa.progreso()
+        if m.get("estado") == "escaneando" or (m.get("fin") and ahora - m["fin"] < 60 and m.get("estado") == "listo"):
+            salida.append({"id": "mapa", "nombre": "Mapa de archivos", "inicio": m.get("inicio"), "hechos": m.get("hechos", 0),
+                           "total": m.get("total_estimado") if m.get("estado") != "escaneando" or (m.get("total_estimado") or 0) > m.get("hechos", 0) else None,
+                           "etapa": "Recorriendo " + os.path.basename(m.get("carpeta") or "") if m.get("estado") == "escaneando" else "Listo",
+                           "estado": "en marcha" if m.get("estado") == "escaneando" else "terminado", "fin": m.get("fin")})
+    except Exception:
+        pass
+    if viejos:
+        bd.escribir_grupo("proceso", {}, viejos)
+    return sorted(salida, key=lambda p: p.get("inicio") or 0)
+
+
 def ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None, aprobado=False):
+    with proceso(servicio.get("nombre") or "Servicio"):
+        return _ejecutar_y_anotar(servicio, motivo, esperar_segundos, aprobado)
+
+
+def _ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None, aprobado=False):
     """Ejecuta el servicio y lo anota todo. En modo prueba solo apunta lo que haría (salvo aprobado)."""
     if servicio.get("modo_prueba") and not aprobado:
         return proponer(servicio, motivo, esperar_segundos)
@@ -1853,55 +1997,45 @@ def terminar_prueba(servicio_id, activar=True):
 
 # --------------------------------------------------------------------------- buscador: ¿a dónde fue?
 
-def indexar(servicio, operaciones):
+def indexar(servicio, operaciones, quien="gestor"):
+    """Anota para siempre cada movimiento en la base de datos (historial, buscador, estadísticas)."""
     if not operaciones:
         return
     t = time.time()
+    _migrar_indice()
+    bd.anotar_movimientos([{"t": t, "servicio": servicio.get("nombre", ""), "accion": op["accion"],
+                            "origen": op["origen"], "destino": op.get("destino", ""),
+                            "zip": op.get("nombre_en_zip"), "papelera_id": op.get("papelera_id"),
+                            "carpeta": op.get("carpeta", False), "bytes": op.get("bytes", 0), "quien": quien}
+                           for op in operaciones])
     try:
-        if os.path.exists(ARCHIVO_INDICE) and os.path.getsize(ARCHIVO_INDICE) > MAX_INDICE:
-            with open(ARCHIVO_INDICE, "rb") as f:  # se queda con la mitad más reciente
-                f.seek(-MAX_INDICE // 2, os.SEEK_END)
-                resto = f.read().split(b"\n", 1)[-1]
-            with open(ARCHIVO_INDICE, "wb") as f:
-                f.write(resto)
-        with open(ARCHIVO_INDICE, "a", encoding="utf-8") as f:
-            for op in operaciones:
-                f.write(json.dumps({"t": t, "s": servicio.get("nombre", ""), "a": op["accion"],
-                                    "o": op["origen"], "d": op.get("destino", ""),
-                                    "z": op.get("nombre_en_zip"), "p": op.get("papelera_id"),
-                                    "c": op.get("carpeta", False), "b": op.get("bytes", 0)},
-                                   ensure_ascii=False) + "\n")
-    except OSError:
+        import mapa
+        if mapa.config()["activo"]:
+            mapa.tras_operaciones(operaciones)
+    except Exception:
         pass
 
 
-def _leer_indice():
-    try:
-        with open(ARCHIVO_INDICE, encoding="utf-8") as f:
-            for linea in f:
-                try:
-                    yield json.loads(linea)
-                except ValueError:
-                    continue
-    except OSError:
-        return
+_indice_migrado = False
+
+
+def _migrar_indice():
+    global _indice_migrado
+    if not _indice_migrado:
+        bd.migrar_indice(ARCHIVO_INDICE)
+        _indice_migrado = True
+
+
+def _leer_indice(desde=None):
+    _migrar_indice()
+    yield from bd.movimientos(desde=desde, limite=None)
 
 
 def ultimos_movimientos(n=10):
-    """Lo último que GESTOR movió, del más reciente al más antiguo (lee solo el final del índice)."""
-    try:
-        with open(ARCHIVO_INDICE, "rb") as f:
-            f.seek(0, os.SEEK_END)
-            f.seek(max(0, f.tell() - 200_000))
-            lineas = f.read().decode("utf-8", "ignore").splitlines()
-    except OSError:
-        return []
+    """Lo último que GESTOR movió, del más reciente al más antiguo."""
+    _migrar_indice()
     salida = []
-    for linea in reversed(lineas):
-        try:
-            r = json.loads(linea)
-        except ValueError:
-            continue
+    for r in bd.movimientos(limite=n, recientes_primero=True):
         salida.append({"fecha": dt.datetime.fromtimestamp(r["t"]).isoformat(timespec="minutes"),
                        "servicio": r.get("s", ""), "accion": r["a"], "nombre": os.path.basename(r["o"]),
                        "destino": r.get("d") or "", "existe": bool(r.get("d")) and os.path.exists(r["d"])})
@@ -1911,32 +2045,14 @@ def ultimos_movimientos(n=10):
 
 
 def resumen_desde(desde):
-    movidos = papelera = bytes_papelera = 0
-    for r in _leer_indice():
-        if r["t"] < desde:
-            continue
-        if r["a"] == "papelera":
-            papelera += 1
-            bytes_papelera += r.get("b", 0)
-        else:
-            movidos += 1
-    return {"movidos": movidos, "papelera": papelera, "bytes_papelera": bytes_papelera}
+    _migrar_indice()
+    return bd.resumen_movimientos(desde)
 
 
 def buscar_movidos(texto, desde=None, hasta=None, limite=200):
     """Busca por nombre (sin importar acentos ni mayúsculas) en todo lo que GESTOR ha movido."""
-    palabras = [p for p in sin_acentos((texto or "").lower()).split() if p]
-    resultados = []
-    for r in _leer_indice():
-        if desde and r["t"] < desde:
-            continue
-        if hasta and r["t"] > hasta:
-            continue
-        nombres = sin_acentos((os.path.basename(r["o"]) + " " + os.path.basename(r["d"] or "")).lower())
-        if palabras and not all(p in nombres for p in palabras):
-            continue
-        resultados.append(r)
-    resultados.reverse()  # lo más reciente primero
+    _migrar_indice()
+    resultados = bd.movimientos(texto or "", desde, hasta, limite=None, recientes_primero=True)
     salida = []
     for r in resultados[:limite]:
         donde = r["d"]
@@ -1945,12 +2061,15 @@ def buscar_movidos(texto, desde=None, hasta=None, limite=200):
             estado = "en la papelera de GESTOR" if existe else "ya no está en la papelera"
         elif r["a"] == "archivar":
             estado = "dentro del ZIP" if os.path.exists(donde) else "el ZIP ya no está ahí"
+        elif r["a"] == "borrado":
+            estado = "se borró (o se mandó a la papelera de Windows)"
         else:
             estado = "está ahí" if os.path.exists(donde) else "ya no está ahí (se movió o se deshizo)"
         salida.append({"fecha": dt.datetime.fromtimestamp(r["t"]).isoformat(timespec="minutes"),
                        "servicio": r["s"], "accion": r["a"], "origen": r["o"], "destino": donde,
                        "en_zip": r.get("z"), "carpeta": r.get("c"), "estado": estado,
-                       "existe": os.path.exists(donde) if donde else False, "papelera_id": r.get("p")})
+                       "existe": os.path.exists(donde) if donde else False, "papelera_id": r.get("p"),
+                       "quien": r.get("quien")})
     return {"resultados": salida, "total": len(resultados)}
 
 
@@ -1981,9 +2100,7 @@ def resumen_semana(ahora=None):
     ahora = ahora or time.time()
     desde = ahora - 7 * 86400
     por_servicio, movidos, a_papelera, bytes_papelera = {}, 0, 0, 0
-    for r in _leer_indice():
-        if r["t"] < desde:
-            continue
+    for r in _leer_indice(desde):
         por_servicio[r["s"]] = por_servicio.get(r["s"], 0) + 1
         if r["a"] == "papelera":
             a_papelera += 1
@@ -2090,6 +2207,7 @@ def analizar_espacio(min_mb=50, maximo=100, limite_archivos=300_000):
             continue
         for carpeta, subcarpetas, archivos in os.walk(raiz):
             subcarpetas[:] = [d for d in subcarpetas if not d.startswith(".") and d.lower() != "appdata"]
+            avance(sumar=len(archivos), etapa="Mirando " + nombre)
             for n in archivos:
                 vistos += 1
                 if vistos > limite_archivos:
@@ -2214,7 +2332,12 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
     Se filtra en tres pasos para no leer de más: mismo tamaño, mismos primeros 64 KB y
     misma huella SHA-256 completa. Devuelve los grupos ordenados por espacio recuperable.
     """
-    progreso = progreso or (lambda **k: None)
+    externo = progreso or (lambda **k: None)
+
+    def progreso(**k):
+        externo(**k)
+        avance(hechos=k.get("comparados", k.get("revisados")), total=k.get("total") if "comparados" in k else None,
+               etapa=k.get("fase"))
     por_tamano, vistos, revisados = {}, set(), 0
     por_carpeta = por_carpeta if por_carpeta is not None else {}
     # Los respaldos son copias a propósito: no se cuentan como duplicados.
@@ -2303,6 +2426,87 @@ def carpetas_que_se_repiten(grupos, por_carpeta, minimo=3, maximo=100):
                        "pct_b": round(100 * p["archivos"] / max(por_carpeta.get(b, 1), 1))})
     salida.sort(key=lambda x: x["bytes"], reverse=True)
     return salida[:maximo]
+
+
+ID_COMBINAR = "_combinar"
+
+
+def combinar_carpetas(conservar, vaciar, simular=True):
+    """Junta dos carpetas parecidas: todo lo de «vaciar» pasa a «conservar» con su misma estructura.
+
+    Lo que ya existe igual (mismo contenido) va a la papelera de GESTOR; si existe con otro contenido,
+    se guarda como «archivo (1)». Las carpetas que quedan vacías se borran. Se puede deshacer.
+    """
+    for c in (conservar, vaciar):
+        problema = problema_aplanar(c)
+        if problema:
+            return {"ok": False, "mensaje": f"{c}: {problema}"}
+    if _norm(conservar) == _norm(vaciar) or _dentro_de(conservar, vaciar) or _dentro_de(vaciar, conservar):
+        return {"ok": False, "mensaje": "Una carpeta está dentro de la otra: elige dos carpetas distintas."}
+    plan, previstos = [], set()
+    resumen = {"mover": 0, "iguales": 0, "renombrados": 0, "bytes_liberados": 0}
+    for carpeta, subcarpetas, archivos in os.walk(vaciar):
+        subcarpetas[:] = [d for d in subcarpetas if not d.startswith(".")]
+        avance(sumar=len(archivos), etapa="Comparando archivos")
+        for n in archivos:
+            ruta = os.path.join(carpeta, n)
+            destino = os.path.join(conservar, os.path.relpath(ruta, vaciar))
+            try:
+                st = os.stat(ruta)
+                if os.path.exists(destino) and os.path.getsize(destino) == st.st_size and _huella(destino) == _huella(ruta):
+                    plan.append({"accion": "papelera", "origen": ruta, "destino": "", "duplicado": True,
+                                 "igual_a": destino, "bytes": st.st_size, "categoria": categoria_de(os.path.splitext(n)[1].lower())})
+                    resumen["iguales"] += 1
+                    resumen["bytes_liberados"] += st.st_size
+                    continue
+            except OSError:
+                continue
+            renombrado = os.path.exists(destino) or _norm(destino) in previstos
+            if renombrado:
+                b, e = os.path.splitext(destino)
+                i = 1
+                while os.path.exists(f"{b} ({i}){e}") or _norm(f"{b} ({i}){e}") in previstos:
+                    i += 1
+                destino = f"{b} ({i}){e}"
+                resumen["renombrados"] += 1
+            previstos.add(_norm(destino))
+            resumen["mover"] += 1
+            plan.append({"accion": "mover", "origen": ruta, "destino": destino, "bytes": st.st_size,
+                         "renombrado": renombrado, "categoria": categoria_de(os.path.splitext(n)[1].lower())})
+    if simular:
+        return {"ok": True, "simulado": True, "operaciones": plan, "resumen": resumen}
+    hechas, errores = [], []
+    avance(hechos=0, total=len(plan), etapa="Combinando")
+    with Bloqueo():
+        for op in plan:
+            avance(sumar=1)
+            try:
+                aplicar(op)
+                hechas.append(op)
+            except Exception as e:
+                errores.append(dict(op, error=str(e)))
+        borradas = []
+        for carpeta, _, _ in sorted(os.walk(vaciar), key=lambda x: -len(x[0])):
+            try:
+                restos = os.listdir(carpeta)
+                if all(r.lower() in ("desktop.ini", "thumbs.db", ".ds_store") for r in restos):
+                    for r in restos:
+                        os.remove(os.path.join(carpeta, r))
+                    os.rmdir(carpeta)
+                    borradas.append(carpeta)
+            except OSError:
+                pass
+    servicio = {"id": ID_COMBINAR, "nombre": "Combinar carpetas"}
+    if hechas or errores:
+        guardar_registro({"servicio": ID_COMBINAR, "nombre": "Combinar carpetas",
+                          "fecha": dt.datetime.now().isoformat(timespec="seconds"), "operaciones": hechas,
+                          "errores": errores, "avisos": [], "deshecho": False, "carpetas_borradas": borradas})
+    indexar(servicio, hechas)
+    if resumen["iguales"]:
+        anotar_liberado(sum(op["bytes"] for op in hechas if op["accion"] == "papelera"),
+                        sum(1 for op in hechas if op["accion"] == "papelera"))
+    return {"ok": True, "simulado": False, "operaciones": hechas, "errores": [e["error"] for e in errores][:50],
+            "resumen": resumen, "carpetas_borradas": borradas}
 
 
 def anotar_liberado(bytes_liberados, archivos):
@@ -2589,7 +2793,7 @@ def necesita_residente():
     ajustes = cargar_ajustes()
     if ajustes.get("detenido"):
         return False
-    if ajustes.get("acceso_red"):
+    if ajustes.get("acceso_red") or (ajustes.get("mapa_archivos") or {}).get("activo", True):
         return True
     if ajustes.get("icono_bandeja", True) and ES_WINDOWS:
         return True

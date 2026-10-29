@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import os
 import struct
 import sys
@@ -435,8 +436,7 @@ class PruebaVaciarYPlantillas(PruebaServicio):
         self.assertTrue(nucleo.cumple(contrato, os.path.join(self.origen, "Contratos_casa.pdf"), st, time.time()))
 
     def test_resumen_semanal(self):
-        if os.path.exists(nucleo.ARCHIVO_SISTEMA):
-            os.remove(nucleo.ARCHIVO_SISTEMA)
+        nucleo.borrar_json(nucleo.ARCHIVO_SISTEMA)
         ahora = time.time()
         self.assertFalse(nucleo.aviso_semanal(ahora - 8 * 86400))  # la primera vez solo empieza a contar
         nucleo.indexar({"nombre": "S"}, [{"accion": "mover", "origen": "/a/x.pdf", "destino": "/b/x.pdf"}])
@@ -639,6 +639,95 @@ class PruebaSeguridad(unittest.TestCase):
         nombres = [p["nombre"] for p in nucleo.plantillas_iniciales()]
         self.assertEqual(nombres, ["Ordenar Descargas", "Ordenar Documentos", "Ordenar Escritorio"])
         self.assertTrue(all(not p["activo"] for p in nucleo.plantillas_iniciales()))
+
+
+class PruebaBaseDeDatos(unittest.TestCase):
+    def test_estado_no_se_pisa(self):
+        # Dos procesos leen el estado a la vez y cada uno guarda lo suyo: no se borran entre sí.
+        a, b = nucleo.cargar_estado(), nucleo.cargar_estado()
+        a["servicioA"] = {"ultima": "1"}
+        nucleo.guardar_estado(a)
+        b["servicioB"] = {"ultima": "2"}
+        nucleo.guardar_estado(b)
+        e = nucleo.cargar_estado()
+        self.assertEqual(e["servicioA"]["ultima"], "1")
+        self.assertEqual(e["servicioB"]["ultima"], "2")
+        del e["servicioA"]
+        nucleo.guardar_estado(e)
+        self.assertNotIn("servicioA", nucleo.cargar_estado())
+
+    def test_migra_json_antiguo(self):
+        ruta = os.path.join(nucleo.DATOS, "prueba_migrar.json")
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump({"x": 1}, f)
+        self.assertEqual(nucleo.leer_json(ruta, {}), {"x": 1})
+        self.assertFalse(os.path.exists(ruta))
+        nucleo.escribir_json(ruta, {"x": 2})
+        self.assertEqual(nucleo.leer_json(ruta, {}), {"x": 2})
+
+    def test_movimientos_para_siempre(self):
+        antes = nucleo.bd.total_movimientos()
+        nucleo.indexar({"nombre": "S"}, [{"accion": "mover", "origen": "/a/Factura Agua.pdf", "destino": "/b/Factura Agua.pdf"}] * 3)
+        self.assertEqual(nucleo.bd.total_movimientos(), antes + 3)
+        r = nucleo.buscar_movidos("factura agua")
+        self.assertGreaterEqual(r["total"], 3)
+
+    def test_procesos(self):
+        with nucleo.proceso("Prueba larga"):
+            nucleo.avance(total=10, etapa="Contando")
+            nucleo.avance(sumar=4)
+            p = [x for x in nucleo.procesos() if x["nombre"] == "Prueba larga"][0]
+            self.assertEqual(p["estado"], "en marcha")
+        p = [x for x in nucleo.procesos() if x["nombre"] == "Prueba larga"][0]
+        self.assertEqual(p["estado"], "terminado")
+        self.assertEqual((p["hechos"], p["total"]), (4, 10))
+
+
+class PruebaCombinarYMapa(unittest.TestCase):
+    def escribir(self, ruta, contenido):
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "wb") as f:
+            f.write(contenido)
+
+    def test_combinar_carpetas(self):
+        raiz = tempfile.mkdtemp()
+        a, b = os.path.join(raiz, "Fotos"), os.path.join(raiz, "Fotos copia")
+        self.escribir(os.path.join(a, "1.jpg"), b"uno")
+        self.escribir(os.path.join(b, "1.jpg"), b"uno")          # igual: a la papelera
+        self.escribir(os.path.join(a, "2.jpg"), b"dos")
+        self.escribir(os.path.join(b, "2.jpg"), b"DOS distinto")  # distinto: 2 (1).jpg
+        self.escribir(os.path.join(b, "sub", "3.jpg"), b"tres")   # nuevo: se mueve con su carpeta
+        sim = nucleo.combinar_carpetas(a, b, simular=True)
+        self.assertEqual(sim["resumen"], {"mover": 2, "iguales": 1, "renombrados": 1, "bytes_liberados": 3})
+        self.assertTrue(os.path.exists(os.path.join(b, "1.jpg")))
+        res = nucleo.combinar_carpetas(a, b, simular=False)
+        self.assertTrue(res["ok"])
+        self.assertFalse(os.path.exists(b))
+        self.assertTrue(os.path.exists(os.path.join(a, "2 (1).jpg")))
+        self.assertTrue(os.path.exists(os.path.join(a, "sub", "3.jpg")))
+        r = nucleo.deshacer(nucleo.ID_COMBINAR)
+        self.assertTrue(r["ok"])
+        self.assertTrue(os.path.exists(os.path.join(b, "sub", "3.jpg")))
+        self.assertTrue(os.path.exists(os.path.join(b, "1.jpg")))
+
+    def test_mapa(self):
+        import mapa
+        raiz = tempfile.mkdtemp()
+        self.escribir(os.path.join(raiz, "docs", "Contrato renta.pdf"), b"x")
+        ajustes = nucleo.cargar_ajustes()
+        ajustes["mapa_archivos"] = {"activo": True, "carpetas": [raiz]}
+        nucleo.guardar_ajustes(ajustes)
+        self.assertTrue(mapa.escanear())
+        self.assertEqual(len(mapa.buscar("contrato")), 1)
+        # GESTOR lo mueve: el mapa lo sigue sin volver a recorrer.
+        nuevo = os.path.join(raiz, "Contratos", "Contrato renta.pdf")
+        nucleo.indexar({"nombre": "S"}, [{"accion": "mover", "origen": os.path.join(raiz, "docs", "Contrato renta.pdf"), "destino": nuevo}])
+        self.assertEqual(mapa.buscar("contrato")[0]["ruta"], nuevo)
+        os.remove(os.path.join(raiz, "docs", "Contrato renta.pdf"))
+        self.assertTrue(mapa.escanear())
+        self.assertEqual(mapa.buscar("contrato"), [])
+        ajustes["mapa_archivos"] = {"activo": False, "carpetas": []}
+        nucleo.guardar_ajustes(ajustes)
 
 
 if __name__ == "__main__":

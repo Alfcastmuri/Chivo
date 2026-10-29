@@ -4,3 +4,4 @@ pillow-heif==0.20.0    # fotos HEIC del iPhone
 pypdf==5.1.0           # reglas por contenido de PDF
 watchdog==6.0.0        # modo "al instante"
 pystray==0.19.5        # icono junto al reloj
+segno==1.6.1           # código QR para abrir el panel en el celular

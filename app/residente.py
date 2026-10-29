@@ -319,6 +319,8 @@ def main(args):
     vigilante = Vigilante()
     aprendiz = Aprendiz()
     en_red = PanelEnRed()
+    import mapa
+    vigia = mapa.Vigia()
     salir = threading.Event()
     bandeja = None
     if "--sin-icono" not in args and nucleo.cargar_ajustes().get("icono_bandeja", True):
@@ -342,6 +344,7 @@ def main(args):
                     vigilante.recargar()
                     aprendiz.recargar()
                     en_red.recargar()
+                    vigia.recargar()
                     if not nucleo.necesita_residente():
                         salir.set()
                         break
@@ -357,6 +360,7 @@ def main(args):
                             bandeja.actualizar()
                 vigilante.atender()
                 aprendiz.atender()
+                vigia.atender()
                 avisos, posicion = nucleo.leer_avisos_desde(posicion)
                 if bandeja:
                     for a in avisos[-3:]:
@@ -367,6 +371,7 @@ def main(args):
         vigilante.detener()
         aprendiz.detener()
         en_red.detener()
+        vigia.detener()
         if bandeja:
             bandeja.icono.stop()
 
