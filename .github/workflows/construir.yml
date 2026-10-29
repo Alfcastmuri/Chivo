@@ -90,16 +90,21 @@ jobs:
 
       - name: Probar el instalador (instalar y desinstalar en silencio)
         shell: pwsh
+        timeout-minutes: 10
         run: |
           $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-instalado"
-          $p = Start-Process -FilePath "salida\GESTOR-Instalador-$env:GESTOR_VERSION.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru -Wait
+          # Sin -Wait: esperaría también al icono de GESTOR que el instalador deja abierto.
+          $p = Start-Process -FilePath "salida\GESTOR-Instalador-$env:GESTOR_VERSION.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
+          $p.WaitForExit()
           if ($p.ExitCode -ne 0) { throw "La instalación falló ($($p.ExitCode))" }
           $app = "$env:LOCALAPPDATA\Programs\GESTOR"
           if (-not (Test-Path "$app\GESTOR.exe")) { throw "No se instaló GESTOR.exe" }
           if (-not (Test-Path "$app\instalador\GESTOR-Instalador.exe")) { throw "Falta la copia del instalador" }
           Get-Process GESTOR -ErrorAction SilentlyContinue | Stop-Process -Force
-          $p = Start-Process -FilePath "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -PassThru -Wait
-          Start-Sleep -Seconds 3
+          $p = Start-Process -FilePath "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -PassThru
+          $p.WaitForExit()
+          # El desinstalador se copia a TEMP y sigue desde ahí: se espera a que termine de borrar.
+          for ($i = 0; $i -lt 60 -and (Test-Path "$app\GESTOR.exe"); $i++) { Start-Sleep -Seconds 2 }
           if (Test-Path "$app\GESTOR.exe") { throw "La desinstalación no quitó GESTOR.exe" }
 
       - name: Comprimir
