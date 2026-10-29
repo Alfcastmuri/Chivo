@@ -14,7 +14,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --fondo: #15181e; --panel: #1e222a; --texto: #e7eaf0; --suave: #9aa3b2; --borde: #323844;
-    --acento: #5b93f0; --acento-texto: #0d1420; --acento-suave: #233149;
+    --acento: #5b93f0; --acento-texto: #ffffff; --acento-suave: #233149;
     --ok: #4cc27f; --ok-suave: #1d3328; --aviso: #e6a34a; --aviso-suave: #3a2e1b;
     --peligro: #ee6b6b; --peligro-suave: #3d2223; --sombra: none;
   }
@@ -1497,7 +1497,7 @@ const VARIABLES_CLASICAS = {
   claro: { "--fondo": "#f5f6f8", "--panel": "#ffffff", "--texto": "#1d2330", "--suave": "#6b7383", "--borde": "#dfe3ea",
     "--acento": "#2f6fde", "--acento-texto": "#ffffff", "--acento-suave": "#e8f0fd" },
   oscuro: { "--fondo": "#15181e", "--panel": "#1e222a", "--texto": "#e7eaf0", "--suave": "#9aa3b2", "--borde": "#323844",
-    "--acento": "#5b93f0", "--acento-texto": "#0d1420", "--acento-suave": "#233149" } };
+    "--acento": "#5b93f0", "--acento-texto": "#ffffff", "--acento-suave": "#233149" } };
 const GRUPOS_COLOR = [["Rojos", 0], ["Naranjas", 18], ["Amarillos", 42], ["Verdes", 72], ["Turquesas", 160], ["Azules", 195],
   ["Morados", 255], ["Rosas", 300], ["Rojos", 345]];
 
@@ -1533,7 +1533,8 @@ function variablesDe(colores, oscuro) {
     acento = hasta(acento, v["--panel"], 4, "#ffffff");
   }
   v["--acento"] = acento;
-  v["--acento-texto"] = contraste(acento, "#ffffff") >= contraste(acento, "#111111") ? "#ffffff" : "#111111";
+  // Blanco sobre cualquier acento medio u oscuro (el degradado de los botones aún lo oscurece); oscuro solo en acentos muy claros.
+  v["--acento-texto"] = contraste(acento, "#ffffff") >= 2.4 ? "#ffffff" : "#111111";
   v["--acento-suave"] = mezcla(acento, v["--panel"], oscuro ? .75 : .86);
   v["--borde"] = mezcla(v["--texto"], v["--panel"], oscuro ? .8 : .85);
   v["--suave"] = hasta(mezcla(v["--texto"], v["--panel"], .4), v["--panel"], 4.5, v["--texto"]);

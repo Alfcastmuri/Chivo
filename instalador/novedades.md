@@ -6,6 +6,7 @@
 - **Servicios en pestañas**: Carpetas, Cuándo, Reglas, Opciones e Historial.
 - **Tareas de un solo uso o repetitivas**: en «Cuándo» eliges «Repetir siempre» o «Solo una vez». Las de un solo uso se desactivan solas al terminar y quedan guardadas para reusarlas. También puedes programarlas para un día y hora concretos.
 - **Más gráficas en Inicio**: actividad de 30 días, archivos por tipo, por servicio, tendencia semanal y anillos de espacio en disco.
+- **Texto blanco sobre fondos oscuros**: botones, pestañas activas y tarjetas de color siempre se leen bien.
 - **El código QR para el celular ya se ve completo.**
 - **Icono propio de GESTOR** en el escritorio, el menú Inicio y junto al reloj.
 

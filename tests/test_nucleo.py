@@ -539,7 +539,8 @@ class PruebaCincoMas(PruebaServicio):
             with open(ruta, "wb") as f:
                 f.write(contenido)
         r = nucleo.aplanar(self.origen, simular=True)
-        self.assertEqual(len(r["operaciones"]), 4)
+        self.assertEqual(len(r["operaciones"]), 4, [(o["origen"], o.get("destino"), o.get("accion")) for o in r["operaciones"]]
+                         + r.get("errores", []) + r.get("avisos", []))
         r = nucleo.aplanar(self.origen, simular=False)
         self.assertEqual(len(r["errores"]), 0)
         self.assertEqual(sorted(n for n in os.listdir(self.origen) if os.path.isfile(os.path.join(self.origen, n))),
