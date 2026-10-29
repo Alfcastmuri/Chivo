@@ -189,7 +189,7 @@ $("#lista").addEventListener("click", e => {
 $("#btnNuevo").onclick = () => {
   if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
   abrir({ id: "", nombre: "Nuevo servicio", activo: false, origenes: [], subcarpetas: false,
-    horario: { tipo: "intervalo", cada: 8, unidad: "horas" }, conflicto: "renombrar", esperar_minutos: 10, ignorar: [],
+    horario: { tipo: "intervalo", cada: 8, unidad: "horas" }, conflicto: "renombrar", identicos: "papelera", esperar_minutos: 10, ignorar: [],
     reglas: [nuevaRegla()] });
   abiertas.add(actual.reglas[0]);
   pintarEditor();
@@ -241,6 +241,13 @@ function pintarEditor() {
         <select data-k="conflicto">
           ${[["renombrar", "Renombrar (archivo (1).pdf)"], ["saltar", "Dejarlo donde está"], ["reemplazar", "Reemplazar el existente"]]
             .map(([v, t]) => `<option value="${v}" ${s.conflicto === v ? "selected" : ""}>${t}</option>`).join("")}
+        </select></label>
+    </div>
+    <div class="fila">
+      <label>Si además es idéntico (mismo contenido):
+        <select data-k="identicos">
+          ${[["papelera", "No duplicar: enviar el nuevo a la papelera"], ["conflicto", "Tratarlo como arriba"]]
+            .map(([v, t]) => `<option value="${v}" ${(s.identicos || "papelera") === v ? "selected" : ""}>${t}</option>`).join("")}
         </select></label>
     </div>
     <div class="campo"><span>Ignorar archivos (patrones separados por coma, por ejemplo <code>*.ini, borrador*</code>)</span>
@@ -515,7 +522,7 @@ function pintarResultado(res, simulado) {
       <div class="aviso ${ops.length ? "okmsg" : ""}">${simulado ? `Se procesarían ${ops.length} archivos.` : `${ops.length} archivos procesados.`}${errores.length ? ` ${errores.length} con error.` : ""}</div>
       ${ops.length || errores.length ? `<div class="resultado"><table>
         <tr><th>Acción</th><th>Archivo</th><th>Destino</th></tr>
-        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.destino || "Papelera de reciclaje")}</td></tr>`).join("")}
+        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.destino || (o.identico_a ? `Papelera (idéntico a ${o.identico_a})` : "Papelera de reciclaje"))}</td></tr>`).join("")}
         ${errores.map(o => `<tr><td style="color:var(--peligro)">Error</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.error)}</td></tr>`).join("")}
       </table>${ops.length > 500 ? `<p class="ayuda">Y ${ops.length - 500} más…</p>` : ""}</div>` : ""}
     </section>`;

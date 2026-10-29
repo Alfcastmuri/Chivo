@@ -36,6 +36,9 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
 - **Horario:** cada N minutos, horas o días; ciertas horas todos los días; ciertos días de
   la semana o del mes; al iniciar sesión; o solo manual. Si el equipo estaba apagado,
   se ejecuta al encenderlo.
+- **Duplicados:** si en el destino ya hay un archivo con el mismo nombre y el mismo contenido
+  (se compara el tamaño y la huella SHA-256), el nuevo va a la papelera en lugar de crear
+  `archivo (1)`. Se puede desactivar por servicio.
 - **Seguridad:** espera a que un archivo lleve unos minutos sin cambios, ignora descargas a
   medias y accesos directos, nunca borra definitivamente, guarda un historial de cada
   ejecución y permite **deshacerla**.

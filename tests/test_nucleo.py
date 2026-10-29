@@ -93,6 +93,28 @@ class PruebaServicio(unittest.TestCase):
         self.assertEqual([os.path.basename(o["origen"]) for o in plan], ["a.pdf"])
 
 
+class PruebaIdenticos(PruebaServicio):
+    def test_identico_va_a_papelera_y_distinto_se_renombra(self):
+        os.makedirs(self.destino)
+        for nombre, contenido in (("igual.pdf", b"mismo"), ("distinto.pdf", b"viejo"), ("otro.pdf", b"aa")):
+            with open(os.path.join(self.destino, nombre), "wb") as f:
+                f.write(contenido)
+        with open(os.path.join(self.destino, "otro (1).pdf"), "wb") as f:
+            f.write(b"bb")
+        self.crear("igual.pdf", b"mismo")
+        self.crear("distinto.pdf", b"nuevo")
+        self.crear("otro.pdf", b"bb")
+        s = self.servicio([{"si": {}, "accion": "mover", "destino": self.destino}])
+        plan = {os.path.basename(o["origen"]): o for o in nucleo.planificar(s)[0]}
+        self.assertEqual(plan["igual.pdf"]["accion"], "papelera")
+        self.assertEqual(plan["otro.pdf"]["identico_a"], os.path.join(self.destino, "otro (1).pdf"))
+        self.assertEqual(plan["distinto.pdf"]["destino"], os.path.join(self.destino, "distinto (1).pdf"))
+
+        s["identicos"] = "conflicto"
+        plan = {os.path.basename(o["origen"]): o for o in nucleo.planificar(s)[0]}
+        self.assertEqual(plan["igual.pdf"]["destino"], os.path.join(self.destino, "igual (1).pdf"))
+
+
 class PruebaHorarios(unittest.TestCase):
     ahora = dt.datetime(2026, 10, 29, 10, 0)  # jueves
 

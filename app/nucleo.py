@@ -8,6 +8,7 @@ propio que entiende JPEG.
 import calendar
 import datetime as dt
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -205,7 +206,8 @@ def plantillas_iniciales():
         {
             "id": nuevo_id(), "nombre": "Ordenar Descargas", "activo": False,
             "origenes": [descargas], "subcarpetas": False, "horario": dict(horario),
-            "conflicto": "renombrar", "esperar_minutos": 10, "ignorar": [],
+            "conflicto": "renombrar", "identicos": "papelera",
+            "esperar_minutos": 10, "ignorar": [],
             "reglas": [
                 regla("Imágenes", os.path.join(imagenes, "{año}", "{mes}"), "captura"),
                 regla("Documentos", os.path.join(documentos, "Descargados", "{año}")),
@@ -220,7 +222,8 @@ def plantillas_iniciales():
         {
             "id": nuevo_id(), "nombre": "Ordenar Documentos", "activo": False,
             "origenes": [documentos], "subcarpetas": False, "horario": dict(horario),
-            "conflicto": "renombrar", "esperar_minutos": 30, "ignorar": [],
+            "conflicto": "renombrar", "identicos": "papelera",
+            "esperar_minutos": 30, "ignorar": [],
             "reglas": [
                 regla("Imágenes", os.path.join(imagenes, "{año}", "{mes}"), "captura"),
                 regla("Documentos", os.path.join(documentos, "{categoria}", "{año}")),
@@ -231,7 +234,8 @@ def plantillas_iniciales():
         {
             "id": nuevo_id(), "nombre": "Ordenar Escritorio", "activo": False,
             "origenes": [escritorio], "subcarpetas": False, "horario": dict(horario),
-            "conflicto": "renombrar", "esperar_minutos": 60, "ignorar": [],
+            "conflicto": "renombrar", "identicos": "papelera",
+            "esperar_minutos": 60, "ignorar": [],
             "reglas": [
                 regla("Imágenes", os.path.join(imagenes, "Escritorio", "{año}", "{mes}"), "captura"),
                 {"id": nuevo_id(), "si": {"antiguedad_mayor_dias": 7}, "accion": "mover",
@@ -534,6 +538,34 @@ def planificar(servicio, ahora=None):
     return plan, avisos
 
 
+def _huella(ruta):
+    h = hashlib.sha256()
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(bloque)
+    return h.digest()
+
+
+def _copia_identica(ruta, st, destino):
+    """Busca en el destino un archivo con el mismo nombre (o "nombre (N)") y el mismo contenido.
+
+    Primero compara el tamaño, que es gratis; la huella SHA-256 solo se calcula si coincide.
+    """
+    base, ext = os.path.splitext(destino)
+    candidato, i, huella = destino, 1, None
+    while os.path.exists(candidato):
+        try:
+            if os.path.getsize(candidato) == st.st_size:
+                huella = huella or _huella(ruta)
+                if _huella(candidato) == huella:
+                    return candidato
+        except OSError:
+            pass
+        candidato = f"{base} ({i}){ext}"
+        i += 1
+    return None
+
+
 def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
     accion = regla.get("accion", "mover")
     if accion == "papelera":
@@ -553,6 +585,13 @@ def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
     destino = os.path.join(carpeta, nombre)
     if _norm(destino) == _norm(ruta):
         return None
+    if os.path.exists(destino) and servicio.get("identicos", "papelera") == "papelera":
+        gemelo = _copia_identica(ruta, st, destino)
+        if gemelo:
+            if accion == "copiar":
+                return None  # la copia ya está en el destino
+            return {"accion": "papelera", "origen": ruta, "destino": "", "regla": regla.get("id"),
+                    "identico_a": gemelo}
     conflicto = servicio.get("conflicto", "renombrar")
     if os.path.exists(destino) or _norm(destino) in destinos_previstos:
         if conflicto == "saltar":
