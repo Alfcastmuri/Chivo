@@ -50,6 +50,7 @@ CATEGORIAS = {
     "Instaladores": [".exe", ".msi", ".msix", ".appx", ".bat", ".cmd"],
     "Código": [".py", ".js", ".ts", ".html", ".css", ".json", ".xml", ".java", ".c", ".cpp",
                ".cs", ".php", ".sql", ".ps1", ".sh", ".yml", ".yaml"],
+    "Accesos directos": [".lnk", ".url"],
 }
 
 # Archivos que ningún servicio toca: descargas a medias, accesos directos, archivos del sistema.
@@ -60,7 +61,13 @@ MESES = ["", "01-Enero", "02-Febrero", "03-Marzo", "04-Abril", "05-Mayo", "06-Ju
          "08-Agosto", "09-Septiembre", "10-Octubre", "11-Noviembre", "12-Diciembre"]
 
 AJUSTES_POR_DEFECTO = {"revisar_cada_minutos": 5, "pausado": False, "notificaciones": True,
-                       "icono_bandeja": True, "papelera": "gestor", "retencion_dias": 30, "copias": []}
+                       "icono_bandeja": True, "papelera": "gestor", "retencion_dias": 30, "copias": [],
+                       "mis_rfc": "", "umbral_disco": 10, "aviso_semanal": True,
+                       "no_molestar": {"bateria": True, "pantalla_completa": True,
+                                       "horas": False, "desde": "22:00", "hasta": "07:00"}}
+ARCHIVO_SISTEMA = os.path.join(DATOS, "sistema.json")  # avisos de disco, resumen semanal
+ARCHIVO_INDICE = os.path.join(DATOS, "indice.jsonl")   # a dónde fue cada archivo, para el buscador
+MAX_INDICE = 20 * 1024 * 1024
 ARCHIVO_PAPELERA = os.path.join(DATOS, "papelera.json")
 PUERTO_RESIDENTE = int(os.environ.get("GESTOR_PUERTO_RESIDENTE", "8766"))
 MAX_HECHOS = 5000
@@ -252,6 +259,27 @@ def plantillas_iniciales():
     ]
 
 
+def sin_tocar_acceso(funcion):
+    """Lo que GESTOR lee (contenido, EXIF, huellas) no cuenta como "usar" el archivo: se restaura su
+    último acceso, para que "sin usar en N días" no se reinicie solo porque GESTOR lo miró."""
+    @functools.wraps(funcion)
+    def envoltura(ruta, *args, **kwargs):
+        try:
+            antes = os.stat(ruta)
+        except OSError:
+            return funcion(ruta, *args, **kwargs)
+        try:
+            return funcion(ruta, *args, **kwargs)
+        finally:
+            try:
+                despues = os.stat(ruta)
+                if despues.st_atime_ns != antes.st_atime_ns and despues.st_mtime_ns == antes.st_mtime_ns:
+                    os.utime(ruta, ns=(antes.st_atime_ns, antes.st_mtime_ns))
+            except OSError:
+                pass
+    return envoltura
+
+
 # --------------------------------------------------------------------------- metadatos de fotos
 
 def _exif_jpeg(ruta):
@@ -321,6 +349,7 @@ def _parsear_fecha_exif(valor):
 
 
 @functools.lru_cache(maxsize=4096)
+@sin_tocar_acceso
 def _metadatos(ruta, _mtime):
     """Fecha de captura, marca y modelo de cámara. Usa Pillow si está instalado."""
     datos = {}
@@ -484,6 +513,7 @@ def pypdf_disponible():
 
 
 @functools.lru_cache(maxsize=1024)
+@sin_tocar_acceso
 def _texto(ruta, _mtime):
     extension = os.path.splitext(ruta)[1].lower()
     try:
@@ -528,9 +558,104 @@ def _contenido_cumple(c, ruta):
             return re.search(valor, texto, re.IGNORECASE) is not None
         except re.error:
             return False
-    # Varias palabras separadas por coma: tienen que aparecer todas.
-    texto = texto.lower()
-    return all(p.strip().lower() in texto for p in valor.split(",") if p.strip())
+    # Varias palabras separadas por coma: tienen que aparecer todas. Con "|", basta una.
+    texto = sin_acentos(texto.lower())
+    for grupo in valor.split(","):
+        opciones = [sin_acentos(p.strip().lower()) for p in grupo.split("|") if p.strip()]
+        if opciones and not any(o in texto for o in opciones):
+            return False
+    return True
+
+
+def dato_de_regla(regla, ruta):
+    """El dato que captura la expresión regular de contenido de la regla: el grupo "dato" o el primero."""
+    c = (regla or {}).get("si") or {}
+    if c.get("contenido_modo") != "regex" or not c.get("contenido_valor"):
+        return None
+    try:
+        m = re.search(c["contenido_valor"], texto_de(ruta), re.IGNORECASE)
+    except re.error:
+        return None
+    if not m:
+        return None
+    if "dato" in m.groupdict():
+        return (m.group("dato") or "").strip() or None
+    return (m.group(1) if m.groups() else m.group(0)).strip() or None
+
+
+# --------------------------------------------------------------------------- facturas (CFDI de México)
+
+_RFC = re.compile(r"\b([A-ZÑ&]{3,4})-?(\d{6})-?([A-Z\d]{3})\b")
+_PROVEEDOR = [
+    re.compile(r"(?:nombre|raz[oó]n social)\s*(?:del\s+)?emisor\s*[:\-]?\s*([^\n]{3,80})", re.IGNORECASE),
+    re.compile(r"emisor\s*[:\-]\s*([^\n]{3,80})", re.IGNORECASE),
+    re.compile(r"(?:nombre|raz[oó]n social)\s*[:\-]\s*([^\n]{3,80})", re.IGNORECASE),
+]
+_PALABRAS_FACTURA = ("folio fiscal", "cfdi", "comprobante fiscal", "factura")
+
+
+def sin_acentos(texto):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
+
+
+@sin_tocar_acceso
+def _cfdi_xml(ruta):
+    import xml.etree.ElementTree as ET
+    try:
+        raiz = ET.parse(ruta).getroot()
+    except (ET.ParseError, OSError):
+        return None
+    if not raiz.tag.endswith("Comprobante"):
+        return None
+    emisor = next((e for e in raiz if e.tag.endswith("Emisor")), None)
+    receptor = next((e for e in raiz if e.tag.endswith("Receptor")), None)
+    return {"es_factura": True,
+            "rfc": (emisor.get("Rfc") or emisor.get("rfc") or "") if emisor is not None else "",
+            "proveedor": (emisor.get("Nombre") or emisor.get("nombre") or "") if emisor is not None else "",
+            "rfc_receptor": (receptor.get("Rfc") or "") if receptor is not None else "",
+            "fecha": raiz.get("Fecha") or raiz.get("fecha") or ""}
+
+
+@functools.lru_cache(maxsize=1024)
+def _datos_factura(ruta, _mtime, mis_rfc):
+    extension = os.path.splitext(ruta)[1].lower()
+    vacio = {"es_factura": False, "rfc": "", "proveedor": "", "rfc_receptor": "", "fecha": ""}
+    if extension == ".xml":
+        return _cfdi_xml(ruta) or vacio
+    if extension != ".pdf":
+        return vacio
+    # El PDF de una factura suele ir acompañado de su XML con el mismo nombre.
+    for ext in (".xml", ".XML"):
+        gemelo = os.path.splitext(ruta)[0] + ext
+        if os.path.exists(gemelo):
+            datos = _cfdi_xml(gemelo)
+            if datos:
+                return datos
+    texto = texto_de(ruta)
+    plano = sin_acentos(texto.lower())
+    if not any(p in plano for p in _PALABRAS_FACTURA):
+        return vacio
+    rfcs = ["".join(m.groups()) for m in _RFC.finditer(texto.upper())]
+    ajenos = [r for r in rfcs if r not in mis_rfc]
+    proveedor = ""
+    for patron in _PROVEEDOR:
+        m = patron.search(texto)
+        if m:
+            proveedor = re.split(r"\s{2,}|\bRFC\b", m.group(1).strip(), flags=re.IGNORECASE)[0].strip(" :-,")
+            if proveedor:
+                break
+    return {"es_factura": True, "rfc": ajenos[0] if ajenos else (rfcs[0] if rfcs else ""),
+            "proveedor": proveedor, "rfc_receptor": "", "fecha": ""}
+
+
+def datos_factura(ruta):
+    """RFC y nombre del emisor de una factura (XML de CFDI, o PDF con su XML o con el texto)."""
+    mis_rfc = tuple(r.strip().upper() for r in str(cargar_ajustes().get("mis_rfc", "")).split(",") if r.strip())
+    try:
+        return _datos_factura(ruta, os.path.getmtime(ruta), mis_rfc)
+    except OSError:
+        return {"es_factura": False, "rfc": "", "proveedor": "", "rfc_receptor": "", "fecha": ""}
 
 
 # --------------------------------------------------------------------------- reglas
@@ -568,16 +693,16 @@ def cumple(condiciones, ruta, st, ahora):
     texto = c.get("nombre_valor")
     if texto:
         modo = c.get("nombre_modo", "contiene")
-        n, v = nombre.lower(), texto.lower()
-        if modo == "contiene" and v not in n:
+        n, v = sin_acentos(nombre.lower()), sin_acentos(texto.lower())
+        if modo == "contiene" and not any(p.strip() and p.strip() in n for p in v.split("|")):
             return False
         if modo == "empieza" and not n.startswith(v):
             return False
-        if modo == "termina" and not base.lower().endswith(v):
+        if modo == "termina" and not sin_acentos(base.lower()).endswith(v):
             return False
         if modo == "regex":
             try:
-                if not re.search(texto, nombre, re.IGNORECASE):
+                if not (re.search(texto, nombre, re.IGNORECASE) or re.search(texto, n, re.IGNORECASE)):
                     return False
             except re.error:
                 return False
@@ -591,14 +716,49 @@ def cumple(condiciones, ruta, st, ahora):
         return False
     if c.get("antiguedad_menor_dias") not in (None, "") and dias >= float(c["antiguedad_menor_dias"]):
         return False
+    if c.get("sin_uso_dias") not in (None, "") and (ahora - ultimo_uso(st)) / 86400 <= float(c["sin_uso_dias"]):
+        return False
+    if c.get("zip_descomprimido") and not zip_descomprimido(ruta):
+        return False
+    if c.get("factura") and not datos_factura(ruta)["es_factura"]:
+        return False
     return _contenido_cumple(c, ruta)  # lo más costoso, al final
+
+
+def llegada(st):
+    """Cuándo llegó el archivo a la carpeta: en Windows, su fecha de creación (la de la descarga)."""
+    nacimiento = getattr(st, "st_birthtime", None)
+    if nacimiento is None and ES_WINDOWS:
+        nacimiento = st.st_ctime
+    return nacimiento or st.st_mtime
+
+
+def ultimo_uso(st):
+    """Lo más reciente entre llegada, modificación y último acceso (abrirlo cuenta como usarlo)."""
+    return max(llegada(st), st.st_mtime, st.st_atime)
+
+
+def zip_descomprimido(ruta):
+    """Un .zip (o .rar, .7z) con una carpeta del mismo nombre al lado: ya se descomprimió."""
+    base, ext = os.path.splitext(ruta)
+    if ext.lower() not in (".zip", ".rar", ".7z"):
+        return False
+    return any(os.path.isdir(c) and _tiene_algo(c) for c in (base, base.rstrip(" ")))
+
+
+def _tiene_algo(carpeta):
+    try:
+        with os.scandir(carpeta) as it:
+            return any(True for _ in it)
+    except OSError:
+        return False
 
 
 def _limpiar_nombre(texto):
     return re.sub(r'[<>:"/\\|?*]', "_", texto).strip() or "_"
 
 
-def expandir(patron, ruta, origen, fecha):
+def expandir(patron, ruta, origen, fecha, regla=None):
     nombre = os.path.basename(ruta)
     base, extension = os.path.splitext(nombre)
     valores = {
@@ -613,6 +773,15 @@ def expandir(patron, ruta, origen, fecha):
     }
     if re.search(r"\{(procedencia|camara|sitio)\}", patron):
         valores.update(procedencia_de(ruta))
+    if re.search(r"\{(rfc|proveedor)\}", patron):
+        f = datos_factura(ruta)
+        valores["rfc"] = f["rfc"] or "Sin RFC"
+        valores["proveedor"] = (f["proveedor"] or f["rfc"] or "Proveedor desconocido").title() \
+            if f["proveedor"].isupper() else (f["proveedor"] or f["rfc"] or "Proveedor desconocido")
+    if "{tipo_acceso}" in patron:
+        valores["tipo_acceso"] = tipo_acceso(ruta)
+    if "{dato}" in patron:
+        valores["dato"] = dato_de_regla(regla, ruta) or "Sin dato"
 
     def sustituir(m):
         clave = m.group(1)
@@ -623,6 +792,62 @@ def expandir(patron, ruta, origen, fecha):
         return _limpiar_nombre(valores[clave])
 
     return re.sub(r"\{([a-zñ_]+)\}", sustituir, patron)
+
+
+_JUEGOS = ("steam", "epic games", "epicgames", "com.epicgames", "riot games", "battle.net", "ubisoft",
+           "ea games", "origin games", "gog galaxy", "xboxgames", "minecraft", "roblox", "rockstar")
+
+
+def destino_de_acceso(ruta):
+    """A qué apunta un acceso directo (.url: su dirección; .lnk: la ruta local guardada en él)."""
+    try:
+        if ruta.lower().endswith(".url"):
+            with open(ruta, encoding="utf-8", errors="ignore") as f:
+                for linea in f:
+                    if linea.strip().lower().startswith("url="):
+                        return linea.strip()[4:]
+            return ""
+        with open(ruta, "rb") as f:
+            d = f.read(64 * 1024)
+        if len(d) < 0x4C or d[:4] != b"\x4c\x00\x00\x00":
+            return ""
+        flags = struct.unpack_from("<I", d, 0x14)[0]
+        pos = 0x4C
+        if flags & 0x01:  # HasLinkTargetIDList
+            pos += 2 + struct.unpack_from("<H", d, pos)[0]
+        if not flags & 0x02:  # HasLinkInfo
+            return ""
+        inicio = pos
+        cabecera = struct.unpack_from("<I", d, inicio + 4)[0]
+        if cabecera >= 0x24:  # ruta en Unicode
+            off = struct.unpack_from("<I", d, inicio + 0x1C)[0]
+            fin = d.find(b"\x00\x00", inicio + off)
+            while fin != -1 and (fin - inicio - off) % 2:
+                fin = d.find(b"\x00\x00", fin + 1)
+            return d[inicio + off:fin].decode("utf-16-le", "ignore")
+        off = struct.unpack_from("<I", d, inicio + 0x10)[0]
+        return d[inicio + off:d.find(b"\x00", inicio + off)].decode("mbcs" if ES_WINDOWS else "latin-1", "ignore")
+    except (OSError, struct.error, ValueError, LookupError):
+        return ""
+
+
+def tipo_acceso(ruta):
+    """Programas, Juegos, Sitios web, Carpetas o Archivos, según a qué apunte el acceso directo."""
+    destino = destino_de_acceso(ruta)
+    d = destino.lower()
+    nombre = os.path.basename(ruta).lower()
+    if any(j in d or j in nombre for j in _JUEGOS) or d.startswith(("steam:", "com.epicgames", "uplay:")):
+        return "Juegos"
+    if d.startswith(("http:", "https:")):
+        return "Sitios web"
+    if ruta.lower().endswith(".url"):
+        return "Sitios web" if "://" in d else "Programas"
+    ext = os.path.splitext(d)[1]
+    if not d or ext in (".exe", ".msc", ".bat", ".cmd", ".appref-ms") or "\\program files" in d:
+        return "Programas"
+    if not ext:
+        return "Carpetas"
+    return "Archivos"
 
 
 def _raiz_fija(destino):
@@ -819,7 +1044,8 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
     ya_hechos son archivos que GESTOR ya renombró en su sitio, para no renombrarlos otra vez.
     """
     ahora = ahora or time.time()
-    ignorar = IGNORAR_SIEMPRE + [p for p in servicio.get("ignorar", []) if p]
+    ignorar = [p for p in IGNORAR_SIEMPRE if not (servicio.get("ordenar_accesos") and p in ("*.lnk", "*.url"))]
+    ignorar += [p for p in servicio.get("ignorar", []) if p]
     esperar = (float(servicio.get("esperar_minutos") or 0) * 60 if esperar_segundos is None
                else esperar_segundos)
     ya_hechos = ya_hechos or {}
@@ -842,6 +1068,7 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
             excluir.append(_norm(_raiz_fija((servicio.get("carpeta_duplicados") or os.path.join(
                 "{origen}", "Duplicados")).replace("{origen}", origen))))
         excluir = [e for e in excluir if e != _norm(origen)]
+        mantener = (servicio.get("carpeta_mantener") or "Mantener").strip().lower()
         for carpeta, subcarpetas, archivos in os.walk(origen):
             if not servicio.get("subcarpetas"):
                 subcarpetas[:] = []
@@ -849,28 +1076,158 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
                 subcarpetas[:] = [d for d in subcarpetas
                                   if not d.startswith(".")
                                   and not any(_dentro_de(os.path.join(carpeta, d), e) for e in excluir)]
-            for nombre in archivos:
-                if _ignorado(nombre, ignorar):
-                    continue
-                ruta = os.path.join(carpeta, nombre)
-                try:
-                    st = os.stat(ruta)
-                except OSError:
-                    continue
-                if ahora - st.st_mtime < esperar:
-                    continue
-                if ya_hechos.get(_norm(ruta)) == int(st.st_mtime):
-                    continue
-                for regla in reglas:
-                    if not cumple(regla.get("si"), ruta, st, ahora):
+            if servicio.get("subcarpetas"):
+                subcarpetas[:] = [d for d in subcarpetas if d.lower() != mantener]
+            juntos = servicio.get("mover_hermanos", True)
+            for grupo in _grupos(archivos, juntos):
+                listos = []
+                for nombre in grupo:
+                    if _ignorado(nombre, ignorar):
                         continue
-                    op = _operacion(regla, ruta, st, origen, servicio, destinos_previstos)
-                    if op:
-                        plan.append(op)
-                    break
+                    ruta = os.path.join(carpeta, nombre)
+                    try:
+                        st = os.stat(ruta)
+                    except OSError:
+                        continue
+                    if ahora - st.st_mtime < esperar:
+                        listos = None  # un hermano aún se está descargando: se espera a todo el grupo
+                        break
+                    if ya_hechos.get(_norm(ruta)) == int(st.st_mtime):
+                        continue
+                    listos.append((ruta, st))
+                if not listos:
+                    continue
+                restantes = list(listos)
+                while restantes:
+                    ruta, st = restantes.pop(0)
+                    op = _primera_regla(reglas, ruta, st, ahora, origen, servicio, destinos_previstos)
+                    if not op:
+                        continue
+                    plan.append(op)
+                    if juntos and len(listos) > 1 and op["accion"] != "papelera" and not op.get("duplicado"):
+                        for h_ruta, h_st in restantes:
+                            h = _operacion_hermana(op, h_ruta, h_st, servicio, destinos_previstos)
+                            if h:
+                                plan.append(h)
+                        restantes = []
+        plan.extend(_carpetas_viejas(servicio, origen, ahora, excluir, ignorar, mantener, destinos_previstos))
     return plan, avisos
 
 
+# Extensiones que acompañan a otro archivo: nunca mandan sobre a dónde va el grupo.
+_ACOMPANANTES = {".xml", ".xmp", ".aae", ".json", ".srt", ".vtt", ".sub", ".txt", ".nfo", ".thm",
+                 ".lrc", ".cue", ".md5", ".sha1", ".sfv", ".log", ".ini"}
+
+
+def _grupos(nombres, juntos):
+    """Agrupa archivos con el mismo nombre y distinta extensión (factura.pdf + factura.xml).
+
+    El principal va primero: el de una categoría "de verdad" antes que un acompañante.
+    """
+    if not juntos:
+        return [[n] for n in nombres]
+    grupos = {}
+    for n in nombres:
+        grupos.setdefault(os.path.splitext(n)[0].lower(), []).append(n)
+
+    def peso(n):
+        ext = os.path.splitext(n)[1].lower()
+        return (ext in _ACOMPANANTES, categoria_de(ext) == "Otros", n.lower())
+
+    return [sorted(g, key=peso) for g in grupos.values()]
+
+
+def _primera_regla(reglas, ruta, st, ahora, origen, servicio, destinos_previstos):
+    for regla in reglas:
+        if cumple(regla.get("si"), ruta, st, ahora):
+            return _operacion(regla, ruta, st, origen, servicio, destinos_previstos)
+    return None
+
+
+def _operacion_hermana(principal, ruta, st, servicio, destinos_previstos):
+    """El hermano sigue al principal: misma carpeta, mismo nombre nuevo, su propia extensión."""
+    if principal.get("duplicado"):
+        return None
+    extension = os.path.splitext(ruta)[1]
+    categoria = categoria_de(extension.lower())
+    base_op = {"origen": ruta, "regla": principal.get("regla"), "bytes": st.st_size,
+               "categoria": categoria, "hermano_de": principal["origen"]}
+    if principal["accion"] == "archivar":
+        return dict(base_op, accion="archivar", destino=principal["destino"])
+    base_nueva = os.path.splitext(os.path.basename(principal["destino"]))[0]
+    destino = os.path.join(os.path.dirname(principal["destino"]), base_nueva + extension)
+    if _norm(destino) == _norm(ruta):
+        return None
+    if os.path.exists(destino) or _norm(destino) in destinos_previstos:
+        if servicio.get("conflicto", "renombrar") == "saltar":
+            return None
+        b, e = os.path.splitext(destino)
+        i = 1
+        while os.path.exists(destino) or _norm(destino) in destinos_previstos:
+            destino = f"{b} ({i}){e}"
+            i += 1
+    destinos_previstos.add(_norm(destino))
+    return dict(base_op, accion=principal["accion"], destino=destino)
+
+
+def _tamano_carpeta(carpeta, limite=200_000):
+    total, vistos, reciente = 0, 0, 0.0
+    for raiz, _, archivos in os.walk(carpeta):
+        for n in archivos:
+            try:
+                st = os.stat(os.path.join(raiz, n))
+            except OSError:
+                continue
+            total += st.st_size
+            reciente = max(reciente, st.st_mtime)
+            vistos += 1
+            if vistos >= limite:
+                return total, reciente
+    return total, reciente
+
+
+def _carpetas_viejas(servicio, origen, ahora, excluir, ignorar, mantener, destinos_previstos):
+    """Mueve carpetas enteras del origen (por ejemplo un zip ya descomprimido) sin desarmarlas."""
+    conf = servicio.get("carpetas") or {}
+    if not conf.get("activo") or not conf.get("destino"):
+        return []
+    dias = float(conf.get("dias") or 0)
+    ops = []
+    try:
+        entradas = list(os.scandir(origen))
+    except OSError:
+        return []
+    for d in entradas:
+        nombre = d.name
+        if not d.is_dir(follow_symlinks=False) or nombre.startswith(".") or nombre.lower() == mantener:
+            continue
+        if _ignorado(nombre, ignorar) or any(_dentro_de(d.path, e) or _dentro_de(e, d.path) for e in excluir):
+            continue
+        try:
+            st = d.stat()
+        except OSError:
+            continue
+        total, reciente = _tamano_carpeta(d.path)
+        # Sin el último acceso de la carpeta: el propio GESTOR lo actualiza al recorrerla.
+        uso = max(llegada(st), st.st_mtime, reciente)
+        if (ahora - uso) / 86400 <= dias:
+            continue
+        fecha = dt.datetime.fromtimestamp(llegada(st))
+        carpeta = os.path.abspath(expandir(conf["destino"], d.path, origen, fecha))
+        destino = os.path.join(carpeta, nombre)
+        if _dentro_de(carpeta, d.path):
+            continue
+        i = 1
+        while os.path.exists(destino) or _norm(destino) in destinos_previstos:
+            destino = os.path.join(carpeta, f"{nombre} ({i})")
+            i += 1
+        destinos_previstos.add(_norm(destino))
+        ops.append({"accion": "mover", "origen": d.path, "destino": destino, "regla": "carpetas",
+                    "bytes": total, "categoria": "Carpetas", "carpeta": True})
+    return ops
+
+
+@sin_tocar_acceso
 def _huella(ruta):
     h = hashlib.sha256()
     with open(ruta, "rb") as f:
@@ -932,14 +1289,14 @@ def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
     categoria = categoria_de(os.path.splitext(ruta)[1].lower())
     if accion == "archivar":
         carpeta = os.path.abspath(expandir(regla.get("destino") or os.path.join("{origen}", "Archivados"),
-                                           ruta, origen, fecha))
+                                           ruta, origen, fecha, regla))
         zip_ruta = os.path.join(carpeta, f"Archivo {fecha:%Y-%m}.zip")
         return {"accion": "archivar", "origen": ruta, "destino": zip_ruta, "regla": regla.get("id"),
                 "bytes": st.st_size, "categoria": categoria}
     nombre = os.path.basename(ruta)
     extension = os.path.splitext(nombre)[1]
     if regla.get("nuevo_nombre"):
-        nombre = _limpiar_nombre(expandir(regla["nuevo_nombre"], ruta, origen, fecha)) + extension
+        nombre = _limpiar_nombre(expandir(regla["nuevo_nombre"], ruta, origen, fecha, regla)) + extension
     limpiado = False
     if servicio.get("limpiar_nombres") or servicio.get("fecha_al_inicio"):
         base = os.path.splitext(nombre)[0]
@@ -950,7 +1307,7 @@ def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
     if accion == "renombrar":
         carpeta = os.path.dirname(ruta)
     else:
-        carpeta = expandir(regla.get("destino", ""), ruta, origen, fecha)
+        carpeta = expandir(regla.get("destino", ""), ruta, origen, fecha, regla)
         if not carpeta:
             return None
         carpeta = os.path.abspath(carpeta)
@@ -1263,12 +1620,17 @@ class Bloqueo:
             pass
 
 
-def ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None):
+def ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None, aprobado=False):
+    """Ejecuta el servicio y lo anota todo. En modo prueba solo apunta lo que haría (salvo aprobado)."""
+    if servicio.get("modo_prueba") and not aprobado:
+        return proponer(servicio, motivo, esperar_segundos)
     with Bloqueo():
         estado = cargar_estado()
         e = estado.setdefault(servicio["id"], {})
         registro = ejecutar_servicio(servicio, esperar_segundos=esperar_segundos,
                                      ya_hechos=e.get("hechos"))
+        e.pop("propuestas", None)
+        indexar(servicio, registro["operaciones"])
         e["ultima"] = dt.datetime.now().isoformat(timespec="seconds")
         e["ultimo_resultado"] = {"movidos": len(registro["operaciones"]),
                                  "errores": len(registro["errores"]), "motivo": motivo}
@@ -1299,6 +1661,337 @@ def ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None):
         return registro
 
 
+def proponer(servicio, motivo="horario", esperar_segundos=None):
+    """Modo prueba: calcula lo que haría y lo guarda para aprobarlo desde el panel con un clic."""
+    plan, avisos = planificar(servicio, esperar_segundos=esperar_segundos)
+    estado = cargar_estado()
+    e = estado.setdefault(servicio["id"], {})
+    antes = (e.get("propuestas") or {}).get("n", 0)
+    e["ultima"] = dt.datetime.now().isoformat(timespec="seconds")
+    e["propuestas"] = {"fecha": e["ultima"], "n": len(plan), "operaciones": plan[:500], "avisos": avisos}
+    e["ultimo_resultado"] = {"movidos": 0, "errores": 0, "motivo": motivo, "propuestos": len(plan)}
+    guardar_estado(estado)
+    if plan and len(plan) != antes:
+        avisar(f'{servicio.get("nombre", "GESTOR")} (modo prueba)',
+               f"Propone {len(plan)} cambios. Revísalos y apruébalos en el panel.")
+    return {"simulado": True, "prueba": True, "operaciones": plan, "errores": [], "avisos": avisos}
+
+
+def aprobar_prueba(servicio_id):
+    """Ejecuta de verdad un servicio en modo prueba y lo saca del modo prueba."""
+    servicios = cargar_servicios()
+    servicio = next((s for s in servicios if s["id"] == servicio_id), None)
+    if not servicio:
+        raise ValueError("No existe ese servicio.")
+    servicio["modo_prueba"] = False
+    servicio["activo"] = True
+    guardar_servicios(servicios)
+    return ejecutar_y_anotar(servicio, motivo="aprobado", aprobado=True)
+
+
+def terminar_prueba(servicio_id, activar=True):
+    servicios = cargar_servicios()
+    for s in servicios:
+        if s["id"] == servicio_id:
+            s["modo_prueba"] = False
+            s["activo"] = bool(activar)
+    guardar_servicios(servicios)
+    estado = cargar_estado()
+    estado.get(servicio_id, {}).pop("propuestas", None)
+    guardar_estado(estado)
+
+
+# --------------------------------------------------------------------------- buscador: ¿a dónde fue?
+
+def indexar(servicio, operaciones):
+    if not operaciones:
+        return
+    t = time.time()
+    try:
+        if os.path.exists(ARCHIVO_INDICE) and os.path.getsize(ARCHIVO_INDICE) > MAX_INDICE:
+            with open(ARCHIVO_INDICE, "rb") as f:  # se queda con la mitad más reciente
+                f.seek(-MAX_INDICE // 2, os.SEEK_END)
+                resto = f.read().split(b"\n", 1)[-1]
+            with open(ARCHIVO_INDICE, "wb") as f:
+                f.write(resto)
+        with open(ARCHIVO_INDICE, "a", encoding="utf-8") as f:
+            for op in operaciones:
+                f.write(json.dumps({"t": t, "s": servicio.get("nombre", ""), "a": op["accion"],
+                                    "o": op["origen"], "d": op.get("destino", ""),
+                                    "z": op.get("nombre_en_zip"), "p": op.get("papelera_id"),
+                                    "c": op.get("carpeta", False), "b": op.get("bytes", 0)},
+                                   ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def _leer_indice():
+    try:
+        with open(ARCHIVO_INDICE, encoding="utf-8") as f:
+            for linea in f:
+                try:
+                    yield json.loads(linea)
+                except ValueError:
+                    continue
+    except OSError:
+        return
+
+
+def buscar_movidos(texto, desde=None, hasta=None, limite=200):
+    """Busca por nombre (sin importar acentos ni mayúsculas) en todo lo que GESTOR ha movido."""
+    palabras = [p for p in sin_acentos((texto or "").lower()).split() if p]
+    resultados = []
+    for r in _leer_indice():
+        if desde and r["t"] < desde:
+            continue
+        if hasta and r["t"] > hasta:
+            continue
+        nombres = sin_acentos((os.path.basename(r["o"]) + " " + os.path.basename(r["d"] or "")).lower())
+        if palabras and not all(p in nombres for p in palabras):
+            continue
+        resultados.append(r)
+    resultados.reverse()  # lo más reciente primero
+    salida = []
+    for r in resultados[:limite]:
+        donde = r["d"]
+        if r["a"] == "papelera":
+            existe = any(x["id"] == r.get("p") for x in listar_papelera())
+            estado = "en la papelera de GESTOR" if existe else "ya no está en la papelera"
+        elif r["a"] == "archivar":
+            estado = "dentro del ZIP" if os.path.exists(donde) else "el ZIP ya no está ahí"
+        else:
+            estado = "está ahí" if os.path.exists(donde) else "ya no está ahí (se movió o se deshizo)"
+        salida.append({"fecha": dt.datetime.fromtimestamp(r["t"]).isoformat(timespec="minutes"),
+                       "servicio": r["s"], "accion": r["a"], "origen": r["o"], "destino": donde,
+                       "en_zip": r.get("z"), "carpeta": r.get("c"), "estado": estado,
+                       "existe": os.path.exists(donde) if donde else False, "papelera_id": r.get("p")})
+    return {"resultados": salida, "total": len(resultados)}
+
+
+def abrir_en_explorador(ruta):
+    import subprocess
+    if not ruta or not os.path.exists(ruta):
+        carpeta = os.path.dirname(ruta or "")
+        if not os.path.isdir(carpeta):
+            raise ValueError("Ya no existe ni el archivo ni su carpeta.")
+        ruta = carpeta
+    if ES_WINDOWS:
+        subprocess.Popen(["explorer", "/select,", os.path.normpath(ruta)])
+    else:
+        subprocess.Popen(["xdg-open", os.path.dirname(ruta)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+# --------------------------------------------------------------------------- resumen semanal
+
+def cargar_sistema():
+    return leer_json(ARCHIVO_SISTEMA, {})
+
+
+def guardar_sistema(datos):
+    escribir_json(ARCHIVO_SISTEMA, datos)
+
+
+def resumen_semana(ahora=None):
+    ahora = ahora or time.time()
+    desde = ahora - 7 * 86400
+    por_servicio, movidos, a_papelera, bytes_papelera = {}, 0, 0, 0
+    for r in _leer_indice():
+        if r["t"] < desde:
+            continue
+        por_servicio[r["s"]] = por_servicio.get(r["s"], 0) + 1
+        if r["a"] == "papelera":
+            a_papelera += 1
+            bytes_papelera += r.get("b", 0)
+        else:
+            movidos += 1
+    return {"movidos": movidos, "papelera": a_papelera, "bytes_papelera": bytes_papelera,
+            "por_servicio": por_servicio}
+
+
+def aviso_semanal(ahora=None):
+    """Una vez por semana, un aviso con lo que se ordenó. Devuelve True si avisó."""
+    ahora = ahora or time.time()
+    if not cargar_ajustes().get("aviso_semanal", True):
+        return False
+    sistema = cargar_sistema()
+    ultimo = sistema.get("resumen_semanal")
+    if ultimo is None:
+        sistema["resumen_semanal"] = ahora  # la primera semana empieza a contar ahora
+        guardar_sistema(sistema)
+        return False
+    if ahora - ultimo < 7 * 86400:
+        return False
+    sistema["resumen_semanal"] = ahora
+    guardar_sistema(sistema)
+    r = resumen_semana(ahora)
+    if not r["movidos"] and not r["papelera"]:
+        return False
+    partes = [f'{r["movidos"]} archivos ordenados']
+    if r["papelera"]:
+        partes.append(f'{r["papelera"]} a la papelera ({tamano_legible(r["bytes_papelera"])} liberables)')
+    top = sorted(r["por_servicio"].items(), key=lambda x: -x[1])[:3]
+    texto = ", ".join(partes) + ". " + " · ".join(f"{n}: {c}" for n, c in top)
+    avisar("Resumen de la semana", texto)
+    return True
+
+
+def tamano_legible(b):
+    for unidad in ("B", "KB", "MB", "GB"):
+        if b < 1024:
+            return f"{b:.0f} {unidad}" if unidad == "B" else f"{b:.1f} {unidad}"
+        b /= 1024
+    return f"{b:.1f} TB"
+
+
+# --------------------------------------------------------------------------- espacio en disco
+
+def unidades_fijas():
+    """[{"letra", "total", "libre"}] de los discos con letra (o "/" fuera de Windows)."""
+    salida = []
+    if ES_WINDOWS:
+        import ctypes
+        mascara = ctypes.windll.kernel32.GetLogicalDrives()
+        for i in range(26):
+            if not mascara & (1 << i):
+                continue
+            raiz = f"{chr(65 + i)}:\\"
+            if ctypes.windll.kernel32.GetDriveTypeW(raiz) not in (2, 3):  # extraíble o fijo
+                continue
+            try:
+                u = shutil.disk_usage(raiz)
+            except OSError:
+                continue
+            salida.append({"letra": raiz[:2], "total": u.total, "libre": u.free})
+    else:
+        u = shutil.disk_usage(os.path.expanduser("~"))
+        salida.append({"letra": "/", "total": u.total, "libre": u.free})
+    return salida
+
+
+def revisar_disco(ahora=None):
+    """Avisa (como mucho una vez al día por disco) si queda menos espacio libre que el umbral."""
+    ahora = ahora or time.time()
+    umbral = float(cargar_ajustes().get("umbral_disco") or 0)
+    if umbral <= 0:
+        return []
+    sistema = cargar_sistema()
+    vistos = sistema.setdefault("aviso_disco", {})
+    avisados = []
+    for u in unidades_fijas():
+        if not u["total"]:
+            continue
+        pct = u["libre"] * 100 / u["total"]
+        if pct >= umbral or ahora - vistos.get(u["letra"], 0) < 86400:
+            continue
+        vistos[u["letra"]] = ahora
+        avisar(f'Queda poco espacio en {u["letra"]}',
+               f'Libre: {tamano_legible(u["libre"])} ({pct:.0f} %). Abre GESTOR > Espacio para ver qué liberar.')
+        avisados.append(u["letra"])
+    if avisados:
+        guardar_sistema(sistema)
+    return avisados
+
+
+def analizar_espacio(min_mb=50, maximo=100, limite_archivos=300_000):
+    """Sugerencias para liberar espacio en las carpetas del usuario."""
+    carpetas = carpetas_rapidas()
+    grandes, instaladores, viejos_descargas = [], [], []
+    ahora = time.time()
+    descargas = _norm(carpetas["Descargas"])
+    vistos = 0
+    for nombre, raiz in carpetas.items():
+        if not os.path.isdir(raiz):
+            continue
+        for carpeta, subcarpetas, archivos in os.walk(raiz):
+            subcarpetas[:] = [d for d in subcarpetas if not d.startswith(".") and d.lower() != "appdata"]
+            for n in archivos:
+                vistos += 1
+                if vistos > limite_archivos:
+                    break
+                ruta = os.path.join(carpeta, n)
+                try:
+                    st = os.stat(ruta)
+                except OSError:
+                    continue
+                fila = {"ruta": ruta, "bytes": st.st_size,
+                        "dias": int((ahora - ultimo_uso(st)) / 86400)}
+                if st.st_size >= min_mb * 1024 * 1024:
+                    grandes.append(fila)
+                if _dentro_de(ruta, descargas):
+                    ext = os.path.splitext(n)[1].lower()
+                    if categoria_de(ext) == "Instaladores" or zip_descomprimido(ruta):
+                        instaladores.append(fila)
+                    elif fila["dias"] > 90:
+                        viejos_descargas.append(fila)
+    grandes.sort(key=lambda f: -f["bytes"])
+    papelera = listar_papelera()
+    return {
+        "discos": unidades_fijas(),
+        "umbral": cargar_ajustes().get("umbral_disco", 10),
+        "grandes": grandes[:maximo],
+        "instaladores": sorted(instaladores, key=lambda f: -f["bytes"])[:maximo],
+        "viejos_descargas": sorted(viejos_descargas, key=lambda f: -f["bytes"])[:maximo],
+        "papelera": {"n": len(papelera), "bytes": sum(p.get("bytes", 0) for p in papelera)},
+        "incompleto": vistos > limite_archivos,
+    }
+
+
+# --------------------------------------------------------------------------- no molestar
+
+def _con_bateria():
+    if not ES_WINDOWS:
+        return False
+    import ctypes
+
+    class SYSTEM_POWER_STATUS(ctypes.Structure):
+        _fields_ = [("ACLineStatus", ctypes.c_ubyte), ("BatteryFlag", ctypes.c_ubyte),
+                    ("BatteryLifePercent", ctypes.c_ubyte), ("SystemStatusFlag", ctypes.c_ubyte),
+                    ("BatteryLifeTime", ctypes.c_ulong), ("BatteryFullLifeTime", ctypes.c_ulong)]
+
+    s = SYSTEM_POWER_STATUS()
+    if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(s)):
+        return False
+    return s.ACLineStatus == 0 and s.BatteryFlag != 128  # desenchufado y con batería
+
+
+def _pantalla_ocupada():
+    """Juego, vídeo o presentación a pantalla completa (lo mismo que usa Windows para callar avisos)."""
+    if not ES_WINDOWS:
+        return False
+    import ctypes
+    estado = ctypes.c_int(0)
+    try:
+        if ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(estado)) != 0:
+            return False
+    except (AttributeError, OSError):
+        return False
+    return estado.value in (2, 3, 4)  # ocupado, Direct3D a pantalla completa, modo presentación
+
+
+def _en_horas(desde, hasta, ahora):
+    def minutos(t):
+        h, m = (t or "0:0").split(":")[:2]
+        return int(h) * 60 + int(m)
+    a, b, n = minutos(desde), minutos(hasta), ahora.hour * 60 + ahora.minute
+    return a <= n < b if a <= b else (n >= a or n < b)
+
+
+def motivo_no_molestar(ahora=None):
+    """Texto con el motivo por el que ahora no conviene ordenar, o None. Lo pendiente se hace después."""
+    nm = cargar_ajustes().get("no_molestar") or {}
+    ahora = ahora or dt.datetime.now()
+    try:
+        if nm.get("horas") and _en_horas(nm.get("desde"), nm.get("hasta"), ahora):
+            return f'horario de no molestar ({nm.get("desde")}–{nm.get("hasta")})'
+        if nm.get("bateria") and _con_bateria():
+            return "el equipo funciona con batería"
+        if nm.get("pantalla_completa") and _pantalla_ocupada():
+            return "hay un juego, vídeo o presentación a pantalla completa"
+    except Exception:
+        return None
+    return None
+
+
 def anotar_totales(estado_servicio, operaciones):
     t = estado_servicio.setdefault("totales", {"archivos": 0, "bytes_ordenados": 0,
                                                "bytes_liberados": 0, "por_categoria": {},
@@ -1317,6 +2010,7 @@ def anotar_totales(estado_servicio, operaciones):
 
 # --------------------------------------------------------------------------- duplicados en todo el disco
 
+@sin_tocar_acceso
 def _huella_parcial(ruta, tam=64 * 1024):
     h = hashlib.sha256()
     with open(ruta, "rb") as f:
@@ -1618,7 +2312,7 @@ def _nombre_amigable(carpeta):
 def crear_desde_asistente(carpeta, reglas, limpiar=False):
     servicio = {
         "id": nuevo_id(), "nombre": f"Ordenar {_nombre_amigable(carpeta)}",
-        "activo": False, "origenes": [carpeta], "subcarpetas": False,
+        "activo": True, "modo_prueba": True, "origenes": [carpeta], "subcarpetas": False,
         "horario": {"tipo": "intervalo", "cada": 8, "unidad": "horas"},
         "conflicto": "renombrar", "identicos": "papelera", "fecha_captura_fotos": True,
         "limpiar_nombres": bool(limpiar), "fecha_al_inicio": False, "borrar_carpetas_vacias": False,

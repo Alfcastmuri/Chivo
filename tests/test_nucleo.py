@@ -295,7 +295,7 @@ class PruebaFunciones(PruebaServicio):
         self.assertEqual(claves, ["whatsapp", "capturas", "instaladores"])
         self.assertEqual(analisis["copias"], 1)
         servicio = nucleo.crear_desde_asistente(self.origen, [s["regla"] for s in analisis["sugerencias"]], True)
-        self.assertFalse(servicio["activo"])
+        self.assertTrue(servicio["activo"] and servicio["modo_prueba"])
         self.assertEqual(len(nucleo.planificar(servicio)[0]), 3)
 
     def test_copia_incremental(self):
@@ -314,6 +314,134 @@ class PruebaFunciones(PruebaServicio):
 
 
 @unittest.skipUnless(__import__("importlib").util.find_spec("watchdog"), "watchdog no instalado")
+class PruebaVaciarYPlantillas(PruebaServicio):
+    def viejo(self, ruta, dias):
+        t = time.time() - dias * 86400
+        os.utime(ruta, (t, t))
+
+    def test_hermanos_se_mueven_juntos(self):
+        self.crear("factura A1.pdf")
+        self.crear("factura A1.xml")
+        self.crear("otra.xml")
+        regla = {"id": "r", "si": {"categorias": ["Documentos"]}, "accion": "mover", "destino": self.destino}
+        plan, _ = nucleo.planificar(self.servicio([regla]))
+        self.assertEqual(sorted(os.path.basename(o["destino"]) for o in plan), ["factura A1.pdf", "factura A1.xml"])
+        plan, _ = nucleo.planificar(self.servicio([regla], mover_hermanos=False))
+        self.assertEqual([os.path.basename(o["destino"]) for o in plan], ["factura A1.pdf"])
+        # El hermano toma el nombre nuevo del principal si hay conflicto.
+        os.makedirs(self.destino)
+        open(os.path.join(self.destino, "factura A1.pdf"), "w").close()
+        plan, _ = nucleo.planificar(self.servicio([regla], identicos="conflicto"))
+        self.assertEqual(sorted(os.path.basename(o["destino"]) for o in plan),
+                         ["factura A1 (1).pdf", "factura A1 (1).xml"])
+
+    def test_carpetas_viejas_y_mantener(self):
+        for nombre, dias in (("proyecto", 20), ("nueva", 1), ("Mantener", 40)):
+            os.makedirs(os.path.join(self.origen, nombre))
+            ruta = os.path.join(self.origen, nombre, "a.txt")
+            open(ruta, "w").close()
+            self.viejo(ruta, dias)
+            self.viejo(os.path.join(self.origen, nombre), dias)
+        s = self.servicio([], carpetas={"activo": True, "dias": 14, "destino": os.path.join(self.destino, "{año}")})
+        plan, _ = nucleo.planificar(s, ahora=time.time())
+        self.assertEqual([os.path.basename(o["origen"]) for o in plan], ["proyecto"])
+        if not nucleo.ES_WINDOWS:  # en Linux la llegada es la modificación: se puede simular
+            registro = nucleo.ejecutar_servicio(s)
+            self.assertTrue(os.path.isfile(os.path.join(plan[0]["destino"], "a.txt")))
+            self.assertTrue(nucleo.deshacer(s["id"])["ok"] or registro)
+
+    def test_sin_uso_y_zip_descomprimido(self):
+        z = self.crear("fotos.zip")
+        os.makedirs(os.path.join(self.origen, "fotos"))
+        open(os.path.join(self.origen, "fotos", "1.jpg"), "w").close()
+        self.crear("suelto.zip")
+        self.assertTrue(nucleo.zip_descomprimido(z))
+        self.assertFalse(nucleo.zip_descomprimido(os.path.join(self.origen, "suelto.zip")))
+        viejo = self.crear("viejo.pdf")
+        self.viejo(viejo, 20)
+        st = os.stat(viejo)
+        if not nucleo.ES_WINDOWS:
+            self.assertTrue(nucleo.cumple({"sin_uso_dias": 14}, viejo, st, time.time()))
+        self.assertFalse(nucleo.cumple({"sin_uso_dias": 14}, z, os.stat(z), time.time()))
+
+    def test_modo_prueba_aprobar_y_buscar(self):
+        self.crear("contrato renta.pdf")
+        regla = {"id": "r", "si": {"categorias": ["Documentos"]}, "accion": "mover", "destino": self.destino}
+        s = self.servicio([regla], modo_prueba=True)
+        nucleo.guardar_servicios([s])
+        r = nucleo.ejecutar_y_anotar(s, motivo="horario")
+        self.assertTrue(r["prueba"])
+        self.assertTrue(os.path.exists(os.path.join(self.origen, "contrato renta.pdf")))
+        self.assertEqual(nucleo.cargar_estado()[s["id"]]["propuestas"]["n"], 1)
+        r = nucleo.aprobar_prueba(s["id"])
+        self.assertEqual(len(r["operaciones"]), 1)
+        self.assertFalse(nucleo.cargar_servicios()[0]["modo_prueba"])
+        encontrados = nucleo.buscar_movidos("CONTRATO")["resultados"]
+        self.assertEqual(encontrados[0]["destino"], os.path.join(self.destino, "contrato renta.pdf"))
+        self.assertTrue(encontrados[0]["existe"])
+        self.assertEqual(nucleo.buscar_movidos("nada parecido")["total"], 0)
+
+    def test_accesos_directos(self):
+        juego = self.crear("Juego.url", b"[InternetShortcut]\r\nURL=steam://rungameid/123\r\n")
+        web = self.crear("Banco.url", b"[InternetShortcut]\r\nURL=https://banco.example\r\n")
+        self.assertEqual(nucleo.tipo_acceso(juego), "Juegos")
+        self.assertEqual(nucleo.tipo_acceso(web), "Sitios web")
+        regla = {"id": "r", "si": {"categorias": ["Accesos directos"]}, "accion": "mover",
+                 "destino": os.path.join(self.origen, "Accesos directos", "{tipo_acceso}")}
+        self.assertEqual(nucleo.planificar(self.servicio([regla]))[0], [])  # ignorados por defecto
+        plan, _ = nucleo.planificar(self.servicio([regla], ordenar_accesos=True))
+        self.assertEqual(sorted(os.path.basename(os.path.dirname(o["destino"])) for o in plan),
+                         ["Juegos", "Sitios web"])
+
+    def test_leer_no_cuenta_como_usar(self):
+        ruta = self.crear("notas.txt", b"hola")
+        self.viejo(ruta, 20)
+        antes = os.stat(ruta).st_atime
+        nucleo.texto_de(ruta)
+        nucleo._huella(ruta)
+        self.assertAlmostEqual(os.stat(ruta).st_atime, antes, delta=1)
+
+    def test_no_molestar_horas(self):
+        self.assertTrue(nucleo._en_horas("22:00", "07:00", dt.datetime(2024, 1, 1, 23, 30)))
+        self.assertTrue(nucleo._en_horas("22:00", "07:00", dt.datetime(2024, 1, 1, 6, 59)))
+        self.assertFalse(nucleo._en_horas("22:00", "07:00", dt.datetime(2024, 1, 1, 12, 0)))
+        self.assertTrue(nucleo._en_horas("09:00", "17:00", dt.datetime(2024, 1, 1, 12, 0)))
+
+    def test_plantilla_documentos_usa_carpetas_existentes(self):
+        import plantillas
+        docs = os.path.join(self.raiz, "Documentos")
+        for d in ("01 - Facturas", "Contratos", "Mi Coche", "Viajes 2024", "My Games"):
+            os.makedirs(os.path.join(docs, d))
+        open(os.path.join(docs, "My Games", "partida.sav"), "w").close()
+        tipos, otras = plantillas.mapa_documentos(docs)
+        self.assertEqual(os.path.basename(tipos["facturas"]), "01 - Facturas")
+        self.assertEqual(os.path.basename(tipos["contratos"]), "Contratos")
+        self.assertEqual(sorted(os.path.basename(o) for o in otras), ["Mi Coche", "Viajes 2024"])
+        reglas = plantillas.reglas_documentos(docs)
+        destinos = {e["regla"]["destino"] for e in reglas if e["marcada"]}
+        self.assertIn(os.path.join(docs, "01 - Facturas", "{proveedor}", "{año}"), destinos)
+        self.assertFalse(any("Games" in d for d in destinos))
+        # Solo crea dentro de Documentos, y desmarcado.
+        nuevas = [e for e in plantillas.reglas_documentos(docs, crear_faltantes=True) if not e["marcada"]]
+        self.assertTrue(nuevas and all(e["regla"]["destino"].startswith(docs) for e in nuevas))
+        # Palabras enteras: «ine» no casa con «online».
+        contrato = {"nombre_modo": "regex", "nombre_valor": plantillas.patron("ine|contrato")}
+        st = os.stat(self.crear("online.pdf"))
+        self.assertFalse(nucleo.cumple(contrato, os.path.join(self.origen, "online.pdf"), st, time.time()))
+        st = os.stat(self.crear("Contratos_casa.pdf"))
+        self.assertTrue(nucleo.cumple(contrato, os.path.join(self.origen, "Contratos_casa.pdf"), st, time.time()))
+
+    def test_resumen_semanal(self):
+        if os.path.exists(nucleo.ARCHIVO_SISTEMA):
+            os.remove(nucleo.ARCHIVO_SISTEMA)
+        ahora = time.time()
+        self.assertFalse(nucleo.aviso_semanal(ahora - 8 * 86400))  # la primera vez solo empieza a contar
+        nucleo.indexar({"nombre": "S"}, [{"accion": "mover", "origen": "/a/x.pdf", "destino": "/b/x.pdf"}])
+        self.assertGreaterEqual(nucleo.resumen_semana(ahora + 1)["por_servicio"].get("S", 0), 1)
+        self.assertTrue(nucleo.aviso_semanal(ahora + 1))
+        self.assertFalse(nucleo.aviso_semanal(ahora + 2))  # una vez por semana
+
+
 class PruebaAlInstante(PruebaServicio):
     def test_ordena_al_aparecer_un_archivo(self):
         import residente

@@ -19,6 +19,7 @@ from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 
 import nucleo
+import plantillas
 
 PUERTO = int(os.environ.get("GESTOR_PUERTO", "8765"))
 TOKEN = secrets.token_urlsafe(24)
@@ -151,7 +152,8 @@ def servicios_con_estado():
         e = estado.get(s["id"], {})
         resultado.append({"servicio": s, "ultima": e.get("ultima"),
                           "ultimo_resultado": e.get("ultimo_resultado"),
-                          "proxima": nucleo.proxima_ejecucion(s, e)})
+                          "proxima": nucleo.proxima_ejecucion(s, e),
+                          "propuestas": e.get("propuestas") if s.get("modo_prueba") else None})
     return resultado
 
 
@@ -334,6 +336,19 @@ class Manejador(BaseHTTPRequestHandler):
                 ajustes["papelera"] = datos["papelera"]
             if "retencion_dias" in datos:
                 ajustes["retencion_dias"] = max(1, min(365, int(datos["retencion_dias"])))
+            if "mis_rfc" in datos:
+                ajustes["mis_rfc"] = str(datos["mis_rfc"]).upper()
+            if "umbral_disco" in datos:
+                ajustes["umbral_disco"] = max(0, min(50, int(datos["umbral_disco"])))
+            if "aviso_semanal" in datos:
+                ajustes["aviso_semanal"] = bool(datos["aviso_semanal"])
+            if isinstance(datos.get("no_molestar"), dict):
+                nm = datos["no_molestar"]
+                ajustes["no_molestar"] = {"bateria": bool(nm.get("bateria")),
+                                          "pantalla_completa": bool(nm.get("pantalla_completa")),
+                                          "horas": bool(nm.get("horas")),
+                                          "desde": str(nm.get("desde") or "22:00")[:5],
+                                          "hasta": str(nm.get("hasta") or "07:00")[:5]}
             if "asistente_visto" in datos:
                 ajustes["asistente_visto"] = True
             nucleo.guardar_ajustes(ajustes)
@@ -394,6 +409,48 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/copias/ejecutar":
             copia = next(c for c in nucleo.cargar_ajustes().get("copias", []) if c["id"] == datos["id"])
             return nucleo.ejecutar_copia(copia)
+        if ruta == "/api/plantillas":
+            return {"plantillas": plantillas.catalogo(int(datos.get("dias") or 14)),
+                    "documentos": plantillas.mapa_documentos()[0]}
+        if ruta == "/api/plantillas/crear":
+            servicio = plantillas.crear(datos["clave"], datos.get("indices"), datos.get("origenes"),
+                                        int(datos.get("dias") or 14), datos.get("modo_prueba", True))
+            nucleo.lanzar_residente()
+            return {"ok": True, "id": servicio["id"], "servicios": servicios_con_estado()}
+        if ruta == "/api/prueba/aprobar":
+            registro = nucleo.aprobar_prueba(datos["id"])
+            return {"registro": registro, "servicios": servicios_con_estado()}
+        if ruta == "/api/prueba/terminar":
+            nucleo.terminar_prueba(datos["id"], datos.get("activar", True))
+            return {"ok": True, "servicios": servicios_con_estado()}
+        if ruta == "/api/prueba/revisar":
+            servicio = next(s for s in nucleo.cargar_servicios() if s["id"] == datos["id"])
+            nucleo.proponer(servicio, motivo="desde el panel")
+            return {"servicios": servicios_con_estado()}
+        if ruta == "/api/buscar":
+            return nucleo.buscar_movidos(datos.get("texto", ""), datos.get("desde"), datos.get("hasta"))
+        if ruta == "/api/abrir":
+            nucleo.abrir_en_explorador(datos.get("ruta", ""))
+            return {"ok": True}
+        if ruta == "/api/espacio":
+            return nucleo.analizar_espacio(int(datos.get("min_mb") or 50))
+        if ruta == "/api/espacio/papelera":
+            rutas = set(datos.get("rutas") or [])
+            permitidas = [os.path.normpath(p) for p in nucleo.carpetas_rapidas().values()]
+            hechos, errores, liberado = 0, [], 0
+            for r in rutas:
+                if not any(nucleo._dentro_de(r, c) for c in permitidas) or not os.path.isfile(r):
+                    errores.append(f"{r}: fuera de tus carpetas")
+                    continue
+                try:
+                    tam = os.path.getsize(r)
+                    nucleo.quitar(r, "liberar espacio")
+                    hechos += 1
+                    liberado += tam
+                except Exception as e:
+                    errores.append(f"{r}: {e}")
+            nucleo.anotar_liberado(liberado, hechos)
+            return {"ok": True, "hechos": hechos, "errores": errores, "liberado": liberado}
         if ruta == "/api/asistente/analizar":
             return nucleo.analizar_carpeta(datos.get("carpeta") or nucleo.carpeta_conocida("Descargas"))
         if ruta == "/api/asistente/crear":

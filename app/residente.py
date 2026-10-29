@@ -91,8 +91,10 @@ class Vigilante:
             self.observador = None
 
     def atender(self):
-        if nucleo.cargar_ajustes().get("pausado"):
+        if not self.pendientes:
             return
+        if nucleo.cargar_ajustes().get("pausado") or nucleo.motivo_no_molestar():
+            return  # se queda pendiente y se ordena cuando deje de molestar
         ahora = time.time()
         with self.candado:
             listos = [sid for sid, t in self.pendientes.items() if ahora - t >= QUIETUD_SEGUNDOS]

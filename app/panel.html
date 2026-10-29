@@ -114,7 +114,10 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   <h1>GESTOR</h1>
   <nav class="pestanas" id="pestanas">
     <button data-vista="Servicios" class="on">Servicios</button>
+    <button data-vista="Plantillas">Plantillas</button>
     <button data-vista="Asistente">Asistente</button>
+    <button data-vista="Buscar">Buscar</button>
+    <button data-vista="Espacio">Espacio</button>
     <button data-vista="Duplicados">Duplicados</button>
     <button data-vista="Papelera">Papelera</button>
     <button data-vista="Copias">Copias a USB</button>
@@ -135,6 +138,9 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   </div>
   <div class="caja editor" id="editor"><div class="vacio">Elige un servicio o crea uno nuevo.</div></div>
 </main>
+<main class="vista simple" id="vistaPlantillas"><div class="caja editor" id="plantillas"></div></main>
+<main class="vista simple" id="vistaBuscar"><div class="caja editor" id="buscar"></div></main>
+<main class="vista simple" id="vistaEspacio"><div class="caja editor" id="espacio"></div></main>
 <main class="vista simple" id="vistaAsistente"><div class="caja editor" id="asistente"></div></main>
 <main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
 <main class="vista simple" id="vistaPapelera"><div class="caja editor" id="papelera"></div></main>
@@ -159,7 +165,17 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
     <div class="fila"><label>Lo que GESTOR quita va a
       <select id="prefPapelera"><option value="gestor">la papelera de GESTOR</option><option value="windows">la papelera de Windows</option></select></label>
       <label>y se guarda <input type="number" id="prefRetencion" min="1" max="365"> días</label></div>
+    <div class="fila"><label><input type="checkbox" id="prefSemanal"> Aviso semanal con lo que se ordenó</label>
+      <label>Avisar si un disco tiene menos de <input type="number" id="prefUmbral" min="0" max="50"> % libre (0 = nunca)</label></div>
     <div id="prefDependencias" class="ayuda"></div>
+    <h2 style="margin-top:22px">No molestar</h2>
+    <p class="ayuda">Mientras se cumpla algo de esto, los servicios automáticos esperan; lo pendiente se ordena después. "Ejecutar ahora" funciona siempre.</p>
+    <div class="fila"><label><input type="checkbox" id="nmBateria"> Con el portátil en batería</label>
+      <label><input type="checkbox" id="nmPantalla"> Con un juego, vídeo o presentación a pantalla completa</label></div>
+    <div class="fila"><label><input type="checkbox" id="nmHoras"> Entre las</label> <input type="time" id="nmDesde"> <label>y las</label> <input type="time" id="nmHasta"></div>
+    <h2 style="margin-top:22px">Facturas</h2>
+    <div class="campo"><span>Tus RFC (separados por coma). Se ignoran al buscar el proveedor de una factura, para no tomar el tuyo.</span>
+      <input type="text" id="prefRfc" placeholder="XAXX010101000"></div>
     <h2 style="margin-top:22px">Copia de la configuración</h2>
     <div class="fila">
       <button id="btnExportar">Exportar servicios y ajustes</button>
@@ -182,7 +198,7 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <script>
 const TOKEN = "__TOKEN__";
 const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
-const VARIABLES = ["{categoria}", "{procedencia}", "{camara}", "{sitio}", "{extension}", "{año}", "{mes}", "{mes_num}", "{dia}", "{nombre}", "{carpeta_origen}", "{origen}"];
+const VARIABLES = ["{categoria}", "{procedencia}", "{camara}", "{sitio}", "{proveedor}", "{rfc}", "{dato}", "{tipo_acceso}", "{extension}", "{año}", "{mes}", "{mes_num}", "{dia}", "{nombre}", "{carpeta_origen}", "{origen}"];
 let datos = { servicios: [], categorias: [], procedencias: [], carpetas_rapidas: {}, ajustes: {}, programacion: {} };
 let actual = null;      // copia del servicio que se edita
 let sinGuardar = false;
@@ -224,11 +240,12 @@ function resumenHorario(h) {
 function pintarLista() {
   const cont = $("#lista");
   if (!datos.servicios.length) { cont.innerHTML = `<div class="vacio">Aún no hay servicios.</div>`; return; }
-  cont.innerHTML = datos.servicios.map(({ servicio: s, ultima, proxima, ultimo_resultado: u }) => `
+  cont.innerHTML = datos.servicios.map(({ servicio: s, ultima, proxima, ultimo_resultado: u, propuestas }) => `
     <div class="item ${actual && actual.id === s.id ? "sel" : ""}" data-id="${esc(s.id)}">
-      <div class="nombre"><span class="punto ${s.activo ? "on" : ""}"></span>${esc(s.nombre || "Sin nombre")}</div>
+      <div class="nombre"><span class="punto ${s.activo ? "on" : ""}"></span>${esc(s.nombre || "Sin nombre")}${s.modo_prueba ? ` <span class="chip on" style="font-size:11px;padding:0 6px">prueba</span>` : ""}</div>
       <div class="meta">${esc(resumenHorario(s.horario))}</div>
       <div class="meta">${s.activo ? (proxima ? "Próxima: " + esc(fechaBonita(proxima)) : "") : "Desactivado"}</div>
+      ${propuestas && propuestas.n ? `<div class="meta" style="color:var(--acento)"><b>${propuestas.n} cambios propuestos</b>: ábrelo para aprobarlos</div>` : ""}
       ${ultima ? `<div class="meta">Última: ${esc(fechaBonita(ultima))}${u ? ` · ${u.movidos} ${u.movidos === 1 ? "archivo" : "archivos"}${u.errores ? `, ${u.errores} con error` : ""}` : ""}</div>` : ""}
     </div>`).join("");
 }
@@ -241,7 +258,7 @@ $("#lista").addEventListener("click", e => {
 });
 $("#btnNuevo").onclick = () => {
   if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
-  abrir({ id: "", nombre: "Nuevo servicio", activo: false, origenes: [], subcarpetas: false,
+  abrir({ id: "", nombre: "Nuevo servicio", activo: false, modo_prueba: true, mover_hermanos: true, origenes: [], subcarpetas: false,
     horario: { tipo: "intervalo", cada: 8, unidad: "horas" }, conflicto: "renombrar", identicos: "papelera", fecha_captura_fotos: true, esperar_minutos: 10, ignorar: [],
     reglas: [nuevaRegla()] });
   abiertas.add(actual.reglas[0]);
@@ -270,7 +287,9 @@ function pintarEditor() {
     <div class="fila">
       <div class="campo" style="flex:1;min-width:220px"><span>Nombre del servicio</span><input type="text" data-k="nombre" value="${esc(s.nombre)}"></div>
       <label style="margin-top:18px"><input type="checkbox" data-k="activo" ${s.activo ? "checked" : ""}> <b>Activo</b></label>
+      <label style="margin-top:18px" title="Funciona con su horario pero solo apunta lo que haría; tú lo apruebas con un clic"><input type="checkbox" data-k="modo_prueba" ${s.modo_prueba ? "checked" : ""}> Modo prueba</label>
     </div>
+    ${s.modo_prueba ? pintarPropuestas(s) : ""}
   </section>
   <section>
     <h3>Carpetas donde actúa</h3>
@@ -295,6 +314,16 @@ function pintarEditor() {
       <label title="${datos.pillow ? "Lee JPEG, HEIC, PNG, TIFF y WebP." : "Sin Pillow solo se lee la fecha de los JPEG."}"><input type="checkbox" data-k="fecha_captura_fotos" ${s.fecha_captura_fotos !== false ? "checked" : ""}> Ordenar fotos por fecha de captura (EXIF)</label>
       <label>Esperar <input type="number" min="0" data-k="esperar_minutos" value="${esc(s.esperar_minutos)}"> min desde la última modificación</label>
     </div>
+    <div class="fila">
+      <label title="factura.pdf + factura.xml, foto.heic + foto.aae, video.mp4 + video.srt"><input type="checkbox" data-k="mover_hermanos" ${s.mover_hermanos !== false ? "checked" : ""}> Mover juntos los archivos con el mismo nombre y distinta extensión</label>
+      <label><input type="checkbox" data-k="ordenar_accesos" ${s.ordenar_accesos ? "checked" : ""}> Incluir accesos directos (.lnk, .url)</label>
+    </div>
+    <div class="fila">
+      <label><input type="checkbox" data-carp="activo" ${(s.carpetas || {}).activo ? "checked" : ""}> Mover también carpetas enteras</label>
+      ${(s.carpetas || {}).activo ? `<label>sin usar en <input type="number" min="0" data-carp="dias" value="${esc((s.carpetas || {}).dias ?? 14)}"> días a</label>
+        <input type="text" data-carp="destino" value="${esc((s.carpetas || {}).destino || "")}" placeholder="C:\\Users\\…\\Documentos\\Carpetas\\{año}" style="flex:1;min-width:220px">` : ""}
+    </div>
+    <div class="fila"><label>Carpeta que nunca se toca dentro del origen: <input type="text" data-k="carpeta_mantener" value="${esc(s.carpeta_mantener || "Mantener")}" style="width:140px"></label></div>
     <div class="fila">
       <label>Si el archivo ya existe en el destino:
         <select data-k="conflicto">
@@ -392,6 +421,11 @@ function pintarRegla(r, i) {
         <div class="fila">
           <label>Modificado hace más de <input type="number" min="0" step="any" data-c="antiguedad_mayor_dias" value="${esc(c.antiguedad_mayor_dias ?? "")}"> días</label>
           <label>menos de <input type="number" min="0" step="any" data-c="antiguedad_menor_dias" value="${esc(c.antiguedad_menor_dias ?? "")}"> días</label>
+          <label title="Cuenta desde que llegó a la carpeta, la última modificación y la última vez que se abrió">Sin usar hace más de <input type="number" min="0" step="any" data-c="sin_uso_dias" value="${esc(c.sin_uso_dias ?? "")}"> días</label>
+        </div>
+        <div class="fila">
+          <label title="PDF o XML de una factura (CFDI). Usa {proveedor} y {rfc} en el destino."><input type="checkbox" data-c="factura" ${c.factura ? "checked" : ""}> Es una factura</label>
+          <label><input type="checkbox" data-c="zip_descomprimido" ${c.zip_descomprimido ? "checked" : ""}> Es un ZIP ya descomprimido (hay una carpeta con su nombre)</label>
         </div>
         <div class="ayuda">Deja vacío lo que no quieras usar. Si todo está vacío, la regla encaja con cualquier archivo.</div>
       </div>
@@ -417,6 +451,12 @@ function pintarRegla(r, i) {
 }
 
 const abiertas = new WeakSet();
+// Las plantillas buscan palabras enteras con una expresión regular; aquí se muestran como palabras.
+function palabrasDePatron(c) {
+  const v = c.nombre_valor || "", ini = "(?<![a-z0-9])(?:", fin = ")(?:s|es)?(?![a-z])";
+  if (c.nombre_modo !== "regex" || !v.startsWith(ini) || !v.endsWith(fin)) return "";
+  return v.slice(ini.length, -fin.length).split("|").map(p => p.split("[\\s_.\\-]+").join(" ").replace(/\\(.)/g, "$1")).join(", ");
+}
 function resumenRegla(r) {
   const c = r.si || {}, partes = [];
   if ((c.categorias || []).length) partes.push(c.categorias.join(" o "));
@@ -425,11 +465,16 @@ function resumenRegla(r) {
   const ext = Array.isArray(c.extensiones) ? c.extensiones : (c.extensiones ? [c.extensiones] : []);
   if (ext.length) partes.push("extensión " + ext.join(", "));
   const modos = { contiene: "contiene", empieza: "empieza por", termina: "termina en", regex: "cumple" };
-  if (c.nombre_valor) partes.push(`nombre ${modos[c.nombre_modo || "contiene"]} "${c.nombre_valor}"`);
+  const palabras = palabrasDePatron(c);
+  if (palabras) partes.push(`con «${palabras}» en el nombre`);
+  else if (c.nombre_valor) partes.push(`nombre ${modos[c.nombre_modo || "contiene"]} "${c.nombre_valor}"`);
   if (c.tamano_mayor_mb) partes.push(`más de ${c.tamano_mayor_mb} MB`);
   if (c.tamano_menor_mb) partes.push(`menos de ${c.tamano_menor_mb} MB`);
   if (c.antiguedad_mayor_dias) partes.push(`sin modificar hace más de ${c.antiguedad_mayor_dias} días`);
   if (c.antiguedad_menor_dias) partes.push(`modificado hace menos de ${c.antiguedad_menor_dias} días`);
+  if (c.sin_uso_dias) partes.push(`sin usar en ${c.sin_uso_dias} días`);
+  if (c.factura) partes.push("una factura");
+  if (c.zip_descomprimido) partes.push("un ZIP ya descomprimido");
   const si = partes.length ? "Si es " + partes.join(", ") : "Cualquier archivo";
   const que = { mover: `mover a ${r.destino || "(falta destino)"}`, copiar: `copiar a ${r.destino || "(falta destino)"}`,
     renombrar: `renombrar como ${r.nuevo_nombre || "(limpiar nombre)"}`, papelera: "enviar a la papelera",
@@ -449,7 +494,15 @@ $("#editor").addEventListener("input", e => {
     else if (t.type === "number") s[k] = t.value === "" ? 0 : Number(t.value);
     else s[k] = t.value;
     if (k === "activo") pintarLista();
-    if (k === "identicos") pintarEditor();
+    if (k === "identicos" || k === "modo_prueba") pintarEditor();
+  } else if (t.dataset.carp) {
+    const c = s.carpetas = s.carpetas || { activo: false, dias: 14, destino: "" };
+    const k = t.dataset.carp;
+    c[k] = t.type === "checkbox" ? t.checked : t.type === "number" ? Number(t.value) : t.value;
+    if (k === "activo") {
+      if (!c.destino && datos.carpetas_rapidas.Documentos) c.destino = datos.carpetas_rapidas.Documentos + "\\Carpetas\\{año}";
+      pintarEditor();
+    }
   } else if (t.dataset.h) {
     s.horario[t.dataset.h] = t.type === "number" ? Number(t.value) : t.value;
   } else if (t.id === "diasMes") {
@@ -460,7 +513,8 @@ $("#editor").addEventListener("input", e => {
     const r = s.reglas[+box.dataset.regla];
     if (t.dataset.c) {
       const v = t.value;
-      if (t.type === "number") r.si[t.dataset.c] = v === "" ? null : Number(v);
+      if (t.type === "checkbox") r.si[t.dataset.c] = t.checked;
+      else if (t.type === "number") r.si[t.dataset.c] = v === "" ? null : Number(v);
       else if (t.dataset.c === "extensiones") r.si.extensiones = v.split(/[,\s;]+/).filter(Boolean);
       else r.si[t.dataset.c] = v;
     } else if (t.dataset.r) {
@@ -551,6 +605,17 @@ $("#editor").addEventListener("click", async e => {
       datos.servicios = res.servicios; pintarLista();
       t.disabled = false; t.textContent = "Ejecutar ahora";
       pintarResultado(res.registro, false); cargarHistorial();
+    } else if (t.dataset.prueba) {
+      if (sinGuardar) { aviso("Guarda los cambios primero."); return; }
+      const accion = t.dataset.prueba;
+      if (accion === "aprobar" && !confirm("Se harán de verdad estos cambios y el servicio dejará el modo prueba. ¿Seguir?")) return;
+      t.disabled = true;
+      const res = await api("/api/prueba/" + accion, { id: s.id });
+      datos.servicios = res.servicios;
+      actual = JSON.parse(JSON.stringify(res.servicios.find(x => x.servicio.id === s.id).servicio));
+      pintarLista(); pintarEditor();
+      if (res.registro) { pintarResultado(res.registro, false); cargarHistorial(); }
+      if (accion === "terminar") aviso("Modo prueba terminado: el servicio ya ordena de verdad.");
     } else if (t.id === "btnBorrar") {
       if (!confirm(`¿Eliminar el servicio "${s.nombre}"? Los archivos no se tocan.`)) return;
       const res = await api("/api/borrar", { id: s.id });
@@ -591,6 +656,23 @@ async function guardar() {
 }
 
 function nombreCorto(ruta) { return ruta.split(/[\\/]/).pop(); }
+function pintarPropuestas(s) {
+  if (!s.id) return `<p class="ayuda">En modo prueba el servicio funciona con su horario pero solo apunta lo que haría. Lo apruebas con un clic.</p>`;
+  const reg = datos.servicios.find(x => x.servicio.id === s.id) || {};
+  const p = reg.propuestas;
+  const verbo = { mover: "Mover", copiar: "Copiar", renombrar: "Renombrar", papelera: "Papelera", archivar: "Archivar" };
+  return `<div class="aviso" style="margin-top:8px">
+    <b>Modo prueba.</b> ${p ? `${esc(fechaBonita(p.fecha))}: propone <b>${p.n}</b> cambios.` : "Todavía no ha propuesto nada (lo hará en su próxima ejecución)."}
+    <div class="fila" style="margin-top:6px">
+      ${p && p.n ? `<button class="prim chico" data-prueba="aprobar">Aprobar y ejecutar</button>` : ""}
+      <button class="chico" data-prueba="revisar">Revisar ahora</button>
+      <button class="chico" data-prueba="terminar">Terminar prueba sin ejecutar</button>
+    </div>
+    ${p && p.n ? `<div class="resultado" style="max-height:260px;margin-top:6px"><table><tr><th>Acción</th><th>Archivo</th><th>Destino</th></tr>
+      ${p.operaciones.slice(0, 200).map(o => `<tr><td>${verbo[o.accion] || o.accion}</td><td title="${esc(o.origen)}">${o.carpeta ? "📁 " : ""}${esc(nombreCorto(o.origen))}${o.hermano_de ? ` <span class="ayuda">(junto a ${esc(nombreCorto(o.hermano_de))})</span>` : ""}</td><td>${esc(o.destino || "Papelera")}</td></tr>`).join("")}
+    </table>${p.n > 200 ? `<p class="ayuda">Y ${p.n - 200} más…</p>` : ""}</div>` : ""}
+  </div>`;
+}
 function pintarResultado(res, simulado) {
   const ops = res.operaciones || [], errores = res.errores || [], avisos = res.avisos || [];
   const verbo = { mover: "Mover", copiar: "Copiar", renombrar: "Renombrar", papelera: "Papelera", archivar: "Archivar" };
@@ -601,7 +683,7 @@ function pintarResultado(res, simulado) {
       <div class="aviso ${ops.length ? "okmsg" : ""}">${simulado ? `Se procesarían ${ops.length} archivos.` : `${ops.length} archivos procesados.`}${errores.length ? ` ${errores.length} con error.` : ""}</div>
       ${ops.length || errores.length ? `<div class="resultado"><table>
         <tr><th>Acción</th><th>Archivo</th><th>Destino</th></tr>
-        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${o.duplicado ? `<b>Duplicado</b> de ${esc(nombreCorto(o.identico_a))}${o.tras_limpiar ? " (al quitar “(1)” o “copia”)" : ""} → ` : ""}${esc(o.destino || "Papelera")}</td></tr>`).join("")}
+        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${o.carpeta ? "📁 " : ""}${esc(nombreCorto(o.origen))}</td><td>${o.duplicado ? `<b>Duplicado</b> de ${esc(nombreCorto(o.identico_a))}${o.tras_limpiar ? " (al quitar “(1)” o “copia”)" : ""} → ` : ""}${esc(o.destino || "Papelera")}</td></tr>`).join("")}
         ${errores.map(o => `<tr><td style="color:var(--peligro)">Error</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.error)}</td></tr>`).join("")}
       </table>${ops.length > 500 ? `<p class="ayuda">Y ${ops.length - 500} más…</p>` : ""}</div>` : ""}
     </section>`;
@@ -670,7 +752,8 @@ function mostrarVista(nombre) {
   vistaActual = nombre;
   document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === nombre));
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
-  ({ Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
+  ({ Plantillas: pintarPlantillas, Buscar: pintarBuscar, Espacio: cargarEspacio,
+     Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
      Copias: cargarCopias, Estadisticas: cargarEstadisticas }[nombre] || (() => { }))();
 }
 const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB";
@@ -684,6 +767,12 @@ function pintarPreferencias() {
   $("#prefPapelera").value = a.papelera || "gestor";
   $("#prefRetencion").value = a.retencion_dias || 30;
   $("#bandaPausa").classList.toggle("on", !!a.pausado);
+  $("#prefSemanal").checked = a.aviso_semanal !== false;
+  $("#prefUmbral").value = a.umbral_disco ?? 10;
+  $("#prefRfc").value = a.mis_rfc || "";
+  const nm = a.no_molestar || {};
+  $("#nmBateria").checked = !!nm.bateria; $("#nmPantalla").checked = !!nm.pantalla_completa; $("#nmHoras").checked = !!nm.horas;
+  $("#nmDesde").value = nm.desde || "22:00"; $("#nmHasta").value = nm.hasta || "07:00";
   const faltan = [["pillow", "Pillow (fotos HEIC/PNG e icono)"], ["pypdf", "pypdf (leer PDF)"], ["watchdog", "watchdog (al instante)"]]
     .filter(([k]) => !datos[k]).map(([, t]) => t);
   $("#prefDependencias").textContent = faltan.length ? "Faltan librerías opcionales: " + faltan.join(", ") + ". El .exe ya las incluye." : "";
@@ -700,6 +789,160 @@ $("#prefPausa").onchange = e => guardarPreferencias({ pausado: e.target.checked 
 $("#prefPapelera").onchange = e => guardarPreferencias({ papelera: e.target.value });
 $("#prefRetencion").onchange = e => guardarPreferencias({ retencion_dias: +e.target.value || 30 });
 $("#btnReanudar").onclick = () => guardarPreferencias({ pausado: false });
+$("#prefSemanal").onchange = e => guardarPreferencias({ aviso_semanal: e.target.checked });
+$("#prefUmbral").onchange = e => guardarPreferencias({ umbral_disco: +e.target.value || 0 });
+$("#prefRfc").onchange = e => guardarPreferencias({ mis_rfc: e.target.value.trim() });
+["#nmBateria", "#nmPantalla", "#nmHoras", "#nmDesde", "#nmHasta"].forEach(id => $(id).onchange = () => guardarPreferencias({ no_molestar: {
+  bateria: $("#nmBateria").checked, pantalla_completa: $("#nmPantalla").checked, horas: $("#nmHoras").checked,
+  desde: $("#nmDesde").value || "22:00", hasta: $("#nmHasta").value || "07:00" } }));
+
+// ---------------------------------------------------------------- plantillas
+let plant = { lista: null, abierta: null, dias: 14, marcadas: {}, origenes: {} };
+async function pintarPlantillas(recargar) {
+  const cont = $("#plantillas");
+  if (recargar || !plant.lista) {
+    cont.innerHTML = `<h2>Plantillas</h2><p class="ayuda">Mirando tus carpetas…</p>`;
+    const res = await api("/api/plantillas", { dias: plant.dias });
+    plant.lista = res.plantillas; plant.documentos = res.documentos;
+    plant.marcadas = {}; plant.origenes = {};
+    plant.lista.forEach(p => { plant.marcadas[p.clave] = new Set(p.reglas.map((r, i) => r.marcada ? i : -1).filter(i => i >= 0)); plant.origenes[p.clave] = [...p.origenes]; });
+  }
+  const docs = Object.values(plant.documentos || {});
+  cont.innerHTML = `
+    <h2>Plantillas</h2>
+    <p class="ayuda">Servicios listos para cada tipo de carpeta. Los documentos van a las carpetas que <b>ya tienes en Documentos</b>
+      ${docs.length ? `(he encontrado: ${docs.map(d => esc(nombreCorto(d))).join(", ")})` : "(no encontré subcarpetas conocidas: lo que no encaje irá a una carpeta genérica dentro de Documentos)"}.
+      Si hace falta crear una carpeta, siempre es dentro de Documentos. Cada servicio arranca <b>en modo prueba</b>: verás lo que haría y lo apruebas con un clic.</p>
+    <div class="fila"><label>Días de espera para Vaciar Descargas y Escritorio: <input type="number" id="plDias" min="0" value="${plant.dias}" style="width:70px"></label>
+      <button class="chico" id="plRecargar">Aplicar</button></div>
+    ${plant.lista.map(p => `
+      <div class="grupo-dup">
+        <div class="fila" style="justify-content:space-between;flex-wrap:nowrap;align-items:flex-start">
+          <div style="flex:1"><b>${esc(p.nombre)}</b>${p.ya_existe ? ` <span class="ayuda">(ya tienes un servicio con este nombre)</span>` : ""}<div class="ayuda">${esc(p.descripcion)}</div></div>
+          <button class="chico" data-pl-abrir="${esc(p.clave)}">${plant.abierta === p.clave ? "Cerrar" : "Ver reglas"}</button>
+        </div>
+        ${plant.abierta === p.clave ? `
+          <div class="ayuda" style="margin-top:6px">Carpeta: ${plant.origenes[p.clave].map(o => `<code>${esc(o)}</code>`).join(" ")} <button class="chico" data-pl-carpeta="${esc(p.clave)}">Cambiar…</button></div>
+          ${p.reglas.map((r, i) => `<label style="display:flex;gap:6px;padding:3px 0;font-family:inherit;font-size:13px"><input type="checkbox" data-pl-regla="${i}" ${plant.marcadas[p.clave].has(i) ? "checked" : ""}> ${esc(r.texto)}</label>`).join("")}
+          ${p.servicio.carpetas ? `<div class="ayuda">Carpetas enteras sin usar en ${p.servicio.carpetas.dias} días → <code>${esc(p.servicio.carpetas.destino)}</code>. Lo que esté en <code>${esc(p.servicio.carpeta_mantener)}</code> no se toca.</div>` : ""}
+          <div class="ayuda">Archivos con el mismo nombre y distinta extensión (factura.pdf + factura.xml) se mueven juntos.</div>
+          <div class="fila" style="margin-top:8px"><button class="prim" data-pl-crear="${esc(p.clave)}">Crear servicio (en modo prueba)</button></div>` : ""}
+      </div>`).join("")}`;
+}
+$("#plantillas").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "plRecargar") { plant.dias = +$("#plDias").value || 0; pintarPlantillas(true); }
+    else if (t.dataset.plAbrir) { plant.abierta = plant.abierta === t.dataset.plAbrir ? null : t.dataset.plAbrir; pintarPlantillas(); }
+    else if (t.dataset.plCarpeta) {
+      const res = await api("/api/elegir-carpeta", { inicial: plant.origenes[t.dataset.plCarpeta][0] || "" });
+      if (res.carpeta) { if (!res.permitida) { aviso(res.aviso); return; } plant.origenes[t.dataset.plCarpeta] = [res.carpeta]; }
+      pintarPlantillas();
+    } else if (t.dataset.plCrear) {
+      const clave = t.dataset.plCrear;
+      t.disabled = true;
+      const res = await api("/api/plantillas/crear", { clave, indices: [...plant.marcadas[clave]], origenes: plant.origenes[clave], dias: plant.dias });
+      datos.servicios = res.servicios;
+      aviso("Servicio creado en modo prueba.");
+      mostrarVista("Servicios");
+      abrir(JSON.parse(JSON.stringify(res.servicios.find(x => x.servicio.id === res.id).servicio)));
+      const r = await api("/api/prueba/revisar", { id: res.id });
+      datos.servicios = r.servicios; pintarLista(); pintarEditor();
+      plant.lista = null;
+    }
+  } catch (err) { aviso("Error: " + err.message); }
+});
+$("#plantillas").addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.plRegla === undefined) return;
+  const m = plant.marcadas[plant.abierta], i = +t.dataset.plRegla;
+  t.checked ? m.add(i) : m.delete(i);
+});
+
+// ---------------------------------------------------------------- buscar
+let busqueda = { texto: "", res: null };
+function pintarBuscar() {
+  const r = busqueda.res;
+  const verbo = { mover: "Movido a", copiar: "Copiado a", renombrar: "Renombrado como", papelera: "Enviado a la papelera", archivar: "Archivado en" };
+  $("#buscar").innerHTML = `
+    <h2>¿A dónde fue mi archivo?</h2>
+    <p class="ayuda">Busca por nombre (el de antes o el nuevo) entre todo lo que GESTOR ha movido, renombrado o quitado.</p>
+    <div class="fila"><input type="text" id="bqTexto" value="${esc(busqueda.texto)}" placeholder="factura cfe, IMG_2024…" style="flex:1"><button class="prim" id="bqIr">Buscar</button></div>
+    ${r ? `<p class="ayuda">${r.total} resultados${r.total > r.resultados.length ? ` (se muestran ${r.resultados.length})` : ""}.</p>
+      <div class="resultado"><table><tr><th>Fecha</th><th>Archivo</th><th>Qué pasó</th><th></th></tr>
+      ${r.resultados.map(x => `<tr><td>${esc(fechaBonita(x.fecha))}<div class="ayuda">${esc(x.servicio)}</div></td>
+        <td title="${esc(x.origen)}">${x.carpeta ? "📁 " : ""}${esc(nombreCorto(x.origen))}<div class="ayuda">${esc(x.origen)}</div></td>
+        <td>${verbo[x.accion] || x.accion} ${x.destino ? `<code>${esc(x.destino)}</code>` : ""}${x.en_zip ? ` como <code>${esc(x.en_zip)}</code>` : ""}<div class="ayuda">${esc(x.estado)}</div></td>
+        <td>${x.existe ? `<button class="chico" data-abrir-ruta="${esc(x.destino)}">Abrir carpeta</button>` : x.accion === "papelera" && x.papelera_id ? `<button class="chico" data-ver-papelera>Ver papelera</button>` : ""}</td></tr>`).join("")}
+      </table></div>` : ""}`;
+  const i = $("#bqTexto"); i.focus(); i.setSelectionRange(i.value.length, i.value.length);
+}
+async function buscarAhora() {
+  busqueda.texto = $("#bqTexto").value.trim();
+  busqueda.res = await api("/api/buscar", { texto: busqueda.texto });
+  pintarBuscar();
+}
+$("#buscar").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "bqIr") await buscarAhora();
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+    else if (t.dataset.verPapelera !== undefined) mostrarVista("Papelera");
+  } catch (err) { aviso("Error: " + err.message); }
+});
+$("#buscar").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "bqTexto") buscarAhora().catch(x => aviso(x.message)); });
+
+// ---------------------------------------------------------------- espacio
+let espacio = { res: null, marcadas: new Set() };
+async function cargarEspacio(recargar) {
+  const cont = $("#espacio");
+  if (recargar !== false || !espacio.res) {
+    cont.innerHTML = `<h2>Espacio en disco</h2><p class="ayuda">Analizando tus carpetas (Descargas, Documentos, Escritorio, Imágenes, Vídeos, Música)…</p>`;
+    espacio.res = await api("/api/espacio"); espacio.marcadas = new Set();
+  }
+  const r = espacio.res;
+  const lista = (titulo, filas, ayuda) => filas.length ? `<section><h3>${titulo}</h3><p class="ayuda">${ayuda}</p>
+    <div class="resultado" style="max-height:300px"><table>${filas.map(f => `<tr>
+      <td><input type="checkbox" data-esp="${esc(f.ruta)}" ${espacio.marcadas.has(f.ruta) ? "checked" : ""}></td>
+      <td title="${esc(f.ruta)}">${esc(nombreCorto(f.ruta))}<div class="ayuda">${esc(f.ruta)}</div></td>
+      <td>${mb(f.bytes)}</td><td class="ayuda">sin usar ${f.dias} días</td>
+      <td><button class="chico" data-abrir-ruta="${esc(f.ruta)}">Abrir carpeta</button></td></tr>`).join("")}</table></div></section>` : "";
+  const total = [...espacio.marcadas].reduce((a, ruta) => a + ([...r.grandes, ...r.instaladores, ...r.viejos_descargas].find(f => f.ruta === ruta) || {}).bytes || 0, 0);
+  cont.innerHTML = `
+    <h2>Espacio en disco</h2>
+    ${r.discos.map(d => { const usado = 100 - d.libre * 100 / d.total; const poco = d.libre * 100 / d.total < (r.umbral || 0); return `
+      <div class="fila"><b style="width:40px">${esc(d.letra)}</b><div class="barra" style="flex:1"><div style="width:${usado.toFixed(0)}%;${poco ? "background:var(--peligro)" : ""}"></div></div>
+      <span class="ayuda">${mb(d.libre)} libres de ${mb(d.total)}${poco ? " · <b style='color:var(--peligro)'>poco espacio</b>" : ""}</span></div>`; }).join("")}
+    <p class="ayuda">GESTOR te avisa si un disco baja del ${r.umbral || 0} % libre (cámbialo en Ajustes).</p>
+    <section><h3>Sugerencias rápidas</h3>
+      ${r.papelera.n ? `<div class="fila"><span>La papelera de GESTOR guarda ${r.papelera.n} archivos (${mb(r.papelera.bytes)}).</span><button class="chico" data-ir="Papelera">Ver / vaciar</button></div>` : ""}
+      <div class="fila"><span>Los archivos repetidos suelen ocupar mucho.</span><button class="chico" data-ir="Duplicados">Buscar duplicados</button></div>
+    </section>
+    ${lista("Instaladores y ZIP ya descomprimidos en Descargas", r.instaladores, "Casi nunca se vuelven a usar.")}
+    ${lista("Descargas sin usar en más de 3 meses", r.viejos_descargas, "")}
+    ${lista("Archivos grandes (más de 50 MB)", r.grandes, "Los 100 más grandes de tus carpetas.")}
+    ${r.incompleto ? `<p class="ayuda">Hay muchísimos archivos: el análisis se detuvo antes de terminar.</p>` : ""}
+    <div class="acciones">
+      <button class="peligro" id="espQuitar" ${espacio.marcadas.size ? "" : "disabled"}>Enviar ${espacio.marcadas.size} a la papelera de GESTOR (${mb(total)})</button>
+      <button id="espRecargar">Volver a analizar</button>
+    </div>
+    <p class="ayuda">El espacio se libera de verdad al vaciar la papelera de GESTOR (o cuando caducan, a los ${datos.ajustes.retencion_dias || 30} días).</p>`;
+}
+$("#espacio").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.dataset.esp !== undefined) { t.checked ? espacio.marcadas.add(t.dataset.esp) : espacio.marcadas.delete(t.dataset.esp); cargarEspacio(false); }
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+    else if (t.dataset.ir) mostrarVista(t.dataset.ir);
+    else if (t.id === "espRecargar") cargarEspacio(true);
+    else if (t.id === "espQuitar") {
+      if (!confirm(`¿Enviar ${espacio.marcadas.size} archivos a la papelera de GESTOR? Podrás restaurarlos.`)) return;
+      const res = await api("/api/espacio/papelera", { rutas: [...espacio.marcadas] });
+      aviso(`${res.hechos} archivos a la papelera${res.errores.length ? `, ${res.errores.length} no se pudieron` : ""}.`);
+      cargarEspacio(true);
+    }
+  } catch (err) { aviso("Error: " + err.message); }
+});
 $("#btnExportar").onclick = async () => {
   const d = await api("/api/exportar");
   const a = document.createElement("a");

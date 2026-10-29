@@ -25,8 +25,8 @@ def buscar(servicio_id):
 def revisar(al_iniciar=False):
     ahora = dt.datetime.now()
     tareas_de_mantenimiento()
-    if nucleo.cargar_ajustes().get("pausado"):
-        return
+    if nucleo.cargar_ajustes().get("pausado") or nucleo.motivo_no_molestar():
+        return  # lo pendiente se hace en la siguiente revisión que no moleste
     estado = nucleo.cargar_estado()
     cambiado = False
     pendientes = []
@@ -48,7 +48,8 @@ def revisar(al_iniciar=False):
 
 def tareas_de_mantenimiento():
     """Cosas baratas que conviene hacer en cada revisión, haya o no servicios que ejecutar."""
-    for tarea in (nucleo.lanzar_residente, nucleo.purgar_papelera, copias_si_toca):
+    for tarea in (nucleo.lanzar_residente, nucleo.purgar_papelera, copias_si_toca,
+                  nucleo.revisar_disco, nucleo.aviso_semanal):
         try:
             tarea()
         except Exception:
@@ -56,7 +57,7 @@ def tareas_de_mantenimiento():
 
 
 def copias_si_toca():
-    if nucleo.cargar_ajustes().get("pausado"):
+    if nucleo.cargar_ajustes().get("pausado") or nucleo.motivo_no_molestar():
         return
     pendientes, _ = nucleo.copias_pendientes()
     for copia in pendientes:

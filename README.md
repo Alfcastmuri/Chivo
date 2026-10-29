@@ -30,22 +30,40 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
   `Program Files` ni `ProgramData`.
 - **Condiciones** (se aplica la primera regla que encaja): tipo de archivo, **procedencia**
   (cámara, WhatsApp, Telegram, captura de pantalla, escáner, descarga de internet), extensión,
-  nombre, **contenido** (texto de PDF, DOCX o TXT, por palabras o expresión regular), tamaño
-  y antigüedad.
+  nombre, **contenido** (texto de PDF, DOCX o TXT, por palabras o expresión regular), tamaño,
+  antigüedad, **sin usar en N días** (desde que llegó, se modificó o se abrió), **es una factura**
+  (CFDI: PDF o XML del SAT) y **ZIP ya descomprimido**.
 - **Acciones:** mover, copiar, renombrar, **archivar en un ZIP mensual** o quitar (a la papelera).
   Variables para destinos y nombres: `{categoria}`, `{procedencia}`, `{camara}`, `{sitio}`,
-  `{extension}`, `{año}`, `{mes}`, `{mes_num}`, `{dia}`, `{nombre}`, `{carpeta_origen}`, `{origen}`.
+  `{proveedor}` y `{rfc}` (de la factura), `{dato}` (lo que captura la expresión regular del
+  contenido), `{tipo_acceso}` (Programas, Juegos, Sitios web…), `{extension}`, `{año}`, `{mes}`, `{mes_num}`, `{dia}`, `{nombre}`, `{carpeta_origen}`, `{origen}`.
 - **Fotos por fecha de captura** (EXIF; si no hay, la fecha del nombre, como en WhatsApp).
 - **Limpiar nombres:** quita "(1)", "copia", espacios dobles y caracteres raros; opcionalmente
   pone la fecha al inicio (AAAA-MM-DD).
 - **Duplicados:** si en el destino ya hay un archivo con el mismo contenido, el nuevo va a la
   papelera o a una carpeta "Duplicados", y recibes una notificación.
+- **Archivos hermanos juntos:** `factura.pdf` + `factura.xml`, `foto.heic` + `foto.aae` o
+  `video.mp4` + `video.srt` se mueven juntos y siguen al principal.
+- **Carpetas enteras:** las que llevan N días sin usarse se mueven completas, sin desarmarlas.
+  La carpeta `Mantener` de cada origen nunca se toca.
+- **Accesos directos** (opcional): se ordenan por tipo dentro de la misma carpeta.
+- **Modo prueba:** el servicio funciona con su horario pero solo propone; apruebas con un clic.
 - **Borrar las carpetas que queden vacías.**
 - **Horario:** cada N minutos, horas o días; ciertas horas; ciertos días de la semana o del
   mes; al iniciar sesión; **al instante** (cuando aparece un archivo); o solo manual.
 
 ## Más herramientas del panel
 
+- **Plantillas** para Descargas, Documentos, Escritorio, Imágenes, capturas, Vídeos, Música,
+  facturas y escaneados. Los documentos van a las subcarpetas que **ya existen** en Documentos
+  (Facturas, Contratos, Bancos…); si hay que crear alguna, siempre es dentro de Documentos.
+  "Vaciar Descargas" y "Vaciar Escritorio" llevan a Documentos lo que lleva 14 días sin usarse,
+  y mandan a la papelera los instaladores de más de 30 días y los ZIP ya descomprimidos.
+- **Buscar:** ¿a dónde fue mi archivo? Busca por nombre en todo lo que GESTOR ha movido.
+- **Espacio:** uso de cada disco, aviso si queda menos del 10 % libre y qué se puede liberar.
+- **No molestar:** con batería, con un juego o presentación a pantalla completa o en ciertas
+  horas, los servicios esperan.
+- **Aviso semanal** con lo que se ordenó.
 - **Asistente:** analiza una carpeta y propone reglas ("tienes 340 fotos de WhatsApp").
 - **Duplicados:** busca archivos idénticos en las carpetas o discos que elijas.
 - **Papelera de GESTOR:** guarda 30 días (configurable) lo que se quita, con restauración.
