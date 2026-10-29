@@ -1,4 +1,8 @@
-## Novedades de GESTOR 0.7.0
+## Novedades de GESTOR 0.7.1
+
+- **El Asistente vuelve al menú de la izquierda** (Organizar → 🧭 Asistente). Sigue también en Plantillas.
+
+## Lo que trajo la 0.7.0
 
 - **Mapa del disco al estilo WinDirStat** (Espacio): cada archivo es un rectángulo de su tamaño, en colores planos y mates que salen de tu tema. Doble clic para entrar en una carpeta.
 - **Más de 670 extensiones en 23 tipos** (diseño, 3D y CAD, fuentes, libros, correo, bases de datos, subtítulos, certificados…) y en Personalizar → Tipos de archivo puedes añadir las tuyas, crear tipos nuevos o subir una lista.

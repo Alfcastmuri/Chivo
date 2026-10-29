@@ -279,6 +279,7 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
 <nav class="lateral" id="pestanas">
   <button data-vista="Inicio" class="on">🏠 Inicio</button>
   <div class="grupo-nav">Organizar</div>
+  <button data-vista="Asistente">🧭 Asistente</button>
   <button data-vista="Servicios">Servicios</button>
   <button data-vista="Plantillas">Plantillas</button>
   <button data-vista="Raiz">Sacar a la raíz</button>
@@ -970,7 +971,7 @@ $("#pestanas").addEventListener("click", e => {
 function mostrarVista(nombre) {
   vistaActual = nombre;
   if (nombre === "Copias") nombre = "Respaldo";
-  const enMenu = { Asistente: "Plantillas" }[nombre] || nombre;
+  const enMenu = nombre;
   document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === enMenu));
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
