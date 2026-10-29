@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GESTOR</title>
+<style>
+:root {
+  --fondo: #f5f6f8; --panel: #ffffff; --texto: #1d2330; --suave: #6b7383; --borde: #dfe3ea;
+  --acento: #2f6fde; --acento-texto: #ffffff; --acento-suave: #e8f0fd;
+  --ok: #1e8a4c; --ok-suave: #e5f5ec; --aviso: #a86200; --aviso-suave: #fdf3e2;
+  --peligro: #c23434; --peligro-suave: #fbe9e9; --sombra: 0 1px 3px rgba(20,30,50,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #15181e; --panel: #1e222a; --texto: #e7eaf0; --suave: #9aa3b2; --borde: #323844;
+    --acento: #5b93f0; --acento-texto: #0d1420; --acento-suave: #233149;
+    --ok: #4cc27f; --ok-suave: #1d3328; --aviso: #e6a34a; --aviso-suave: #3a2e1b;
+    --peligro: #ee6b6b; --peligro-suave: #3d2223; --sombra: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto);
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  background: var(--panel); border-bottom: 1px solid var(--borde); position: sticky; top: 0; z-index: 5; }
+header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+header .estado { color: var(--suave); font-size: 13px; }
+header .espacio { flex: 1; }
+main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+.caja { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; box-shadow: var(--sombra); }
+.lista { padding: 8px; align-self: start; }
+.lista h2, .editor h2 { font-size: 15px; margin: 6px 8px 10px; }
+.item { padding: 10px 12px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; margin-bottom: 4px; }
+.item:hover { background: var(--fondo); }
+.item.sel { background: var(--acento-suave); border-color: var(--acento); }
+.item .nombre { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.item .meta { color: var(--suave); font-size: 12px; margin-top: 2px; }
+.punto { width: 8px; height: 8px; border-radius: 50%; background: var(--suave); flex: none; }
+.punto.on { background: var(--ok); }
+.editor { padding: 16px 20px 24px; min-width: 0; }
+section { border-top: 1px solid var(--borde); padding: 14px 0 6px; }
+section:first-of-type { border-top: 0; }
+section > h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); margin: 0 0 10px; }
+label { display: inline-flex; align-items: center; gap: 6px; }
+.fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.campo { display: flex; flex-direction: column; gap: 4px; }
+.campo > span { font-size: 12px; color: var(--suave); }
+input[type=text], input[type=number], input[type=time], select {
+  font: inherit; color: var(--texto); background: var(--panel); border: 1px solid var(--borde);
+  border-radius: 6px; padding: 6px 8px; min-width: 0; }
+input[type=text] { width: 100%; }
+input[type=number] { width: 90px; }
+input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
+button { font: inherit; border: 1px solid var(--borde); background: var(--panel); color: var(--texto);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--acento); }
+button.prim { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); font-weight: 600; }
+button.peligro { color: var(--peligro); }
+button.chico { padding: 2px 8px; font-size: 12px; }
+button:disabled { opacity: .5; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--borde); font-size: 12px; cursor: pointer; user-select: none; background: var(--panel); }
+.chip.on { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); font-weight: 600; }
+.chip .x { cursor: pointer; color: var(--suave); }
+.carpeta { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border: 1px solid var(--borde);
+  border-radius: 6px; margin-bottom: 6px; font-family: Consolas, monospace; font-size: 13px; word-break: break-all; }
+.carpeta .ruta { flex: 1; }
+.aviso { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: var(--aviso-suave); color: var(--aviso); margin: 4px 0 8px; }
+.error { background: var(--peligro-suave); color: var(--peligro); }
+.okmsg { background: var(--ok-suave); color: var(--ok); }
+.regla { border: 1px solid var(--borde); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.regla .cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.regla .cab b { flex: 1; }
+.regla .grupo { display: grid; grid-template-columns: 70px 1fr; gap: 8px 10px; align-items: start; }
+.regla .grupo > .et { color: var(--suave); font-size: 12px; padding-top: 6px; font-weight: 600; }
+.ayuda { color: var(--suave); font-size: 12px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; bottom: 0; background: var(--panel);
+  padding: 12px 0 4px; border-top: 1px solid var(--borde); margin-top: 8px; }
+.acciones .espacio { flex: 1; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--borde); vertical-align: top; word-break: break-all; }
+th { color: var(--suave); font-weight: 600; }
+.resultado { margin-top: 12px; max-height: 420px; overflow: auto; }
+.vacio { color: var(--suave); padding: 30px; text-align: center; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+.modal.on { display: flex; }
+.modal .caja { padding: 20px; max-width: 520px; width: 100%; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 16px; border-radius: 8px;
+  background: var(--texto); color: var(--panel); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; }
+.toast.on { opacity: 1; }
+code { font-family: Consolas, monospace; font-size: 12px; background: var(--fondo); padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>GESTOR</h1>
+  <span class="estado" id="estadoProg"></span>
+  <span class="espacio"></span>
+  <button id="btnAjustes">Programación</button>
+  <button id="btnCerrar">Cerrar panel</button>
+</header>
+<main>
+  <div class="caja lista">
+    <h2>Servicios</h2>
+    <div id="lista"></div>
+    <button class="prim" id="btnNuevo" style="width:100%;margin-top:6px">+ Nuevo servicio</button>
+  </div>
+  <div class="caja editor" id="editor"><div class="vacio">Elige un servicio o crea uno nuevo.</div></div>
+</main>
+
+<div class="modal" id="modalAjustes">
+  <div class="caja">
+    <h2 style="margin-top:0">Programación automática</h2>
+    <p class="ayuda">Windows lanzará el motor cada cierto tiempo. El motor mira qué servicios toca ejecutar según su horario,
+      los ejecuta y se cierra, así que entre revisiones no consume nada. Cuanto más corto el intervalo, más puntuales serán los horarios.</p>
+    <div class="fila"><label>Revisar cada <input type="number" id="ajMinutos" min="1" max="1440"> minutos</label></div>
+    <div id="ajEstado"></div>
+    <div class="fila" style="margin-top:14px">
+      <button class="prim" id="ajGuardar">Activar / actualizar programación</button>
+      <button class="peligro" id="ajQuitar">Quitar programación</button>
+      <span class="espacio" style="flex:1"></span>
+      <button id="ajCerrar">Cerrar</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
+const VARIABLES = ["{categoria}", "{extension}", "{año}", "{mes}", "{mes_num}", "{dia}", "{nombre}", "{carpeta_origen}", "{origen}"];
+let datos = { servicios: [], categorias: [], carpetas_rapidas: {}, ajustes: {}, programacion: {} };
+let actual = null;      // copia del servicio que se edita
+let sinGuardar = false;
+let avisosCarpeta = {};
+
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(ruta, cuerpo = {}) {
+  const r = await fetch(ruta, { method: "POST", headers: { "Content-Type": "application/json", "X-Gestor-Token": TOKEN }, body: JSON.stringify(cuerpo) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || "Error");
+  return j;
+}
+function aviso(texto) { const t = $("#toast"); t.textContent = texto; t.classList.add("on"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 3000); }
+const fechaBonita = iso => {
+  if (!iso) return "";
+  if (!/^\d{4}-/.test(iso)) return iso;
+  const d = new Date(iso);
+  return d.toLocaleString("es", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+};
+
+function resumenHorario(h) {
+  h = h || {};
+  const horas = (h.horas || []).join(", ") || "09:00";
+  switch (h.tipo) {
+    case "intervalo": return `Cada ${h.cada} ${h.unidad === "dias" ? "días" : h.unidad}`;
+    case "diario": return `Cada día a las ${horas}`;
+    case "semanal": return `${(h.dias || []).map(d => DIAS[d]).join(" ") || "ningún día"} a las ${horas}`;
+    case "mensual": return `Días ${(h.dias_mes || []).join(", ") || "ninguno"} de cada mes a las ${horas}`;
+    case "inicio": return "Al iniciar sesión";
+    default: return "Solo manual";
+  }
+}
+
+// ---------------------------------------------------------------- lista
+function pintarLista() {
+  const cont = $("#lista");
+  if (!datos.servicios.length) { cont.innerHTML = `<div class="vacio">Aún no hay servicios.</div>`; return; }
+  cont.innerHTML = datos.servicios.map(({ servicio: s, ultima, proxima, ultimo_resultado: u }) => `
+    <div class="item ${actual && actual.id === s.id ? "sel" : ""}" data-id="${esc(s.id)}">
+      <div class="nombre"><span class="punto ${s.activo ? "on" : ""}"></span>${esc(s.nombre || "Sin nombre")}</div>
+      <div class="meta">${esc(resumenHorario(s.horario))}</div>
+      <div class="meta">${s.activo ? (proxima ? "Próxima: " + esc(fechaBonita(proxima)) : "") : "Desactivado"}</div>
+      ${ultima ? `<div class="meta">Última: ${esc(fechaBonita(ultima))}${u ? ` · ${u.movidos} ${u.movidos === 1 ? "archivo" : "archivos"}${u.errores ? `, ${u.errores} con error` : ""}` : ""}</div>` : ""}
+    </div>`).join("");
+}
+$("#lista").addEventListener("click", e => {
+  const it = e.target.closest(".item");
+  if (!it) return;
+  if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+  const s = datos.servicios.find(x => x.servicio.id === it.dataset.id).servicio;
+  abrir(JSON.parse(JSON.stringify(s)));
+});
+$("#btnNuevo").onclick = () => {
+  if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
+  abrir({ id: "", nombre: "Nuevo servicio", activo: false, origenes: [], subcarpetas: false,
+    horario: { tipo: "intervalo", cada: 8, unidad: "horas" }, conflicto: "renombrar", esperar_minutos: 10, ignorar: [],
+    reglas: [nuevaRegla()] });
+  abiertas.add(actual.reglas[0]);
+  pintarEditor();
+  sinGuardar = true;
+};
+function nuevaRegla() {
+  return { si: { categorias: [] }, accion: "mover", destino: "", fecha: "modificacion", nuevo_nombre: "" };
+}
+
+// ---------------------------------------------------------------- editor
+function abrir(s) {
+  actual = s; sinGuardar = false; avisosCarpeta = {};
+  s.origenes.forEach(revisarCarpeta);
+  pintarEditor(); pintarLista();
+}
+function cambiado() { sinGuardar = true; }
+
+function pintarEditor() {
+  const s = actual;
+  if (!s) { $("#editor").innerHTML = `<div class="vacio">Elige un servicio o crea uno nuevo.</div>`; return; }
+  const h = s.horario = s.horario || { tipo: "manual" };
+  const rapidas = Object.entries(datos.carpetas_rapidas).map(([n, r]) => `<button class="chico" data-rapida="${esc(r)}">+ ${esc(n)}</button>`).join(" ");
+  $("#editor").innerHTML = `
+  <section>
+    <div class="fila">
+      <div class="campo" style="flex:1;min-width:220px"><span>Nombre del servicio</span><input type="text" data-k="nombre" value="${esc(s.nombre)}"></div>
+      <label style="margin-top:18px"><input type="checkbox" data-k="activo" ${s.activo ? "checked" : ""}> <b>Activo</b></label>
+    </div>
+  </section>
+  <section>
+    <h3>Carpetas donde actúa</h3>
+    ${s.origenes.map((o, i) => `
+      <div class="carpeta"><span class="ruta">${esc(o)}</span><button class="chico peligro" data-quitar-origen="${i}">Quitar</button></div>
+      ${avisosCarpeta[o] ? `<div class="aviso ${avisosCarpeta[o].error ? "error" : ""}">${esc(avisosCarpeta[o].texto)}</div>` : ""}`).join("") || `<p class="ayuda">Todavía no hay carpetas.</p>`}
+    <div class="fila">
+      <button class="prim" id="btnElegirOrigen">Elegir carpeta…</button>
+      ${rapidas}
+    </div>
+    <div class="fila">
+      <input type="text" id="origenManual" placeholder="O escribe una ruta, por ejemplo D:\\Escaneos" style="flex:1">
+      <button id="btnOrigenManual">Añadir</button>
+    </div>
+    <div class="fila">
+      <label><input type="checkbox" data-k="subcarpetas" ${s.subcarpetas ? "checked" : ""}> Incluir subcarpetas</label>
+      <label>Esperar <input type="number" min="0" data-k="esperar_minutos" value="${esc(s.esperar_minutos)}"> min desde la última modificación</label>
+    </div>
+    <div class="fila">
+      <label>Si el archivo ya existe en el destino:
+        <select data-k="conflicto">
+          ${[["renombrar", "Renombrar (archivo (1).pdf)"], ["saltar", "Dejarlo donde está"], ["reemplazar", "Reemplazar el existente"]]
+            .map(([v, t]) => `<option value="${v}" ${s.conflicto === v ? "selected" : ""}>${t}</option>`).join("")}
+        </select></label>
+    </div>
+    <div class="campo"><span>Ignorar archivos (patrones separados por coma, por ejemplo <code>*.ini, borrador*</code>)</span>
+      <input type="text" data-k="ignorar" value="${esc((s.ignorar || []).join(", "))}"></div>
+  </section>
+  <section>
+    <h3>Cuándo se ejecuta</h3>
+    <div class="fila">
+      <select id="tipoHorario">
+        ${[["intervalo", "Cada cierto tiempo"], ["diario", "Todos los días"], ["semanal", "Algunos días de la semana"], ["mensual", "Algunos días del mes"], ["inicio", "Al iniciar sesión en Windows"], ["manual", "Solo cuando pulse Ejecutar"]]
+          .map(([v, t]) => `<option value="${v}" ${h.tipo === v ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      ${h.tipo === "intervalo" ? `
+        <label>cada <input type="number" min="1" step="1" data-h="cada" value="${esc(h.cada ?? 8)}"></label>
+        <select data-h="unidad">${["minutos", "horas", "dias"].map(u => `<option value="${u}" ${h.unidad === u ? "selected" : ""}>${u === "dias" ? "días" : u}</option>`).join("")}</select>` : ""}
+    </div>
+    ${h.tipo === "semanal" ? `<div class="fila"><span class="ayuda">Días:</span><div class="chips">${DIAS.map((d, i) => `<span class="chip ${(h.dias || []).includes(i) ? "on" : ""}" data-dia="${i}">${d}</span>`).join("")}</div></div>` : ""}
+    ${h.tipo === "mensual" ? `<div class="fila"><label>Días del mes <input type="text" style="width:180px" id="diasMes" value="${esc((h.dias_mes || []).join(", "))}" placeholder="1, 15, 31"></label><span class="ayuda">Si pones 31 y el mes tiene menos días, se ejecuta el último día.</span></div>` : ""}
+    ${["diario", "semanal", "mensual"].includes(h.tipo) ? `
+      <div class="fila"><span class="ayuda">Horas:</span>
+        <div class="chips">${(h.horas || []).map((x, i) => `<span class="chip on">${esc(x)} <span class="x" data-quitar-hora="${i}">✕</span></span>`).join("")}</div>
+        <input type="time" id="horaNueva" value="09:00"><button class="chico" id="btnHora">Añadir hora</button>
+      </div>` : ""}
+    <p class="ayuda">Si el equipo está apagado a la hora programada, el servicio se ejecuta en cuanto se encienda.</p>
+  </section>
+  <section>
+    <h3>Reglas <span style="text-transform:none;letter-spacing:0">(se aplica la primera que encaja con cada archivo)</span></h3>
+    ${s.reglas.map((r, i) => pintarRegla(r, i)).join("")}
+    <button id="btnRegla">+ Añadir regla</button>
+  </section>
+  <section>
+    <h3>Historial</h3>
+    <div id="historial" class="ayuda">${s.id ? "Cargando…" : "Guarda el servicio para ver su historial."}</div>
+  </section>
+  <div id="resultado"></div>
+  <div class="acciones">
+    <button class="prim" id="btnGuardar">Guardar</button>
+    <button id="btnSimular">Simular</button>
+    <button id="btnEjecutar" ${s.id ? "" : "disabled"}>Ejecutar ahora</button>
+    <span class="espacio"></span>
+    ${s.id ? `<button class="peligro" id="btnBorrar">Eliminar servicio</button>` : ""}
+  </div>`;
+  if (s.id) cargarHistorial();
+}
+
+function pintarRegla(r, i) {
+  const c = r.si = r.si || {};
+  const cats = c.categorias || [];
+  const accion = r.accion || "mover";
+  const abierta = abiertas.has(r);
+  const cab = `<div class="cab"><b>Regla ${i + 1}</b>
+      <button class="chico" data-abrir-regla>${abierta ? "Plegar" : "Editar"}</button>
+      <button class="chico" data-mover-regla="-1" ${i === 0 ? "disabled" : ""}>↑</button>
+      <button class="chico" data-mover-regla="1" ${i === actual.reglas.length - 1 ? "disabled" : ""}>↓</button>
+      <button class="chico peligro" data-borrar-regla>Quitar</button></div>`;
+  if (!abierta) return `<div class="regla" data-regla="${i}">${cab}<div>${esc(resumenRegla(r))}</div></div>`;
+  return `
+  <div class="regla" data-regla="${i}">
+    ${cab}
+    <div class="grupo">
+      <div class="et">SI</div>
+      <div>
+        <div class="fila"><span class="ayuda">Tipo:</span><div class="chips">${datos.categorias.map(n => `<span class="chip ${cats.includes(n) ? "on" : ""}" data-cat="${esc(n)}">${esc(n)}</span>`).join("")}</div></div>
+        <div class="fila">
+          <div class="campo" style="flex:1;min-width:160px"><span>Extensiones (.pdf, .docx)</span><input type="text" data-c="extensiones" value="${esc(Array.isArray(c.extensiones) ? c.extensiones.join(", ") : c.extensiones || "")}"></div>
+          <div class="campo"><span>Nombre</span><select data-c="nombre_modo">${[["contiene", "contiene"], ["empieza", "empieza por"], ["termina", "termina en"], ["regex", "expresión regular"]].map(([v, t]) => `<option value="${v}" ${(c.nombre_modo || "contiene") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+          <div class="campo" style="flex:1;min-width:140px"><span>&nbsp;</span><input type="text" data-c="nombre_valor" value="${esc(c.nombre_valor || "")}" placeholder="factura"></div>
+        </div>
+        <div class="fila">
+          <label>Tamaño mayor de <input type="number" min="0" step="any" data-c="tamano_mayor_mb" value="${esc(c.tamano_mayor_mb ?? "")}"> MB</label>
+          <label>menor de <input type="number" min="0" step="any" data-c="tamano_menor_mb" value="${esc(c.tamano_menor_mb ?? "")}"> MB</label>
+        </div>
+        <div class="fila">
+          <label>Modificado hace más de <input type="number" min="0" step="any" data-c="antiguedad_mayor_dias" value="${esc(c.antiguedad_mayor_dias ?? "")}"> días</label>
+          <label>menos de <input type="number" min="0" step="any" data-c="antiguedad_menor_dias" value="${esc(c.antiguedad_menor_dias ?? "")}"> días</label>
+        </div>
+        <div class="ayuda">Deja vacío lo que no quieras usar. Si todo está vacío, la regla encaja con cualquier archivo.</div>
+      </div>
+      <div class="et">ENTONCES</div>
+      <div>
+        <div class="fila">
+          <select data-r="accion">${[["mover", "Mover a"], ["copiar", "Copiar a"], ["renombrar", "Renombrar en su sitio"], ["papelera", "Enviar a la papelera"]].map(([v, t]) => `<option value="${v}" ${accion === v ? "selected" : ""}>${t}</option>`).join("")}</select>
+          ${["mover", "copiar"].includes(accion) ? `<input type="text" data-r="destino" value="${esc(r.destino || "")}" placeholder="D:\\Ordenado\\{categoria}\\{año}" style="flex:1;min-width:220px"><button class="chico" data-elegir-destino>Elegir…</button>` : ""}
+        </div>
+        ${["mover", "copiar"].includes(accion) ? `<div class="fila"><span class="ayuda">Variables:</span><div class="chips">${VARIABLES.map(v => `<span class="chip" data-var="${esc(v)}">${esc(v)}</span>`).join("")}</div></div>` : ""}
+        ${accion !== "papelera" ? `
+        <div class="fila">
+          <label>Fecha para {año}/{mes}/{dia}:
+            <select data-r="fecha">${[["modificacion", "Última modificación"], ["creacion", "Creación"], ["captura", "Captura de la foto (si no hay, modificación)"]].map(([v, t]) => `<option value="${v}" ${(r.fecha || "modificacion") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+        </div>
+        <div class="campo"><span>${accion === "renombrar" ? "Nuevo nombre" : "Renombrar al mover (opcional)"}, sin extensión, por ejemplo <code>{año}-{mes_num}-{dia}_{nombre}</code></span>
+          <input type="text" data-r="nuevo_nombre" value="${esc(r.nuevo_nombre || "")}"></div>` : `<div class="ayuda">Los archivos van a la papelera de reciclaje de Windows, desde donde se pueden restaurar. GESTOR nunca borra nada de forma definitiva.</div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+const abiertas = new WeakSet();
+function resumenRegla(r) {
+  const c = r.si || {}, partes = [];
+  if ((c.categorias || []).length) partes.push(c.categorias.join(" o "));
+  const ext = Array.isArray(c.extensiones) ? c.extensiones : (c.extensiones ? [c.extensiones] : []);
+  if (ext.length) partes.push("extensión " + ext.join(", "));
+  const modos = { contiene: "contiene", empieza: "empieza por", termina: "termina en", regex: "cumple" };
+  if (c.nombre_valor) partes.push(`nombre ${modos[c.nombre_modo || "contiene"]} "${c.nombre_valor}"`);
+  if (c.tamano_mayor_mb) partes.push(`más de ${c.tamano_mayor_mb} MB`);
+  if (c.tamano_menor_mb) partes.push(`menos de ${c.tamano_menor_mb} MB`);
+  if (c.antiguedad_mayor_dias) partes.push(`sin modificar hace más de ${c.antiguedad_mayor_dias} días`);
+  if (c.antiguedad_menor_dias) partes.push(`modificado hace menos de ${c.antiguedad_menor_dias} días`);
+  const si = partes.length ? "Si es " + partes.join(", ") : "Cualquier archivo";
+  const que = { mover: `mover a ${r.destino || "(falta destino)"}`, copiar: `copiar a ${r.destino || "(falta destino)"}`,
+    renombrar: `renombrar como ${r.nuevo_nombre || "(falta nombre)"}`, papelera: "enviar a la papelera" }[r.accion || "mover"];
+  const fecha = r.fecha === "captura" ? " · fecha de captura" : r.fecha === "creacion" ? " · fecha de creación" : "";
+  return `${si} → ${que}${r.accion !== "papelera" ? fecha : ""}`;
+}
+
+// eventos del editor (delegados)
+$("#editor").addEventListener("input", e => {
+  const t = e.target, s = actual;
+  if (!s) return;
+  if (t.dataset.k) {
+    const k = t.dataset.k;
+    if (t.type === "checkbox") s[k] = t.checked;
+    else if (k === "ignorar") s.ignorar = t.value.split(",").map(x => x.trim()).filter(Boolean);
+    else if (t.type === "number") s[k] = t.value === "" ? 0 : Number(t.value);
+    else s[k] = t.value;
+    if (k === "activo") pintarLista();
+  } else if (t.dataset.h) {
+    s.horario[t.dataset.h] = t.type === "number" ? Number(t.value) : t.value;
+  } else if (t.id === "diasMes") {
+    s.horario.dias_mes = t.value.split(/[,\s]+/).map(Number).filter(n => n >= 1 && n <= 31);
+  } else {
+    const box = t.closest("[data-regla]");
+    if (!box) return;
+    const r = s.reglas[+box.dataset.regla];
+    if (t.dataset.c) {
+      const v = t.value;
+      if (t.type === "number") r.si[t.dataset.c] = v === "" ? null : Number(v);
+      else if (t.dataset.c === "extensiones") r.si.extensiones = v.split(/[,\s;]+/).filter(Boolean);
+      else r.si[t.dataset.c] = v;
+    } else if (t.dataset.r) {
+      r[t.dataset.r] = t.value;
+      if (t.dataset.r === "accion") pintarEditor();
+    }
+  }
+  cambiado();
+});
+$("#editor").addEventListener("change", e => {
+  if (e.target.id === "tipoHorario") {
+    const tipo = e.target.value, h = actual.horario;
+    actual.horario = { tipo };
+    if (tipo === "intervalo") Object.assign(actual.horario, { cada: h.cada || 8, unidad: h.unidad || "horas" });
+    if (["diario", "semanal", "mensual"].includes(tipo)) actual.horario.horas = h.horas && h.horas.length ? h.horas : ["09:00"];
+    if (tipo === "semanal") actual.horario.dias = h.dias || [0, 1, 2, 3, 4];
+    if (tipo === "mensual") actual.horario.dias_mes = h.dias_mes || [1];
+    cambiado(); pintarEditor();
+  }
+});
+let ultimoDestino = null;
+$("#editor").addEventListener("focusin", e => { if (e.target.dataset.r === "destino" || e.target.dataset.r === "nuevo_nombre") ultimoDestino = e.target; });
+
+$("#editor").addEventListener("click", async e => {
+  const t = e.target, s = actual;
+  const regla = t.closest("[data-regla]");
+  const r = regla ? s.reglas[+regla.dataset.regla] : null;
+  try {
+    if (t.id === "btnElegirOrigen") {
+      t.disabled = true; t.textContent = "Abriendo selector…";
+      const res = await api("/api/elegir-carpeta", { inicial: s.origenes[s.origenes.length - 1] || "" });
+      if (res.carpeta) agregarOrigen(res.carpeta, res);
+      else pintarEditor();
+    } else if (t.dataset.rapida) {
+      agregarOrigen(t.dataset.rapida);
+    } else if (t.id === "btnOrigenManual") {
+      const v = $("#origenManual").value.trim(); if (v) agregarOrigen(v);
+    } else if (t.dataset.quitarOrigen !== undefined) {
+      s.origenes.splice(+t.dataset.quitarOrigen, 1); cambiado(); pintarEditor();
+    } else if (t.dataset.dia !== undefined) {
+      const d = +t.dataset.dia, dias = s.horario.dias = s.horario.dias || [];
+      dias.includes(d) ? dias.splice(dias.indexOf(d), 1) : dias.push(d); dias.sort();
+      cambiado(); pintarEditor();
+    } else if (t.id === "btnHora") {
+      const v = $("#horaNueva").value; const hs = s.horario.horas = s.horario.horas || [];
+      if (v && !hs.includes(v)) { hs.push(v); hs.sort(); } cambiado(); pintarEditor();
+    } else if (t.dataset.quitarHora !== undefined) {
+      s.horario.horas.splice(+t.dataset.quitarHora, 1); cambiado(); pintarEditor();
+    } else if (t.id === "btnRegla") {
+      const nueva = nuevaRegla(); abiertas.add(nueva); s.reglas.push(nueva); cambiado(); pintarEditor();
+    } else if (t.dataset.abrirRegla !== undefined) {
+      abiertas.has(r) ? abiertas.delete(r) : abiertas.add(r); pintarEditor();
+    } else if (t.dataset.borrarRegla !== undefined) {
+      s.reglas.splice(+regla.dataset.regla, 1); cambiado(); pintarEditor();
+    } else if (t.dataset.moverRegla) {
+      const i = +regla.dataset.regla, j = i + +t.dataset.moverRegla;
+      [s.reglas[i], s.reglas[j]] = [s.reglas[j], s.reglas[i]]; cambiado(); pintarEditor();
+    } else if (t.dataset.cat) {
+      const cats = r.si.categorias = r.si.categorias || [];
+      const n = t.dataset.cat; cats.includes(n) ? cats.splice(cats.indexOf(n), 1) : cats.push(n);
+      t.classList.toggle("on"); cambiado();
+    } else if (t.dataset.var) {
+      const input = (ultimoDestino && regla && regla.contains(ultimoDestino)) ? ultimoDestino : regla.querySelector('[data-r="destino"]');
+      const pos = input.selectionStart ?? input.value.length;
+      let ins = t.dataset.var;
+      if (input.dataset.r === "destino" && pos > 0 && !/[\\/]$/.test(input.value.slice(0, pos))) ins = "\\" + ins;
+      input.value = input.value.slice(0, pos) + ins + input.value.slice(pos);
+      r[input.dataset.r] = input.value; input.focus(); cambiado();
+    } else if (t.dataset.elegirDestino !== undefined) {
+      const res = await api("/api/elegir-carpeta", { inicial: (r.destino || "").split("{")[0] });
+      if (res.carpeta) { r.destino = res.carpeta; cambiado(); pintarEditor(); }
+    } else if (t.id === "btnGuardar") {
+      await guardar();
+    } else if (t.id === "btnSimular") {
+      t.disabled = true; t.textContent = "Simulando…";
+      const res = await api("/api/simular", { servicio: s });
+      t.disabled = false; t.textContent = "Simular";
+      pintarResultado(res, true);
+    } else if (t.id === "btnEjecutar") {
+      if (sinGuardar) { aviso("Guarda los cambios antes de ejecutar."); return; }
+      if (!confirm("¿Ejecutar ahora este servicio? Se moverán archivos de verdad (podrás deshacerlo desde el historial).")) return;
+      t.disabled = true; t.textContent = "Ejecutando…";
+      const res = await api("/api/ejecutar", { id: s.id });
+      datos.servicios = res.servicios; pintarLista();
+      t.disabled = false; t.textContent = "Ejecutar ahora";
+      pintarResultado(res.registro, false); cargarHistorial();
+    } else if (t.id === "btnBorrar") {
+      if (!confirm(`¿Eliminar el servicio "${s.nombre}"? Los archivos no se tocan.`)) return;
+      const res = await api("/api/borrar", { id: s.id });
+      datos.servicios = res.servicios; actual = null; sinGuardar = false; pintarEditor(); pintarLista();
+    } else if (t.dataset.deshacer) {
+      if (!confirm("¿Devolver a su sitio los archivos de esa ejecución?")) return;
+      const res = await api("/api/deshacer", { id: s.id, archivo: t.dataset.deshacer });
+      aviso(res.ok ? `${res.devueltos} archivos devueltos${res.fallos.length ? `, ${res.fallos.length} no se pudieron` : ""}.` : res.mensaje);
+      cargarHistorial();
+    }
+  } catch (err) { aviso("Error: " + err.message); pintarEditor(); }
+});
+
+async function revisarCarpeta(c) {
+  try {
+    const res = await api("/api/revisar-carpeta", { carpeta: c });
+    if (!res.existe) avisosCarpeta[c] = { texto: "Esta carpeta no existe ahora mismo (¿un disco desconectado?).", error: true };
+    else if (res.aviso) avisosCarpeta[c] = { texto: res.aviso, error: !res.permitida };
+    else delete avisosCarpeta[c];
+    pintarEditor();
+  } catch (e) { }
+}
+function agregarOrigen(c) {
+  if (actual.origenes.some(o => o.toLowerCase() === c.toLowerCase())) { aviso("Esa carpeta ya está en la lista."); pintarEditor(); return; }
+  actual.origenes.push(c); cambiado(); pintarEditor(); revisarCarpeta(c);
+}
+
+async function guardar() {
+  const s = actual;
+  if (!s.nombre.trim()) { aviso("Ponle un nombre al servicio."); return; }
+  if (s.activo && !s.origenes.length) { aviso("Elige al menos una carpeta antes de activarlo."); return; }
+  const malos = s.reglas.filter(r => ["mover", "copiar"].includes(r.accion) && !(r.destino || "").trim());
+  if (malos.length) { aviso("Hay reglas de mover o copiar sin carpeta de destino."); return; }
+  const res = await api("/api/guardar", { servicio: s });
+  datos.servicios = res.servicios;
+  actual = JSON.parse(JSON.stringify(res.servicios.find(x => x.servicio.id === res.id).servicio));
+  sinGuardar = false; pintarEditor(); pintarLista(); aviso("Guardado.");
+}
+
+function nombreCorto(ruta) { return ruta.split(/[\\/]/).pop(); }
+function pintarResultado(res, simulado) {
+  const ops = res.operaciones || [], errores = res.errores || [], avisos = res.avisos || [];
+  const verbo = { mover: "Mover", copiar: "Copiar", renombrar: "Renombrar", papelera: "Papelera" };
+  $("#resultado").innerHTML = `
+    <section>
+      <h3>${simulado ? "Simulación (no se ha tocado nada)" : "Resultado"}</h3>
+      ${avisos.map(a => `<div class="aviso">${esc(a)}</div>`).join("")}
+      <div class="aviso ${ops.length ? "okmsg" : ""}">${simulado ? `Se procesarían ${ops.length} archivos.` : `${ops.length} archivos procesados.`}${errores.length ? ` ${errores.length} con error.` : ""}</div>
+      ${ops.length || errores.length ? `<div class="resultado"><table>
+        <tr><th>Acción</th><th>Archivo</th><th>Destino</th></tr>
+        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.destino || "Papelera de reciclaje")}</td></tr>`).join("")}
+        ${errores.map(o => `<tr><td style="color:var(--peligro)">Error</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.error)}</td></tr>`).join("")}
+      </table>${ops.length > 500 ? `<p class="ayuda">Y ${ops.length - 500} más…</p>` : ""}</div>` : ""}
+    </section>`;
+  $("#resultado").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function cargarHistorial() {
+  try {
+    const { registros } = await api("/api/registros", { id: actual.id });
+    const cont = $("#historial"); if (!cont) return;
+    cont.innerHTML = registros.length ? `<table>
+      <tr><th>Fecha</th><th>Archivos</th><th>Errores</th><th></th></tr>
+      ${registros.map(r => `<tr><td>${esc(fechaBonita(r.fecha))}</td><td>${r.operaciones.length}</td><td>${r.errores.length}</td>
+        <td>${r.deshecho ? "Deshecho" : r.operaciones.length ? `<button class="chico" data-deshacer="${esc(r.archivo)}">Deshacer</button>` : ""}</td></tr>`).join("")}
+      </table>` : "Todavía no se ha ejecutado.";
+  } catch (e) { }
+}
+
+// ---------------------------------------------------------------- programación
+function pintarProgramacion() {
+  const p = datos.programacion || {};
+  $("#estadoProg").textContent = !datos.windows ? "Programación automática: solo en Windows"
+    : p.instalada ? `Automático: revisa cada ${datos.ajustes.revisar_cada_minutos} min` : "Programación automática desactivada";
+  $("#ajEstado").innerHTML = p.instalada ? `<div class="aviso okmsg">La programación está activa.</div>`
+    : `<div class="aviso">La programación no está activa: los servicios solo se ejecutan con "Ejecutar ahora".</div>`;
+}
+$("#btnAjustes").onclick = () => { $("#ajMinutos").value = datos.ajustes.revisar_cada_minutos; $("#modalAjustes").classList.add("on"); };
+$("#ajCerrar").onclick = () => $("#modalAjustes").classList.remove("on");
+$("#ajGuardar").onclick = async () => {
+  try {
+    const res = await api("/api/ajustes", { revisar_cada_minutos: +$("#ajMinutos").value || 5 });
+    datos.ajustes.revisar_cada_minutos = +$("#ajMinutos").value || 5;
+    datos.programacion = res.programacion; pintarProgramacion(); aviso(res.mensaje);
+  } catch (e) { aviso("Error: " + e.message); }
+};
+$("#ajQuitar").onclick = async () => {
+  const res = await api("/api/quitar-programacion"); datos.programacion = res.programacion; pintarProgramacion(); aviso(res.mensaje);
+};
+$("#btnCerrar").onclick = async () => {
+  if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Cerrar igualmente?")) return;
+  await api("/api/cerrar").catch(() => { });
+  document.body.innerHTML = `<div class="vacio" style="padding:80px">Panel cerrado. Los servicios activos siguen funcionando con la programación automática.</div>`;
+};
+window.addEventListener("beforeunload", e => { if (sinGuardar) { e.preventDefault(); e.returnValue = ""; } });
+setInterval(() => api("/api/latido").catch(() => { }), 60000);
+
+(async () => {
+  datos = await api("/api/inicio");
+  pintarLista(); pintarProgramacion();
+  if (datos.servicios.length) abrir(JSON.parse(JSON.stringify(datos.servicios[0].servicio)));
+})();
+</script>
+</body>
+</html>
