@@ -37,7 +37,7 @@ jobs:
           python -c "import sys; sys.path.insert(0, 'app'); import ocr, bd; print('Idiomas/estado:', ocr.estado()); print('Texto leído:', repr(ocr.texto('recibo.bmp'))); print(bd.leer('ocr:error', None))"
 
       - name: Probar la ventana propia (WebView2)
-        run: python -c "import webview, webview.platforms.winforms as w; print('WebView2 listo:', w.is_chromium() if hasattr(w, 'is_chromium') else 'ok')"
+        run: python -c "import webview, webview.platforms.winforms as w; print('WebView2 listo:', getattr(w, 'is_chromium', '?'))"
 
       - name: Instalar PyInstaller con cargador compilado desde el código fuente
         env:
