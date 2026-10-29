@@ -4,6 +4,8 @@ Todo lo que GESTOR recuerda vive en un solo archivo, gestor.db, dentro de la car
 - datos:       la configuración y el estado (servicios, ajustes, estado...), una fila por clave.
 - movimientos: cada archivo que se movió, copió o fue a la papelera, para siempre.
 - archivos:    dónde está cada uno de tus archivos ahora mismo (si activas el mapa de archivos).
+- etiquetas y notas que le pones a tus archivos (siguen al archivo cuando se mueve).
+- textos:      lo que GESTOR leyó en fotos y PDF escaneados (OCR), para no volver a leerlos.
 
 SQLite aguanta que el panel, el motor y el icono escriban a la vez sin pisarse ni corromperse,
 que era lo que pasaba con los .json cuando Windows o el antivirus los tenían abiertos.
@@ -30,6 +32,11 @@ CREATE TABLE IF NOT EXISTS archivos (
     ruta TEXT PRIMARY KEY, carpeta TEXT, nombre TEXT, busqueda TEXT, ext TEXT,
     bytes INTEGER, mtime REAL, visto REAL);
 CREATE INDEX IF NOT EXISTS arch_carpeta ON archivos(carpeta);
+CREATE INDEX IF NOT EXISTS arch_mtime ON archivos(mtime);
+CREATE TABLE IF NOT EXISTS etiquetas (ruta TEXT, etiqueta TEXT, busqueda TEXT, t REAL, PRIMARY KEY (ruta, etiqueta));
+CREATE INDEX IF NOT EXISTS etq_busqueda ON etiquetas(busqueda);
+CREATE TABLE IF NOT EXISTS notas (ruta TEXT PRIMARY KEY, texto TEXT, busqueda TEXT, t REAL);
+CREATE TABLE IF NOT EXISTS textos (ruta TEXT PRIMARY KEY, mtime REAL, texto TEXT, t REAL);
 """
 
 
@@ -208,6 +215,20 @@ def resumen_movimientos(desde):
     return {"movidos": f[0] or 0, "papelera": f[1] or 0, "bytes_papelera": f[2] or 0}
 
 
+def resumen_periodo(desde, hasta):
+    """Para el informe mensual: movimientos por servicio, por extensión y por día entre dos fechas."""
+    c = con()
+    por_servicio = c.execute("SELECT servicio, quien, COUNT(*), SUM(CASE WHEN accion='papelera' THEN bytes ELSE 0 END) "
+                             "FROM movimientos WHERE t >= ? AND t < ? GROUP BY servicio, quien ORDER BY COUNT(*) DESC",
+                             (desde, hasta)).fetchall()
+    origenes = c.execute("SELECT origen, t FROM movimientos WHERE t >= ? AND t < ? AND quien='gestor'",
+                         (desde, hasta)).fetchall()
+    return {"servicios": [{"servicio": s or "", "quien": q, "n": n, "bytes_papelera": b or 0}
+                          for s, q, n, b in por_servicio],
+            "extensiones": [os.path.splitext(o or "")[1].lower() for o, _ in origenes],
+            "tiempos": [t for _, t in origenes]}
+
+
 def total_movimientos():
     return con().execute("SELECT COUNT(*) FROM movimientos").fetchone()[0]
 
@@ -238,6 +259,7 @@ def archivo_borrado(rutas):
 
 def archivo_movido(antes, despues):
     """Un archivo o una carpeta entera cambió de sitio."""
+    seguir(antes, despues)
     with transaccion() as c:
         sql, args = _dentro(antes)
         filas = c.execute("SELECT ruta FROM archivos WHERE " + sql, args).fetchall()
@@ -263,13 +285,112 @@ def olvidar_no_vistos(raiz, antes_de):
 
 
 def buscar_archivos(texto, limite=200):
-    sql, args = "SELECT ruta, bytes, mtime FROM archivos WHERE 1=1", []
+    """Por nombre, etiqueta o nota: cada palabra tiene que aparecer en alguno de los tres."""
+    sql, args = "SELECT ruta, bytes, mtime FROM archivos a WHERE 1=1", []
     for palabra in sin_acentos(texto).split():
-        sql += " AND busqueda LIKE ?"
-        args.append(f"%{palabra}%")
+        sql += (" AND (a.busqueda LIKE ? OR EXISTS (SELECT 1 FROM etiquetas e WHERE e.ruta=a.ruta AND e.busqueda LIKE ?)"
+                " OR EXISTS (SELECT 1 FROM notas n WHERE n.ruta=a.ruta AND n.busqueda LIKE ?))")
+        args += [f"%{palabra}%"] * 3
     sql += " ORDER BY mtime DESC LIMIT ?"
     args.append(limite)
     return [{"ruta": r, "bytes": b, "mtime": m} for r, b, m in con().execute(sql, args)]
+
+
+def archivos_entre(desde, hasta, limite=3000):
+    """Los archivos del mapa modificados entre dos fechas (para la línea de tiempo)."""
+    return [{"ruta": r, "bytes": b, "mtime": m} for r, b, m in con().execute(
+        "SELECT ruta, bytes, mtime FROM archivos WHERE mtime >= ? AND mtime < ? ORDER BY mtime DESC LIMIT ?",
+        (desde, hasta, limite))]
+
+
+def archivos_bajo(carpeta):
+    """(ruta, bytes) de todo lo que el mapa conoce dentro de una carpeta (para el mapa del disco)."""
+    sql, args = _dentro(carpeta)
+    return con().execute("SELECT ruta, bytes FROM archivos WHERE " + sql, args).fetchall()
+
+
+def hay_otra_copia(ruta, nombre, tam):
+    """¿El mapa conoce otro archivo con el mismo nombre y tamaño?"""
+    return con().execute("SELECT 1 FROM archivos WHERE nombre=? AND bytes=? AND ruta<>? LIMIT 1",
+                         (nombre, tam, ruta)).fetchone() is not None
+
+
+# --------------------------------------------------------------------------- etiquetas y notas
+
+def seguir(antes, despues):
+    """Las etiquetas, notas y textos leídos siguen al archivo (o a la carpeta) cuando se mueve."""
+    sql, args = _dentro(antes)
+    with transaccion() as c:
+        for tabla in ("etiquetas", "notas", "textos"):
+            for (r,) in c.execute(f"SELECT DISTINCT ruta FROM {tabla} WHERE " + sql, args).fetchall():
+                nueva = despues + r[len(antes):]
+                c.execute(f"UPDATE OR REPLACE {tabla} SET ruta=? WHERE ruta=?", (nueva, r))
+
+
+def poner_etiqueta(ruta, etiqueta):
+    etiqueta = " ".join((etiqueta or "").split())[:60]
+    if etiqueta:
+        con().execute("INSERT OR IGNORE INTO etiquetas VALUES (?,?,?,?)",
+                      (ruta, etiqueta, sin_acentos(etiqueta), time.time()))
+
+
+def quitar_etiqueta(ruta, etiqueta):
+    con().execute("DELETE FROM etiquetas WHERE ruta=? AND etiqueta=?", (ruta, etiqueta))
+
+
+def poner_nota(ruta, texto):
+    texto = (texto or "").strip()[:2000]
+    if texto:
+        con().execute("INSERT OR REPLACE INTO notas VALUES (?,?,?,?)", (ruta, texto, sin_acentos(texto), time.time()))
+    else:
+        con().execute("DELETE FROM notas WHERE ruta=?", (ruta,))
+
+
+def etiquetas_de(rutas):
+    """{ruta: {"etiquetas": [...], "nota": "..."}} de una lista de rutas."""
+    salida = {r: {"etiquetas": [], "nota": ""} for r in rutas}
+    rutas = list(salida)
+    for i in range(0, len(rutas), 500):
+        trozo = rutas[i:i + 500]
+        marcas = ",".join("?" * len(trozo))
+        for r, e in con().execute(f"SELECT ruta, etiqueta FROM etiquetas WHERE ruta IN ({marcas}) ORDER BY etiqueta", trozo):
+            salida[r]["etiquetas"].append(e)
+        for r, t in con().execute(f"SELECT ruta, texto FROM notas WHERE ruta IN ({marcas})", trozo):
+            salida[r]["nota"] = t
+    return salida
+
+
+def todas_las_etiquetas():
+    return [{"etiqueta": e, "n": n} for e, n in con().execute(
+        "SELECT etiqueta, COUNT(*) FROM etiquetas GROUP BY etiqueta ORDER BY COUNT(*) DESC, etiqueta")]
+
+
+def buscar_etiquetados(texto, limite=200, exacta=None):
+    """Rutas con esa etiqueta (exacta) o cuyas etiquetas o nota contienen todas las palabras."""
+    if exacta:
+        return [r for (r,) in con().execute("SELECT ruta FROM etiquetas WHERE etiqueta=? ORDER BY t DESC LIMIT ?",
+                                            (exacta, limite))]
+    palabras = sin_acentos(texto).split()
+    if not palabras:
+        return []
+    sql = "SELECT ruta FROM (SELECT ruta, busqueda FROM etiquetas UNION ALL SELECT ruta, busqueda FROM notas) GROUP BY ruta HAVING 1=1"
+    args = []
+    for p in palabras:
+        sql += " AND SUM(busqueda LIKE ?) > 0"
+        args.append(f"%{p}%")
+    sql += " LIMIT ?"
+    return [r for (r,) in con().execute(sql, args + [limite])]
+
+
+# --------------------------------------------------------------------------- textos leídos (OCR)
+
+def texto_guardado(ruta, mtime):
+    f = con().execute("SELECT texto FROM textos WHERE ruta=? AND mtime=?", (ruta, mtime)).fetchone()
+    return f[0] if f else None
+
+
+def guardar_texto(ruta, mtime, texto):
+    con().execute("INSERT OR REPLACE INTO textos VALUES (?,?,?,?)", (ruta, mtime, texto or "", time.time()))
 
 
 def contar_archivos():

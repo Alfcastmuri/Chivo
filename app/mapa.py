@@ -129,12 +129,21 @@ def estado():
     return {**config(), "raices": raices(), "progreso": progreso(), **c}
 
 
-def buscar(texto, limite=200):
-    salida = []
-    for r in bd.buscar_archivos(texto, limite):
-        salida.append({**r, "nombre": os.path.basename(r["ruta"]), "carpeta": os.path.dirname(r["ruta"]),
-                       "existe": os.path.exists(r["ruta"])})
-    return salida
+def buscar(texto, limite=200, etiqueta=None):
+    """Por nombre, etiqueta o nota. Los archivos con etiqueta salen aunque el mapa esté apagado."""
+    filas = [] if etiqueta else (bd.buscar_archivos(texto, limite) if config()["activo"] else [])
+    conocidas = {r["ruta"] for r in filas}
+    for ruta in bd.buscar_etiquetados(texto, limite, exacta=etiqueta):
+        if ruta not in conocidas:
+            try:
+                st = os.stat(ruta)
+                filas.append({"ruta": ruta, "bytes": st.st_size, "mtime": st.st_mtime})
+            except OSError:
+                filas.append({"ruta": ruta, "bytes": 0, "mtime": 0})
+            conocidas.add(ruta)
+    marcas = bd.etiquetas_de([r["ruta"] for r in filas])
+    return [{**r, "nombre": os.path.basename(r["ruta"]), "carpeta": os.path.dirname(r["ruta"]),
+             "existe": os.path.exists(r["ruta"]), **marcas.get(r["ruta"], {})} for r in filas[:limite]]
 
 
 def tras_operaciones(operaciones):

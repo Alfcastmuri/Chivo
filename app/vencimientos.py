@@ -130,11 +130,21 @@ def analizar(ruta):
     return {"tipo": tipo, "fecha": fecha.isoformat() if fecha else "", "fragmento": fragmento[:160]}
 
 
+def _extensiones():
+    ext = set(EXT)
+    if nucleo.ES_WINDOWS:
+        import ocr
+        if ocr.activo():
+            ext |= ocr.EXT_IMAGEN | {".pdf"}  # fotos de la INE, el pasaporte, una póliza...
+    return ext
+
+
 def escanear(segundos=20, limite=30000):
     """Analiza los documentos nuevos o cambiados durante unos segundos. Devuelve True si terminó."""
     d = cargar()
     archivos = d["archivos"]
-    inicio, vistos, terminado = time.time(), set(), True
+    inicio, vistos, por_leer, terminado = time.time(), set(), [], True
+    extensiones = _extensiones()
     for raiz in carpetas_a_revisar():
         if not os.path.isdir(raiz):
             continue
@@ -142,7 +152,7 @@ def escanear(segundos=20, limite=30000):
             subcarpetas[:] = [s for s in subcarpetas if not s.startswith((".", "$"))]
             nucleo.avance(sumar=len(nombres), etapa="Leyendo documentos")
             for n in nombres:
-                if os.path.splitext(n)[1].lower() not in EXT or nucleo._ignorado(n, nucleo.IGNORAR_SIEMPRE):
+                if os.path.splitext(n)[1].lower() not in extensiones or nucleo._ignorado(n, nucleo.IGNORAR_SIEMPRE):
                     continue
                 ruta = os.path.join(carpeta, n)
                 vistos.add(ruta)
@@ -155,15 +165,22 @@ def escanear(segundos=20, limite=30000):
                 previo = archivos.get(ruta)
                 if previo and previo.get("mtime") == int(st.st_mtime):
                     continue
-                if time.time() - inicio > segundos:
-                    terminado = False
-                    continue
                 if st.st_size > 30 * 1024 * 1024:
                     archivos[ruta] = {"mtime": int(st.st_mtime), "tipo": None}
                     continue
-                datos = analizar(ruta) or {"tipo": None}
-                datos["mtime"] = int(st.st_mtime)
-                archivos[ruta] = datos
+                por_leer.append((ruta, int(st.st_mtime)))
+    if nucleo.ES_WINDOWS and por_leer:
+        import ocr
+        fotos = [r for r, _ in por_leer if os.path.splitext(r)[1].lower() in ocr.EXT_IMAGEN][:40]
+        if fotos:
+            ocr.leer_lote(fotos, segundos=max(30, segundos * 3))
+    for ruta, mtime in por_leer:
+        if time.time() - inicio > segundos:
+            terminado = False
+            break
+        datos = analizar(ruta) or {"tipo": None}
+        datos["mtime"] = mtime
+        archivos[ruta] = datos
     if terminado:
         # Lo que ya no existe (o se movió) se olvida; su nueva ubicación se analiza aparte.
         for ruta in [r for r in archivos if r not in vistos]:

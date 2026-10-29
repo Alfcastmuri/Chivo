@@ -28,6 +28,14 @@ jobs:
 
       # El cargador precompilado de PyInstaller lo comparten miles de programas (también malware),
       # y por eso algunos antivirus lo bloquean. Compilarlo aquí genera un .exe propio.
+      - name: Probar el OCR de Windows (informativo)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-ocr"
+          python -c "from PIL import Image, ImageDraw, ImageFont; i = Image.new('RGB', (900, 200), 'white'); d = ImageDraw.Draw(i); d.text((30, 60), 'FECHA LIMITE DE PAGO 15 NOV 26', fill='black', font=ImageFont.truetype('arial.ttf', 44)); i.save('recibo.png')"
+          python -c "import sys; sys.path.insert(0, 'app'); import ocr, bd; print('Idiomas/estado:', ocr.estado()); print('Texto leído:', repr(ocr.texto('recibo.png'))); print(bd.leer('ocr:error', None))"
+
       - name: Instalar PyInstaller con cargador compilado desde el código fuente
         env:
           PYINSTALLER_COMPILE_BOOTLOADER: "1"

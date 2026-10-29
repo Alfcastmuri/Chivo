@@ -18,16 +18,22 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 
+import actualizar
 import aprendizaje
-import nucleo
-import plantillas
+import correo
+import disco
+import informe
 import mapa
+import nucleo
+import pagos
+import plantillas
 import respaldo
 import vencimientos
 
 PUERTO = int(os.environ.get("GESTOR_PUERTO", "8765"))
 PUERTO_RED = int(os.environ.get("GESTOR_PUERTO_RED", "8770"))  # panel para el celular (lo sirve el residente)
-SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes"}
+SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes",
+                 "/api/abrir-archivo", "/api/actualizacion/instalar"}
 TOKEN = secrets.token_urlsafe(24)
 INACTIVIDAD_SEGUNDOS = 5 * 60
 ultima_actividad = time.time()
@@ -129,11 +135,19 @@ PROCESOS_LARGOS = {"/api/simular": "Simulando", "/api/ejecutar": "Ordenando", "/
                    "/api/aplanar/ejecutar": "Sacando a la raíz", "/api/espacio": "Analizando espacio",
                    "/api/duplicados/combinar": "Combinando carpetas", "/api/prueba/aprobar": "Aplicando cambios aprobados",
                    "/api/copias/ejecutar": "Copia a USB", "/api/asistente/analizar": "Analizando carpeta",
-                   "/api/deshacer": "Deshaciendo", "/api/mantenimiento/respaldar-base": "Respaldando la base de datos", "/api/papelera/vaciar": "Vaciando papelera"}
+                   "/api/deshacer": "Deshaciendo", "/api/mantenimiento/respaldar-base": "Respaldando la base de datos", "/api/papelera/vaciar": "Vaciando papelera",
+                   "/api/informe/generar": "Creando el informe mensual", "/api/actualizacion/comprobar": "Buscando actualizaciones"}
 TRABAJOS = {}  # tareas largas en segundo plano: escanear vencimientos, respaldar...
 
 
-NOMBRES_TRABAJOS = {"vencimientos": "Buscando vencimientos", "respaldo": "Respaldo", "mapa": "Mapa de archivos"}
+NOMBRES_TRABAJOS = {"vencimientos": "Buscando vencimientos", "respaldo": "Respaldo", "mapa": "Mapa de archivos",
+                    "pagos": "Leyendo recibos y facturas", "disco": "Mapa del disco", "correo": "Adjuntos de Outlook",
+                    "actualizar": "Actualizando GESTOR"}
+
+
+def _sin_resultado(trabajo):
+    """El estado de un trabajo sin su resultado (que puede ser grande)."""
+    return {k: v for k, v in (trabajo or {}).items() if k != "resultado"} or None
 
 
 def en_segundo_plano(nombre, funcion, *args):
@@ -198,6 +212,9 @@ def dashboard():
         "papelera": {"n": len(papelera), "bytes": sum(p.get("bytes", 0) for p in papelera)},
         "respaldos": respaldos,
         "ultimos": nucleo.ultimos_movimientos(8),
+        "pagos": [p for p in pagos.lista()["pagos"] if p["estado"] == "pendiente"][:6],
+        "retenidos": len(nucleo.retenidos()),
+        "actualizacion": actualizar.estado(),
     }
 
 
@@ -493,7 +510,8 @@ class Manejador(BaseHTTPRequestHandler):
                                           "horas": bool(nm.get("horas")),
                                           "desde": str(nm.get("desde") or "22:00")[:5],
                                           "hasta": str(nm.get("hasta") or "07:00")[:5]}
-            for clave in ("acceso_red", "aprender", "vencimientos", "renombrar_facturas"):
+            for clave in ("acceso_red", "aprender", "vencimientos", "renombrar_facturas", "ocr", "pagos",
+                          "papelera_inteligente", "informe_mensual", "buscar_actualizaciones"):
                 if clave in datos:
                     ajustes[clave] = bool(datos[clave])
             if "detenido" in datos:
@@ -551,6 +569,85 @@ class Manejador(BaseHTTPRequestHandler):
             return en_segundo_plano("mapa", mapa.escanear)
         if ruta == "/api/mapa/buscar":
             return {"archivos": mapa.buscar(datos.get("texto", ""))}
+        if ruta == "/api/etiquetas":
+            return {"etiquetas": nucleo.bd.todas_las_etiquetas()}
+        if ruta == "/api/etiquetas/poner":
+            for r in datos.get("rutas") or [datos.get("ruta")]:
+                if r:
+                    nucleo.bd.poner_etiqueta(r, datos.get("etiqueta", ""))
+            return {"ok": True, "etiquetas": nucleo.bd.todas_las_etiquetas()}
+        if ruta == "/api/etiquetas/quitar":
+            nucleo.bd.quitar_etiqueta(datos["ruta"], datos["etiqueta"])
+            return {"ok": True, "etiquetas": nucleo.bd.todas_las_etiquetas()}
+        if ruta == "/api/notas/poner":
+            nucleo.bd.poner_nota(datos["ruta"], datos.get("texto", ""))
+            return {"ok": True}
+        if ruta == "/api/etiquetas/archivos":
+            return {"archivos": mapa.buscar("", etiqueta=datos.get("etiqueta"))}
+        if ruta == "/api/linea":
+            desde, hasta = float(datos["desde"]), float(datos["hasta"])
+            archivos = nucleo.bd.archivos_entre(desde, hasta) if mapa.config()["activo"] else []
+            marcas = nucleo.bd.etiquetas_de([a["ruta"] for a in archivos])
+            return {"archivos": [{**a, "nombre": os.path.basename(a["ruta"]), "carpeta": os.path.dirname(a["ruta"]),
+                                  "tipo": nucleo.categoria_de(os.path.splitext(a["ruta"])[1].lower()),
+                                  **marcas.get(a["ruta"], {})} for a in archivos],
+                    "movimientos": nucleo.bd.movimientos("", desde, hasta, limite=2000, recientes_primero=True),
+                    "mapa": mapa.config()["activo"]}
+        if ruta == "/api/disco":
+            return {"lugares": disco.lugares(), "trabajo": _sin_resultado(TRABAJOS.get("disco")),
+                    "ultimo": disco.ultimo() if datos.get("con_ultimo") else None}
+        if ruta == "/api/disco/analizar":
+            TRABAJOS.pop("disco-cancelar", None)
+            return en_segundo_plano("disco", disco.analizar, datos["ruta"], lambda: bool(TRABAJOS.get("disco-cancelar")))
+        if ruta == "/api/disco/cancelar":
+            TRABAJOS["disco-cancelar"] = {"estado": "pedido"}
+            return {"ok": True}
+        if ruta == "/api/pagos":
+            return dict(pagos.lista(), trabajo=TRABAJOS.get("pagos"), carpetas=pagos.carpetas_a_revisar(),
+                        activo=nucleo.cargar_ajustes().get("pagos", True))
+        if ruta == "/api/pagos/escanear":
+            return en_segundo_plano("pagos", pagos.escanear, 3600)
+        if ruta == "/api/pagos/cambiar":
+            pagos.cambiar(datos["clave"], datos["estado"])
+            return pagos.lista()
+        if ruta == "/api/pagos/agregar":
+            pagos.agregar(datos.get("proveedor", ""), datos["limite"], datos.get("total"))
+            return pagos.lista()
+        if ruta == "/api/pagos/borrar":
+            pagos.borrar_manual(datos["clave"])
+            return pagos.lista()
+        if ruta == "/api/retenidos":
+            return {"retenidos": nucleo.retenidos()}
+        if ruta == "/api/retenidos/decidir":
+            r = nucleo.decidir_retenido(datos["id"], bool(datos.get("borrar")))
+            return {**r, "retenidos": nucleo.retenidos()}
+        if ruta == "/api/correo":
+            return {**correo.estado(), "trabajo": TRABAJOS.get("correo")}
+        if ruta == "/api/correo/guardar":
+            return correo.guardar_config(datos)
+        if ruta == "/api/correo/revisar":
+            return en_segundo_plano("correo", correo.revisar, True)
+        if ruta == "/api/informes":
+            return {"informes": informe.lista(), "carpeta": informe.carpeta_informes()}
+        if ruta == "/api/informe/generar":
+            r = informe.generar(int(datos["anio"]) if datos.get("anio") else None, int(datos["mes"]) if datos.get("mes") else None)
+            return {**r, "informes": informe.lista()}
+        if ruta == "/api/abrir-archivo":
+            r = os.path.normpath(datos.get("ruta", ""))
+            if not nucleo._dentro_de(r, informe.carpeta_informes()) or not os.path.isfile(r):
+                raise ValueError("Solo se pueden abrir los informes de GESTOR.")
+            if nucleo.ES_WINDOWS:
+                os.startfile(r)
+            return {"ok": True}
+        if ruta == "/api/actualizacion":
+            return actualizar.estado()
+        if ruta == "/api/actualizacion/comprobar":
+            return actualizar.comprobar(forzar=True)
+        if ruta == "/api/actualizacion/instalar":
+            return actualizar.instalar()
+        if ruta == "/api/ocr":
+            import ocr
+            return ocr.estado()
         if ruta == "/api/historial":
             filas = nucleo.bd.movimientos(datos.get("texto", ""), datos.get("desde"), datos.get("hasta"),
                                           limite=int(datos.get("limite") or 300), recientes_primero=True)

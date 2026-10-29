@@ -57,6 +57,8 @@ Name: "{autodesktop}\GESTOR"; Filename: "{app}\GESTOR.exe"; Tasks: escritorio
 [Run]
 Filename: "{app}\GESTOR.exe"; Parameters: "--reiniciar"; StatusMsg: "Activando los servicios de GESTOR..."; Flags: runhidden waituntilterminated
 Filename: "{app}\GESTOR.exe"; Description: "Abrir GESTOR"; Flags: postinstall nowait skipifsilent
+; Actualización automática desde el panel: instala en silencio y vuelve a abrir GESTOR.
+Filename: "{app}\GESTOR.exe"; Flags: nowait; Check: ReabrirTrasActualizar
 
 [UninstallRun]
 Filename: "{app}\GESTOR.exe"; Parameters: "--desinstalar"; Flags: runhidden waituntilterminated; RunOnceId: "QuitarServicios"
@@ -80,6 +82,11 @@ function NoEsLaCopiaInstalada: Boolean;
 begin
   // Si se repara desde la copia del menú Inicio, no se puede sobrescribir a sí misma.
   Result := CompareText(ExpandConstant('{srcexe}'), ExpandConstant('{app}\instalador\GESTOR-Instalador.exe')) <> 0;
+end;
+
+function ReabrirTrasActualizar: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:reabrir|0}') = '1');
 end;
 
 function ClaveDesinstalar: String;

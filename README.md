@@ -80,6 +80,21 @@ El menú lateral agrupa las herramientas en Organizar, Encontrar, Proteger y Al 
 En **Colores** eliges entre 100 combinaciones (por tipo o por color), en modo claro, oscuro o
 automático, o creas y guardas tus propias combinaciones.
 
+Desde la 0.7:
+
+- **Espacio y mapa del disco**: un mapa al estilo WinDirStat de tu carpeta de usuario o de un disco
+  entero (rectángulos del tamaño de cada archivo, coloreados por tipo).
+- **Línea de tiempo**: tus archivos por día, con lo que movió GESTOR y lo que moviste tú.
+- **Etiquetas y notas** en los archivos; se buscan en Buscar y siguen al archivo si se mueve.
+- **OCR de Windows** (`ocr.py`): lee fotos y PDF escaneados para las reglas por contenido, los
+  vencimientos y los pagos. No hay que instalar nada.
+- **Pagos** (`pagos.py`): fechas límite de recibos y facturas, avisos 3 días antes y gastos por proveedor.
+- **Informe mensual en PDF** (`informe.py`) en Documentos\GESTOR\Informes.
+- **Papelera inteligente**: lo que abriste hace poco o no tiene otra copia espera tu decisión.
+- **Adjuntos de correo** (`correo.py`): guarda los adjuntos de Outlook clásico por remitente.
+- **Actualización automática** (`actualizar.py`): consulta GitHub Releases una vez al día. Para
+  publicar una versión, sube `VERSION` y empuja el commit a la rama `publicar`.
+
 - **Plantillas** para Descargas, Documentos, Escritorio, Imágenes, capturas, Vídeos, Música,
   facturas y escaneados. Los documentos van a las subcarpetas que **ya existen** en Documentos
   (Facturas, Contratos, Bancos…); si hay que crear alguna, siempre es dentro de Documentos.

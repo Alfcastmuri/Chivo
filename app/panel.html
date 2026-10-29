@@ -182,6 +182,26 @@ details.mas .caja button { text-align: left; border-color: transparent; }
 .cuenta { font-variant-numeric: tabular-nums; }
 .qr { display: flex; gap: 14px; align-items: center; margin-top: 8px; }
 .qr-img svg { display: block; width: 150px; height: 150px; border-radius: 8px; }
+.chip.tag { font-size: 12px; padding: 1px 8px; margin: 2px 4px 0 0; background: var(--acento-suave); border-color: transparent; color: var(--acento); }
+.nota { font-size: 12px; color: var(--suave); margin-top: 2px; white-space: normal; }
+.nube { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.nube button { border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+.linea { position: relative; margin-top: 8px; }
+.linea::before { content: ""; position: absolute; left: 27px; top: 0; bottom: 0; width: 2px; background: var(--borde); }
+.dia { display: flex; gap: 14px; margin-bottom: 14px; position: relative; }
+.dia-fecha { width: 56px; flex: none; text-align: center; background: var(--panel); border: 2px solid var(--acento); border-radius: 12px; padding: 4px 0; height: fit-content; z-index: 1; }
+.dia-fecha b { display: block; font-size: 20px; line-height: 1.1; }
+.dia-fecha span { font-size: 11px; color: var(--suave); text-transform: uppercase; }
+.dia-cuerpo { flex: 1; min-width: 0; border: 1px solid var(--borde); border-radius: 10px; padding: 8px 12px; background: var(--panel); }
+.dia-cuerpo .renglon .txt { white-space: normal; }
+.tm-marco { position: relative; border: 1px solid var(--borde); border-radius: 6px; overflow: hidden; background: #888; line-height: 0; }
+.tm-marco canvas { width: 100%; display: block; cursor: crosshair; }
+.tm-info { display: none; position: absolute; pointer-events: none; background: rgba(15,20,30,.92); color: #fff; padding: 6px 9px; border-radius: 6px; font-size: 12px; line-height: 1.4; max-width: 250px; word-break: break-all; }
+.tm-info span { color: #b8c2d6; }
+.tm-sel { min-height: 54px; padding: 8px 2px; }
+.tm-camino a { color: var(--acento); text-decoration: none; font-weight: 600; }
+.tm-color { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; }
+tr.pagado td { opacity: .6; }
 .mapa-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin: 4px 0 8px; border: 1px solid var(--borde); border-radius: 8px; background: var(--fondo); }
 /* ---------------- modo cuaderno */
 body.cuaderno {
@@ -243,6 +263,8 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
     <button id="btnSalir">Cerrar sesión</button><button id="btnCerrar">Cerrar panel</button></div></details>
 </header>
 <div class="banda" id="bandaDetenido">GESTOR está detenido: no ordena, no vigila y no muestra el icono. <button class="chico prim" id="btnEncender">Encender GESTOR</button></div>
+<div class="banda" id="bandaActualizar" style="background:var(--acento-suave);color:var(--acento)">⬆ <span id="actuTexto"></span>
+  <button class="chico prim" data-actu-instalar>Actualizar ahora</button><button class="chico" id="actuNotas">Novedades</button></div>
 <div class="banda" id="bandaPausa">GESTOR está en pausa: no se ordenará nada automáticamente. <button class="chico" id="btnReanudar">Reanudar</button></div>
 <div class="marco">
 <nav class="lateral" id="pestanas">
@@ -251,16 +273,18 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
   <button data-vista="Servicios">Servicios</button>
   <button data-vista="Plantillas">Plantillas</button>
   <button data-vista="Raiz">Sacar a la raíz</button>
+  <button data-vista="Correo">Adjuntos de correo</button>
   <div class="grupo-nav">Encontrar</div>
   <button data-vista="Buscar">Buscar</button>
   <button data-vista="Duplicados">Duplicados</button>
-  <button data-vista="Espacio">Espacio</button>
+  <button data-vista="Linea">Línea de tiempo</button>
+  <button data-vista="Espacio">Espacio y mapa del disco</button>
   <div class="grupo-nav">Proteger</div>
   <button data-vista="Respaldo">Respaldo y USB</button>
   <button data-vista="Papelera">Papelera</button>
   <div class="grupo-nav">Al día</div>
-  <button data-vista="Vencimientos">Vencimientos</button>
-  <button data-vista="Estadisticas">Estadísticas</button>
+  <button data-vista="Vencimientos">Pagos y vencimientos</button>
+  <button data-vista="Estadisticas">Estadísticas e informes</button>
   <div class="grupo-nav">Personalizar</div>
   <button data-vista="Colores">🎨 Colores</button>
 </nav>
@@ -278,14 +302,16 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
 </main>
 <main class="vista simple" id="vistaPlantillas"><div class="caja editor" id="plantillas"></div></main>
 <main class="vista simple" id="vistaBuscar"><div class="caja editor" id="buscar"></div></main>
-<main class="vista simple" id="vistaEspacio"><div class="caja editor" id="espacio"></div></main>
-<main class="vista simple" id="vistaVencimientos"><div class="caja editor" id="vencimientos"></div></main>
+<main class="vista simple" id="vistaEspacio"><div class="caja editor" id="discoMapa"></div><div class="caja editor" id="espacio"></div></main>
+<main class="vista simple" id="vistaVencimientos"><div class="caja editor" id="pagos"></div><div class="caja editor" id="vencimientos"></div></main>
+<main class="vista simple" id="vistaLinea"><div class="caja editor" id="linea"></div></main>
+<main class="vista simple" id="vistaCorreo"><div class="caja editor" id="correo"></div></main>
 <main class="vista simple" id="vistaRespaldo"><div class="caja editor" id="respaldo"></div><div class="caja editor" id="copias"></div></main>
 <main class="vista simple" id="vistaAsistente"><div class="caja editor" id="asistente"></div></main>
 <main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
-<main class="vista simple" id="vistaPapelera"><div class="caja editor" id="papelera"></div></main>
+<main class="vista simple" id="vistaPapelera"><div class="caja editor" id="retenidos" style="display:none"></div><div class="caja editor" id="papelera"></div></main>
 <main class="vista simple" id="vistaColores"><div class="caja editor" id="colores"></div></main>
-<main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div></main>
+<main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div><div class="caja editor" id="informes"></div></main>
 </div>
 </div>
 
@@ -325,6 +351,14 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
     <div class="fila"><label><input type="checkbox" id="nmBateria"> Con el portátil en batería</label>
       <label><input type="checkbox" id="nmPantalla"> Con un juego, vídeo o presentación a pantalla completa</label></div>
     <div class="fila"><label><input type="checkbox" id="nmHoras"> Entre las</label> <input type="time" id="nmDesde"> <label>y las</label> <input type="time" id="nmHasta"></div>
+    <h2 style="margin-top:22px">Inteligencia</h2>
+    <div class="fila"><label title="Usa el lector de texto de Windows: sin internet y sin instalar nada"><input type="checkbox" id="prefOcr"> Leer el texto de fotos y PDF escaneados (OCR)</label>
+      <span class="ayuda" id="ocrEstado"></span></div>
+    <div class="fila"><label title="Si un servicio quiere mandar a la papelera algo que abriste hace poco o que no tiene otra copia, te pregunta antes"><input type="checkbox" id="prefPapInt"> Papelera inteligente</label>
+      <label><input type="checkbox" id="prefPagos"> Recordatorios de pago</label></div>
+    <h2 style="margin-top:22px">Actualizaciones</h2>
+    <div class="fila"><label><input type="checkbox" id="prefActu"> Buscar versiones nuevas cada día</label><button class="chico" id="actuBuscar">Buscar ahora</button></div>
+    <div class="ayuda" id="actuEstado"></div>
     <h2 style="margin-top:22px">Facturas</h2>
     <div class="campo"><span>Tus RFC (separados por coma). Se ignoran al buscar el proveedor de una factura, para no tomar el tuyo.</span>
       <input type="text" id="prefRfc" placeholder="XAXX010101000"></div>
@@ -881,7 +915,10 @@ function pintarProgramacion() {
   $("#ajEstado").innerHTML = p.instalada ? `<div class="aviso okmsg">La programación está activa.</div>`
     : `<div class="aviso">La programación no está activa: los servicios solo se ejecutan con "Ejecutar ahora".</div>`;
 }
-$("#btnAjustes").onclick = () => { $("#ajMinutos").value = datos.ajustes.revisar_cada_minutos; $("#modalAjustes").classList.add("on"); pintarRed(); };
+$("#btnAjustes").onclick = () => {
+  $("#ajMinutos").value = datos.ajustes.revisar_cada_minutos; $("#modalAjustes").classList.add("on"); pintarRed(); pintarActualizacionAjustes();
+  api("/api/ocr").then(o => { $("#ocrEstado").textContent = !o.windows ? "Solo en Windows." : o.error ? "No disponible: " + o.error : o.leidos ? `${o.leidos.toLocaleString("es")} archivos leídos.` : ""; }).catch(() => { });
+};
 $("#ajCerrar").onclick = () => $("#modalAjustes").classList.remove("on");
 $("#ajGuardar").onclick = async () => {
   try {
@@ -926,9 +963,10 @@ function mostrarVista(nombre) {
   document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === enMenu));
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
-  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: () => { cargarRespaldo(); cargarCopias(); },
-     Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
-     Copias: cargarCopias, Estadisticas: cargarEstadisticas }[nombre] || (() => { }))();
+  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: () => { cargarDisco(); cargarEspacio(); }, Vencimientos: () => { cargarPagos(); cargarVencimientos(); },
+     Linea: cargarLinea, Correo: cargarCorreo, Respaldo: () => { cargarRespaldo(); cargarCopias(); },
+     Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: () => { cargarRetenidos(); cargarPapelera(); },
+     Copias: cargarCopias, Estadisticas: () => { cargarEstadisticas(); cargarInformes(); } }[nombre] || (() => { }))();
 }
 const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB";
 
@@ -954,7 +992,7 @@ function pintarInicio() {
     detalle.push(e.residente ? "icono activo" : "sin icono");
   }
   detalle.push(plural(sv.activos, "servicio activo", "servicios activos") + ` de ${sv.total}`);
-  const pendientes = sv.en_prueba.filter(x => x.n).length + d.aprendido.length;
+  const pendientes = sv.en_prueba.filter(x => x.n).length + d.aprendido.length + (d.retenidos ? 1 : 0);
   const discosBajos = d.discos.filter(x => x.total && x.libre / x.total * 100 < d.umbral);
   const venceYa = d.vencimientos.filter(v => v.dias <= 30);
 
@@ -984,7 +1022,10 @@ function pintarInicio() {
       <button class="chico prim" data-servicio="${esc(x.id)}">Revisar</button></div>`),
     ...d.aprendido.map(p => `<div class="renglon"><span class="etiqueta verde">aprendí</span>
       <span class="txt" title="${esc(p.ejemplos.join(", "))}">«${esc(p.palabra)}» → <b>${esc(nombreCorto(p.carpeta))}</b> (${p.n})</span>
-      <button class="chico prim" data-ini-apr-si="${esc(p.id)}">Hazlo tú</button><button class="chico" data-ini-apr-no="${esc(p.id)}">No</button></div>`)];
+      <button class="chico prim" data-ini-apr-si="${esc(p.id)}">Hazlo tú</button><button class="chico" data-ini-apr-no="${esc(p.id)}">No</button></div>`),
+    ...(d.retenidos ? [`<div class="renglon"><span class="etiqueta ambar">papelera</span>
+      <span class="txt">${plural(d.retenidos, "archivo espera", "archivos esperan")} tu decisión antes de borrarse</span>
+      <button class="chico prim" data-ir="Papelera">Revisar</button></div>`] : [])];
   const enPruebaSinCambios = sv.en_prueba.filter(x => !x.n);
   const tarjetaPend = `<div class="panelito ${pendientes ? "destacado" : ""}">
     <h3>Pendiente de tu aprobación ${pendientes ? `<span class="etiqueta ambar">${pendientes}</span>` : ""}</h3>
@@ -998,6 +1039,14 @@ function pintarInicio() {
       <span class="etiqueta ${v.dias <= 7 ? "rojo" : v.dias <= 30 ? "ambar" : ""}">${esc(diasTexto(v.dias))}</span>
       <span class="txt" title="${esc(v.ruta || v.nombre)}"><b>${esc(v.tipo)}</b> · ${esc(v.nombre)}</span></div>`).join("")
       : `<div class="ayuda">Nada vence en los próximos 60 días.</div>`}
+  </div>`;
+
+  const tarjetaPagos = `<div class="panelito ${d.pagos.some(p => p.dias <= 3) ? "destacado" : ""}">
+    <h3>Pagos <button class="chico ir" data-ir="Vencimientos">Ver todos</button></h3>
+    ${d.pagos.length ? d.pagos.map(p => `<div class="renglon">
+      <span class="etiqueta ${p.dias < 0 ? "rojo" : p.dias <= 3 ? "ambar" : ""}">${p.dias < 0 ? `venció hace ${-p.dias} d` : p.dias === 0 ? "hoy" : p.dias === 1 ? "mañana" : `en ${p.dias} días`}</span>
+      <span class="txt" title="${esc(p.ruta || "")}"><b>${esc(p.proveedor)}</b></span><span class="der"><b>${p.total != null ? "$" + Number(p.total).toLocaleString("es-MX", { minimumFractionDigits: 2 }) : ""}</b></span></div>`).join("")
+      : `<div class="ayuda">No hay pagos pendientes.</div>`}
   </div>`;
 
   const tarjetaDiscos = `<div class="panelito ${discosBajos.length ? "destacado" : ""}">
@@ -1039,7 +1088,8 @@ function pintarInicio() {
   </div>`;
 
   const atajos = [["Plantillas", "Plantillas", "Servicios listos para cada carpeta"], ["Buscar", "Buscar", "¿A dónde fue mi archivo?"],
-    ["Duplicados", "Duplicados", "Archivos repetidos en el disco"], ["Raiz", "Sacar a la raíz", "Vaciar subcarpetas"]];
+    ["Duplicados", "Duplicados", "Archivos repetidos en el disco"], ["Espacio", "Mapa del disco", "Qué ocupa tu espacio"],
+    ["Linea", "Línea de tiempo", "Tus archivos día a día"], ["Raiz", "Sacar a la raíz", "Vaciar subcarpetas"]];
   const tarjetaAtajos = `<div class="panelito doble"><h3>Accesos rápidos</h3>
     <div class="tarjetas" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin:0;gap:8px">${atajos.map(([v, t, a]) =>
       `<button data-ir="${v}" style="text-align:left;padding:10px"><b>${esc(t)}</b><div class="ayuda">${esc(a)}</div></button>`).join("")}</div></div>`;
@@ -1053,7 +1103,7 @@ function pintarInicio() {
       <div class="ayuda">${avisos.length ? avisos.map(esc).join(" ") : "Todo en orden. GESTOR sigue trabajando por ti."}</div></div>
     <div class="tablero">
       ${tarjetaEstado}${tarjetaPend}${tarjetaActividad}
-      ${tarjetaVence}${tarjetaDiscos}${tarjetaServicios}
+      ${tarjetaPagos}${tarjetaVence}${tarjetaDiscos}${tarjetaServicios}
       ${tarjetaRespaldo}${tarjetaAtajos}
       ${tarjetaUltimos}
     </div>`;
@@ -1361,6 +1411,8 @@ function pintarPreferencias() {
   $("#prefSemanal").checked = a.aviso_semanal !== false;
   $("#prefUmbral").value = a.umbral_disco ?? 10;
   $("#prefRfc").value = a.mis_rfc || "";
+  $("#prefOcr").checked = a.ocr !== false; $("#prefPapInt").checked = a.papelera_inteligente !== false;
+  $("#prefPagos").checked = a.pagos !== false; $("#prefActu").checked = a.buscar_actualizaciones !== false;
   const nm = a.no_molestar || {};
   $("#nmBateria").checked = !!nm.bateria; $("#nmPantalla").checked = !!nm.pantalla_completa; $("#nmHoras").checked = !!nm.horas;
   $("#nmDesde").value = nm.desde || "22:00"; $("#nmHasta").value = nm.hasta || "07:00";
@@ -1386,6 +1438,10 @@ $("#btnDetener").onclick = async () => {
 $("#prefAprender").onchange = e => guardarPreferencias({ aprender: e.target.checked });
 $("#prefVence").onchange = e => guardarPreferencias({ vencimientos: e.target.checked });
 $("#prefRenFact").onchange = e => guardarPreferencias({ renombrar_facturas: e.target.checked });
+$("#prefOcr").onchange = e => guardarPreferencias({ ocr: e.target.checked });
+$("#prefPapInt").onchange = e => guardarPreferencias({ papelera_inteligente: e.target.checked });
+$("#prefPagos").onchange = e => guardarPreferencias({ pagos: e.target.checked });
+$("#prefActu").onchange = e => guardarPreferencias({ buscar_actualizaciones: e.target.checked });
 $("#prefRed").onchange = async e => {
   const r0 = await api("/api/red");
   if (e.target.checked && !r0.hay_clave) { e.target.checked = false; aviso("Primero crea una contraseña."); return; }
@@ -1536,7 +1592,8 @@ function pintarBuscar() {
   const prog = m && m.progreso || {};
   $("#buscar").innerHTML = `
     <h2>Buscar un archivo</h2>
-    <p class="ayuda">Escribe parte del nombre. Te digo dónde está ahora y todo lo que le ha pasado (lo que movió GESTOR y lo que moviste tú).</p>
+    <p class="ayuda">Escribe parte del nombre, una etiqueta o algo de una nota. Te digo dónde está ahora y todo lo que le ha pasado (lo que movió GESTOR y lo que moviste tú).
+      Ponle etiquetas a tus archivos (🏷) como «garantía» o «impuestos» para encontrarlos por tema.</p>
     <div class="fila"><input type="text" id="bqTexto" value="${esc(busqueda.texto)}" placeholder="factura cfe, IMG_2024, contrato…" style="flex:1"><button class="prim" id="bqIr">Buscar</button></div>
     ${m ? `<div class="mapa-estado">
       <label><input type="checkbox" id="mapaActivo" ${m.activo ? "checked" : ""}> <b>Mapa de archivos</b></label>
@@ -1547,10 +1604,11 @@ function pintarBuscar() {
     ${busqueda.verCarpetas && m.activo ? `<div class="grupo-dup"><p class="ayuda" style="margin-top:0">Carpetas que vigila el mapa${m.carpetas.length ? "" : " (las de siempre: Documentos, Descargas, Escritorio, Imágenes, Vídeos y Música)"}:</p>
       ${m.raices.map((c, i) => `<div class="carpeta"><span class="ruta">${esc(c)}</span>${m.carpetas.length ? `<button class="chico peligro" data-mapa-quitar="${i}">Quitar</button>` : ""}</div>`).join("")}
       <button class="chico" id="mapaAnadir">+ Añadir carpeta o disco</button></div>` : ""}` : ""}
-    ${a ? `<section><h3>Dónde está ahora ${a.length ? `<span class="ayuda">(${a.length})</span>` : ""}</h3>
-      ${a.length ? `<div class="resultado" style="max-height:300px"><table>${a.map(x => `<tr><td><b>${esc(x.nombre)}</b><div class="ayuda">${esc(x.carpeta)}</div></td>
+    ${todasEtiquetas.length ? `<div class="nube"><span class="ayuda">Tus etiquetas:</span>${todasEtiquetas.slice(0, 30).map(e => `<button data-bq-tag="${esc(e.etiqueta)}" class="${busqueda.etiqueta === e.etiqueta ? "prim" : ""}">🏷 ${esc(e.etiqueta)} <span class="ayuda">${e.n}</span></button>`).join("")}</div>` : ""}
+    ${a ? `<section><h3>${busqueda.etiqueta ? `Con la etiqueta «${esc(busqueda.etiqueta)}»` : "Dónde está ahora"} ${a.length ? `<span class="ayuda">(${a.length})</span>` : ""}</h3>
+      ${a.length ? `<div class="resultado" style="max-height:420px"><table>${a.map(x => `<tr><td><b>${esc(x.nombre)}</b><div class="ayuda">${esc(x.carpeta)}</div>${marcasDe(x)}</td>
         <td class="ayuda" style="white-space:nowrap">${mb(x.bytes || 0)}</td>
-        <td style="text-align:right">${x.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(x.ruta)}">Abrir carpeta</button>` : ""}</td></tr>`).join("")}</table></div>`
+        <td style="text-align:right;white-space:nowrap">${botonesMarcas(x)}${x.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(x.ruta)}">Abrir carpeta</button>` : ""}</td></tr>`).join("")}</table></div>`
         : `<p class="ayuda">${m && m.activo ? "No hay ningún archivo con ese nombre en las carpetas del mapa." : "Activa el mapa de archivos para saber dónde está cualquier archivo."}</p>`}</section>` : ""}
     ${r ? `<section><h3>Historial ${r.total ? `<span class="ayuda">(${r.total})</span>` : ""}</h3>
       ${r.resultados.length ? `<div class="resultado"><table><tr><th>Fecha</th><th>Archivo</th><th>Qué pasó</th><th></th></tr>
@@ -1565,15 +1623,21 @@ function pintarBuscar() {
 }
 async function cargarBuscar() {
   try { busqueda.mapa = await api("/api/mapa"); } catch (e) { }
+  await cargarEtiquetas();
   if ((busqueda.mapa && busqueda.mapa.progreso || {}).estado === "escaneando") sondearProcesos();
   pintarBuscar();
 }
 async function buscarAhora() {
-  busqueda.texto = $("#bqTexto").value.trim();
+  busqueda.texto = $("#bqTexto").value.trim(); busqueda.etiqueta = null;
   const [h, m] = await Promise.all([api("/api/buscar", { texto: busqueda.texto }),
-    busqueda.mapa && busqueda.mapa.activo && busqueda.texto ? api("/api/mapa/buscar", { texto: busqueda.texto }) : Promise.resolve(null)]);
+    busqueda.texto ? api("/api/mapa/buscar", { texto: busqueda.texto }) : Promise.resolve(null)]);
   busqueda.res = h; busqueda.ahora = m ? m.archivos : (busqueda.texto ? [] : null);
   pintarBuscar();
+}
+async function buscarEtiqueta(etq) {
+  busqueda.etiqueta = etq; busqueda.res = null;
+  busqueda.ahora = (await api("/api/etiquetas/archivos", { etiqueta: etq })).archivos;
+  await cargarEtiquetas(); pintarBuscar();
 }
 async function guardarMapa(cambios) {
   busqueda.mapa = await api("/api/mapa/guardar", cambios); pintarBuscar();
@@ -1581,7 +1645,9 @@ async function guardarMapa(cambios) {
 $("#buscar").addEventListener("click", async e => {
   const t = e.target;
   try {
+    if (await accionMarcas(e.target.closest("button, .x") || t, () => busqueda.etiqueta ? buscarEtiqueta(busqueda.etiqueta) : buscarAhora())) return;
     if (t.id === "bqIr") await buscarAhora();
+    else if (t.closest("[data-bq-tag]")) await buscarEtiqueta(t.closest("[data-bq-tag]").dataset.bqTag);
     else if (t.id === "mapaRepasar") { await api("/api/mapa/escanear"); aviso("Repasando tus carpetas…"); setTimeout(cargarBuscar, 800); setTimeout(sondearProcesos, 400); }
     else if (t.id === "mapaCarpetas") { busqueda.verCarpetas = !busqueda.verCarpetas; pintarBuscar(); }
     else if (t.id === "mapaAnadir") {
@@ -1976,7 +2042,7 @@ function pintarVencimientos() {
   $("#vencimientos").innerHTML = `
     <h2>Vencimientos</h2>
     <p class="ayuda">GESTOR lee pólizas, contratos, INE, pasaportes, licencias y garantías en ${r.carpetas.map(c => `<code>${esc(c)}</code>`).join(", ")}
-      y te avisa un mes antes, una semana antes y el día que vencen. Las fotos o escaneos sin texto no se pueden leer: añádelos a mano.
+      y te avisa un mes antes, una semana antes y el día que vencen. ${datos.windows ? "Las fotos y los escaneos se leen con el OCR de Windows." : "Las fotos o escaneos sin texto no se pueden leer: añádelos a mano."}
       ${r.ultimo_escaneo ? `Última revisión completa: ${esc(fechaBonita(new Date(r.ultimo_escaneo * 1000).toISOString()))}.` : "Aún no se ha terminado de revisar todo."}</p>
     <div class="fila"><button id="vcEscanear" ${r.trabajo && r.trabajo.estado === "en marcha" ? "disabled" : ""}>${r.trabajo && r.trabajo.estado === "en marcha" ? "Revisando documentos…" : "Revisar ahora"}</button></div>
     <div class="fila"><input type="text" id="vcNombre" placeholder="Añadir a mano: Pasaporte de Alfonso" style="flex:1;min-width:180px">
@@ -2082,6 +2148,423 @@ $("#respaldo").addEventListener("click", async e => {
   } catch (err) { aviso("Error: " + err.message); }
 });
 
+// ---------------------------------------------------------------- etiquetas y notas (en Buscar y en la línea de tiempo)
+let todasEtiquetas = [];
+async function cargarEtiquetas() { try { todasEtiquetas = (await api("/api/etiquetas")).etiquetas; } catch (e) { } }
+function marcasDe(x) {
+  return `${(x.etiquetas || []).map(t => `<span class="chip tag">🏷 ${esc(t)} <span class="x" data-tag-quitar="${esc(t)}" data-ruta="${esc(x.ruta)}" title="Quitar etiqueta">✕</span></span>`).join("")}
+    ${x.nota ? `<div class="nota">📝 ${esc(x.nota)}</div>` : ""}`;
+}
+function botonesMarcas(x) {
+  return `<button class="chico" data-tag-poner="${esc(x.ruta)}" title="Ponerle una etiqueta">🏷</button><button class="chico" data-nota="${esc(x.ruta)}" data-nota-actual="${esc(x.nota || "")}" title="Escribirle una nota">📝</button>`;
+}
+async function accionMarcas(t, despues) {
+  if (t.dataset.tagPoner) {
+    const sug = todasEtiquetas.slice(0, 8).map(e => e.etiqueta).join(", ");
+    const etq = prompt(`Etiqueta para este archivo (por ejemplo: garantía, pendiente de pagar, impuestos)${sug ? `\nYa usas: ${sug}` : ""}`);
+    if (!etq || !etq.trim()) return true;
+    todasEtiquetas = (await api("/api/etiquetas/poner", { ruta: t.dataset.tagPoner, etiqueta: etq.trim() })).etiquetas;
+    aviso("Etiqueta puesta."); await despues(); return true;
+  }
+  if (t.dataset.tagQuitar) {
+    todasEtiquetas = (await api("/api/etiquetas/quitar", { ruta: t.dataset.ruta, etiqueta: t.dataset.tagQuitar })).etiquetas;
+    await despues(); return true;
+  }
+  if (t.dataset.nota !== undefined && t.dataset.nota) {
+    const texto = prompt("Nota para este archivo (déjala vacía para borrarla):", t.dataset.notaActual || "");
+    if (texto === null) return true;
+    await api("/api/notas/poner", { ruta: t.dataset.nota, texto }); aviso(texto.trim() ? "Nota guardada." : "Nota borrada."); await despues(); return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------- línea de tiempo
+const ICONO_TIPO = { "Imágenes": "🖼", "Vídeos": "🎬", "Música": "🎵", "Documentos": "📄", "Hojas de cálculo": "📊", "Presentaciones": "📽", "Comprimidos": "🗜", "Instaladores": "⚙", "Código": "💻", "Accesos directos": "🔗", "Otros": "📎" };
+let linea = { mes: null, res: null, abiertos: new Set() };
+async function cargarLinea() {
+  if (!linea.mes) { const h = new Date(); linea.mes = new Date(h.getFullYear(), h.getMonth(), 1); }
+  const desde = linea.mes, hasta = new Date(desde.getFullYear(), desde.getMonth() + 1, 1);
+  $("#linea").innerHTML = `<h2>Línea de tiempo</h2><p class="ayuda">Cargando…</p>`;
+  linea.res = await api("/api/linea", { desde: desde.getTime() / 1000, hasta: hasta.getTime() / 1000 });
+  if (!todasEtiquetas.length) await cargarEtiquetas();
+  pintarLinea();
+}
+function pintarLinea() {
+  const r = linea.res, dias = {};
+  const clave = t => { const d = new Date(t * 1000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  r.archivos.forEach(a => (dias[clave(a.mtime)] ||= { archivos: [], movs: [] }).archivos.push(a));
+  r.movimientos.forEach(m => (dias[clave(m.t)] ||= { archivos: [], movs: [] }).movs.push(m));
+  const mesTxt = linea.mes.toLocaleDateString("es", { month: "long", year: "numeric" }).replace(/^./, c => c.toUpperCase());
+  const hoyMes = new Date(); const esActual = linea.mes.getFullYear() === hoyMes.getFullYear() && linea.mes.getMonth() === hoyMes.getMonth();
+  const verbo = { mover: "movido a", copiar: "copiado a", renombrar: "renombrado", papelera: "a la papelera", archivar: "archivado", borrado: "borrado" };
+  $("#linea").innerHTML = `
+    <h2>Línea de tiempo</h2>
+    <p class="ayuda">Tus archivos por fecha, como un diario: lo que creaste o cambiaste cada día y lo que se movió.${r.mapa ? "" : " <b>Activa el mapa de archivos (en Buscar) para ver también los archivos de cada día;</b> ahora solo se ven los movimientos."}</p>
+    <div class="fila linea-mes"><button data-lm="-1">‹</button><b style="min-width:150px;text-align:center">${esc(mesTxt)}</b><button data-lm="1" ${esConActual(esActual)}>›</button>
+      <span class="ayuda">${r.archivos.length.toLocaleString("es")} archivos · ${r.movimientos.length.toLocaleString("es")} movimientos${r.archivos.length >= 3000 ? " (se muestran los 3000 más recientes)" : ""}</span></div>
+    ${Object.keys(dias).length ? `<div class="linea">${Object.keys(dias).sort().reverse().map(k => {
+      const d = dias[k], fecha = new Date(k + "T12:00"), abierto = linea.abiertos.has(k);
+      const porTipo = {}; d.archivos.forEach(a => porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1);
+      const gestor = d.movs.filter(m => m.quien !== "tu").length, tuyos = d.movs.length - gestor;
+      const lista = abierto ? d.archivos : d.archivos.slice(0, 8);
+      return `<div class="dia"><div class="dia-fecha"><b>${fecha.getDate()}</b><span>${esc(fecha.toLocaleDateString("es", { weekday: "short" }))}</span></div>
+        <div class="dia-cuerpo">
+          <div class="fila" style="margin-bottom:6px">${Object.entries(porTipo).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<span class="chip">${ICONO_TIPO[t] || "📎"} ${n} ${esc(t.toLowerCase())}</span>`).join("")}
+            ${gestor ? `<span class="chip">🤖 GESTOR movió ${gestor}</span>` : ""}${tuyos ? `<span class="chip">👤 Tú moviste ${tuyos}</span>` : ""}</div>
+          ${lista.map(a => `<div class="renglon"><span>${ICONO_TIPO[a.tipo] || "📎"}</span><div class="txt" title="${esc(a.ruta)}"><b>${esc(a.nombre)}</b> <span class="ayuda">${esc(a.carpeta)} · ${new Date(a.mtime * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })} · ${mb(a.bytes || 0)}</span>${marcasDe(a)}</div>
+            ${botonesMarcas(a)}${datos.en_red ? "" : `<button class="chico" data-abrir-ruta="${esc(a.ruta)}">Abrir carpeta</button>`}</div>`).join("")}
+          ${abierto && d.movs.length ? d.movs.map(m => `<div class="renglon"><span>${m.quien === "tu" ? "👤" : "🤖"}</span><div class="txt" title="${esc(m.o)}">${esc(nombreCorto(m.o || ""))} <span class="ayuda">${esc(verbo[m.a] || m.a)} ${m.d ? esc(m.d) : ""} · ${esc(m.s || "")}</span></div></div>`).join("") : ""}
+          ${d.archivos.length > 8 || d.movs.length ? `<button class="chico" data-ld="${k}">${abierto ? "Ver menos" : `Ver todo${d.archivos.length > 8 ? ` (${d.archivos.length} archivos)` : ""}${d.movs.length ? ` y ${d.movs.length} movimientos` : ""}`}</button>` : ""}
+        </div></div>`; }).join("")}</div>` : `<p class="ayuda">Nada en este mes.</p>`}`;
+}
+function esConActual(esActual) { return esActual ? "disabled" : ""; }
+$("#linea").addEventListener("click", async e => {
+  const t = e.target.closest("button, .x") || e.target;
+  try {
+    if (await accionMarcas(t, cargarLinea)) return;
+    if (t.dataset.lm) { linea.mes = new Date(linea.mes.getFullYear(), linea.mes.getMonth() + +t.dataset.lm, 1); linea.abiertos = new Set(); cargarLinea(); }
+    else if (t.dataset.ld) { linea.abiertos.has(t.dataset.ld) ? linea.abiertos.delete(t.dataset.ld) : linea.abiertos.add(t.dataset.ld); pintarLinea(); }
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+  } catch (err) { aviso("Error: " + err.message); }
+});
+
+// ---------------------------------------------------------------- mapa del disco (estilo WinDirStat)
+const COLORES_TM = [[64, 105, 240], [235, 64, 64], [64, 200, 64], [240, 210, 40], [40, 200, 220], [210, 64, 220], [255, 140, 30], [150, 100, 255],
+  [120, 200, 120], [250, 120, 170], [140, 140, 255], [200, 160, 90]];
+let tm = { res: null, raiz: null, camino: [], hojas: [], colorExt: {}, sel: null, sondeo: null, lugares: [] };
+async function cargarDisco() {
+  const r = await api("/api/disco", { con_ultimo: !tm.res });
+  tm.lugares = r.lugares;
+  if (!tm.res && r.ultimo) { tm.res = r.ultimo; prepararTm(); }
+  tm.trabajo = r.trabajo;
+  pintarDisco();
+  clearTimeout(tm.sondeo);
+  if (r.trabajo && r.trabajo.estado === "en marcha") tm.sondeo = setTimeout(async () => {
+    const r2 = await api("/api/disco");
+    if (!r2.trabajo || r2.trabajo.estado !== "en marcha") {
+      if (r2.trabajo && r2.trabajo.estado === "error") aviso("No se pudo medir: " + r2.trabajo.error);
+      const u = await api("/api/disco", { con_ultimo: true }); if (u.ultimo) { tm.res = u.ultimo; prepararTm(); }
+    }
+    if (vistaActual === "Espacio") cargarDisco();
+  }, 1500);
+}
+function prepararTm() {
+  tm.raiz = tm.res.arbol; tm.camino = [tm.raiz]; tm.sel = null; tm.colorExt = {};
+  tm.res.tipos.slice(0, COLORES_TM.length).forEach((t, i) => tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] = COLORES_TM[i]);
+}
+function pintarDisco() {
+  const r = tm.res, enMarcha = tm.trabajo && tm.trabajo.estado === "en marcha";
+  const actual = tm.camino[tm.camino.length - 1];
+  $("#discoMapa").innerHTML = `
+    <h2>Mapa del disco</h2>
+    <p class="ayuda">Cada rectángulo es un archivo, de tamaño proporcional a lo que ocupa y con el color de su tipo, como en WinDirStat.
+      Los bloques grandes son los que más espacio te quitan. Haz clic en uno para ver qué es; doble clic para entrar en su carpeta.</p>
+    <div class="fila">${tm.lugares.map(l => `<button class="chico" data-tm-medir="${esc(l.ruta)}" ${enMarcha ? "disabled" : ""}>${esc(l.nombre)}${l.total ? ` <span class="ayuda">(${mb(l.total - l.libre)} usados)</span>` : ""}</button>`).join("")}
+      ${datos.en_red ? "" : `<button class="chico" id="tmElegir" ${enMarcha ? "disabled" : ""}>Elegir carpeta…</button>`}
+      ${enMarcha ? `<span class="ayuda">Midiendo… (puede tardar unos minutos en un disco entero)</span><button class="chico" id="tmCancelar">Cancelar</button>` : ""}</div>
+    ${r ? `<div class="fila tm-camino">${tm.camino.map((n, i) => `<a href="#" data-tm-subir="${i}">${esc(i ? n[0] : r.raiz)}</a>`).join(" › ")}
+        <span class="ayuda">· ${mb(actual[1])} · ${(actual[4] || 0).toLocaleString("es")} archivos · medido ${esc(fechaBonita(r.fecha))} en ${r.segundos} s</span></div>
+      <div class="tm-marco"><canvas id="tmLienzo"></canvas><div class="tm-info" id="tmInfo"></div></div>
+      <div id="tmSel" class="tm-sel">${pintarSelTm()}</div>
+      <section><h3>Tipos de archivo</h3><div class="resultado" style="max-height:260px"><table>
+        <tr><th></th><th>Tipo</th><th>Ocupa</th><th>%</th><th>Archivos</th></tr>
+        ${r.tipos.slice(0, 30).map(t => { const c = tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] || [170, 170, 170];
+          return `<tr><td><span class="tm-color" style="background:rgb(${c})"></span></td><td><b>${esc(t[0])}</b> <span class="ayuda">${esc(t[3])}</span></td><td>${mb(t[1])}</td>
+          <td>${(t[1] * 100 / (r.bytes || 1)).toFixed(1)} %</td><td>${t[2].toLocaleString("es")}</td></tr>`; }).join("")}
+      </table></div></section>` : `<p class="ayuda">${enMarcha ? "" : "Elige qué medir: tu carpeta de usuario es rápida; un disco entero tarda más."}</p>`}`;
+  if (r) requestAnimationFrame(dibujarTm);
+}
+function pintarSelTm() {
+  const s = tm.sel; if (!s) return `<span class="ayuda">Pasa el ratón por encima para ver qué es cada bloque.</span>`;
+  const esCarpeta = !!s.nodo[3];
+  return `<b>${esc(s.nodo[0])}</b> <span class="ayuda">${mb(s.nodo[1])}${esCarpeta ? ` · ${(s.nodo[4] || 0).toLocaleString("es")} archivos` : ""}</span>
+    <div class="ayuda" style="word-break:break-all">${esc(s.ruta)}</div>
+    <div class="fila" style="margin:6px 0 0">${datos.en_red || s.nodo[2] === "~" ? "" : `<button class="chico" data-abrir-ruta="${esc(s.ruta)}">Abrir carpeta</button>`}
+      ${s.carpeta && s.carpeta !== tm.camino[tm.camino.length - 1] ? `<button class="chico" data-tm-entrar>Entrar en ${esc(s.carpeta[0])}</button>` : ""}</div>`;
+}
+function rutaTm(cadena) {
+  const sep = tm.res.raiz.includes("\\") ? "\\" : "/";
+  return [tm.res.raiz.replace(/[\\/]+$/, ""), ...cadena.slice(1).map(n => n[0])].join(sep);
+}
+function dibujarTm() {
+  const lienzo = $("#tmLienzo"); if (!lienzo) return;
+  const W = Math.max(200, Math.floor(lienzo.parentElement.clientWidth)), H = Math.max(260, Math.min(560, Math.floor(W * 0.55)));
+  lienzo.width = W; lienzo.height = H;
+  const ctx = lienzo.getContext("2d"), img = ctx.createImageData(W, H), px = img.data;
+  const luz = [-0.09759, -0.19518, 0.9759], ALTURA = 0.38, F = 0.75;
+  tm.hojas = [];
+  const raiz = tm.camino[tm.camino.length - 1];
+  const prefijo = tm.camino.slice(0, -1);
+  // Treemap «squarified» con relieve (cushion) como WinDirStat.
+  function cresta(s, x1, x2, y1, y2, h) {
+    s[0] += -4 * h / (x2 - x1); s[1] += 4 * h * (x2 + x1) / (x2 - x1);
+    s[2] += -4 * h / (y2 - y1); s[3] += 4 * h * (y2 + y1) / (y2 - y1);
+  }
+  function pintar(x1, y1, x2, y2, s, color) {
+    const xa = Math.round(x1), xb = Math.round(x2), ya = Math.round(y1), yb = Math.round(y2);
+    for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) {
+      const nx = -(2 * s[0] * (x + .5) + s[1]), ny = -(2 * s[2] * (y + .5) + s[3]);
+      const cos = (nx * luz[0] + ny * luz[1] + luz[2]) / Math.sqrt(nx * nx + ny * ny + 1);
+      const k = 0.2 + 0.95 * Math.max(0, cos), i = (y * W + x) * 4;
+      px[i] = Math.min(255, color[0] * k); px[i + 1] = Math.min(255, color[1] * k); px[i + 2] = Math.min(255, color[2] * k); px[i + 3] = 255;
+    }
+  }
+  function colorDe(n) { return n[2] === "~" ? [190, 190, 190] : tm.colorExt[n[2] || ""] || [160, 160, 160]; }
+  function nodo(n, x1, y1, x2, y2, s, h, cadena) {
+    s = s.slice(); cresta(s, x1, x2, y1, y2, h);
+    const hijos = (n[3] || []).filter(c => c[1] > 0);
+    if (!hijos.length || (x2 - x1) < 3 || (y2 - y1) < 3) {
+      pintar(x1, y1, x2, y2, s, n[3] ? [150, 150, 150] : colorDe(n));
+      tm.hojas.push({ x1, y1, x2, y2, nodo: n, cadena });
+      return;
+    }
+    let x = x1, y = y1, w = x2 - x1, alto = y2 - y1, i = 0;
+    const escala = w * alto / hijos.reduce((t, c) => t + c[1], 0);
+    while (i < hijos.length) {
+      const lado = Math.min(w, alto); let fila = [], suma = 0, peor = Infinity;
+      for (let j = i; j < hijos.length; j++) {
+        const a = hijos[j][1] * escala, ns = suma + a;
+        const mx = Math.max(a, fila.length ? fila[0] : a), mn = a;
+        const p = Math.max(lado * lado * mx / (ns * ns), ns * ns / (lado * lado * mn));
+        if (fila.length && p > peor) break;
+        fila.push(a); suma = ns; peor = p;
+      }
+      const grosor = suma / lado; let pos = 0;
+      fila.forEach((a, k) => {
+        const largo = a / grosor, c = hijos[i + k];
+        if (w >= alto) nodo(c, x, y + pos, x + grosor, y + pos + largo, s, h * F, cadena.concat([c]));
+        else nodo(c, x + pos, y, x + pos + largo, y + grosor, s, h * F, cadena.concat([c]));
+        pos += largo;
+      });
+      if (w >= alto) { x += grosor; w -= grosor; } else { y += grosor; alto -= grosor; }
+      i += fila.length;
+    }
+  }
+  nodo(raiz, 0, 0, W, H, [0, 0, 0, 0], ALTURA, prefijo.concat([raiz]));
+  ctx.putImageData(img, 0, 0);
+  if (tm.sel && tm.sel.hoja) {
+    const hj = tm.sel.hoja; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(hj.x1 + 1, hj.y1 + 1, hj.x2 - hj.x1 - 2, hj.y2 - hj.y1 - 2);
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.strokeRect(hj.x1 + .5, hj.y1 + .5, hj.x2 - hj.x1 - 1, hj.y2 - hj.y1 - 1);
+  }
+}
+function hojaEn(ev) {
+  const l = $("#tmLienzo"), b = l.getBoundingClientRect();
+  const x = (ev.clientX - b.left) * l.width / b.width, y = (ev.clientY - b.top) * l.height / b.height;
+  return tm.hojas.find(h => x >= h.x1 && x < h.x2 && y >= h.y1 && y < h.y2);
+}
+function seleccionTm(h) {
+  const actual = tm.camino.length;
+  // La carpeta a la que se puede entrar: la subcarpeta de la vista actual que contiene el bloque.
+  const carpeta = h.cadena.length > actual ? h.cadena[actual] : null;
+  const esCarpetaHija = carpeta && carpeta[3] ? carpeta : null;
+  return { hoja: h, nodo: h.nodo, ruta: rutaTm(h.nodo[2] === "~" ? h.cadena.slice(0, -1) : h.cadena), carpeta: esCarpetaHija };
+}
+$("#discoMapa").addEventListener("mousemove", e => {
+  if (e.target.id !== "tmLienzo") return;
+  const h = hojaEn(e), info = $("#tmInfo");
+  if (!h) { info.style.display = "none"; return; }
+  info.style.display = "block";
+  info.innerHTML = `<b>${esc(h.nodo[0])}</b><br>${mb(h.nodo[1])}<br><span>${esc(rutaTm(h.cadena.slice(0, -1)))}</span>`;
+  const b = e.target.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+  info.style.left = Math.min(x + 14, b.width - 260) + "px"; info.style.top = Math.min(y + 14, b.height - 70) + "px";
+});
+$("#discoMapa").addEventListener("mouseleave", () => { const i = $("#tmInfo"); if (i) i.style.display = "none"; }, true);
+$("#discoMapa").addEventListener("dblclick", e => {
+  if (e.target.id !== "tmLienzo") return;
+  const h = hojaEn(e); if (!h) return;
+  const s = seleccionTm(h); if (s.carpeta) { tm.camino = h.cadena.slice(0, tm.camino.length + 1); tm.sel = null; pintarDisco(); }
+});
+$("#discoMapa").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "tmLienzo") { const h = hojaEn(e); if (h) { tm.sel = seleccionTm(h); $("#tmSel").innerHTML = pintarSelTm(); dibujarTm(); } return; }
+    if (t.dataset.tmMedir) { await api("/api/disco/analizar", { ruta: t.dataset.tmMedir }); setTimeout(sondearProcesos, 300); cargarDisco(); }
+    else if (t.id === "tmElegir") { const r = await api("/api/elegir-carpeta", {}); if (r.carpeta) { await api("/api/disco/analizar", { ruta: r.carpeta }); cargarDisco(); } }
+    else if (t.id === "tmCancelar") { await api("/api/disco/cancelar"); aviso("Cancelando…"); }
+    else if (t.dataset.tmSubir !== undefined) { e.preventDefault(); tm.camino = tm.camino.slice(0, +t.dataset.tmSubir + 1); tm.sel = null; pintarDisco(); }
+    else if (t.dataset.tmEntrar !== undefined && tm.sel) { tm.camino = tm.sel.hoja.cadena.slice(0, tm.camino.length + 1); tm.sel = null; pintarDisco(); }
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+  } catch (err) { aviso("Error: " + err.message); }
+});
+window.addEventListener("resize", () => { if (vistaActual === "Espacio" && tm.res) { clearTimeout(tm.rs); tm.rs = setTimeout(dibujarTm, 200); } });
+
+// ---------------------------------------------------------------- pagos
+let pag = { res: null };
+async function cargarPagos() {
+  pag.res = await api("/api/pagos");
+  pintarPagos();
+  if (pag.res.trabajo && pag.res.trabajo.estado === "en marcha") setTimeout(() => vistaActual === "Vencimientos" && cargarPagos(), 2000);
+}
+const pesos = v => v == null ? "" : "$" + Number(v).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function pintarPagos() {
+  const r = pag.res, hoy = new Date().toISOString().slice(0, 10), enMarcha = r.trabajo && r.trabajo.estado === "en marcha";
+  const cuando = d => d < 0 ? `venció hace ${plural(-d, "día", "días")}` : d === 0 ? "vence hoy" : d === 1 ? "vence mañana" : `en ${d} días`;
+  const pend = r.pagos.filter(p => p.estado === "pendiente");
+  $("#pagos").innerHTML = `
+    <h2>Pagos</h2>
+    <p class="ayuda">GESTOR lee tus recibos y facturas (luz, teléfono, internet, tarjetas…) en ${r.carpetas.map(c => `<code>${esc(c)}</code>`).join(", ")}
+      y te recuerda la fecha límite 3 días antes y el mismo día. ${datos.windows ? "Con el OCR de Windows también lee fotos de recibos." : ""}</p>
+    <div class="tarjetas"><div class="tarjeta"><span class="ayuda">Por pagar</span><b>${pesos(r.pendiente)}</b><span class="ayuda">${plural(pend.length, "recibo", "recibos")}</span></div></div>
+    <div class="fila"><button id="pgEscanear" ${enMarcha ? "disabled" : ""}>${enMarcha ? "Leyendo recibos…" : "Revisar recibos ahora"}</button></div>
+    <div class="fila"><input type="text" id="pgProv" placeholder="Añadir a mano: Colegiatura, renta…" style="flex:1;min-width:160px">
+      <input type="date" id="pgFecha" min="${hoy}"><input type="number" id="pgMonto" placeholder="Monto" step="0.01" style="width:110px"><button class="prim" id="pgAgregar">Añadir</button></div>
+    ${r.pagos.length ? `<div class="resultado"><table><tr><th>Fecha límite</th><th>Qué</th><th>Monto</th><th></th></tr>
+      ${r.pagos.map(p => `<tr class="${p.estado === "pagado" ? "pagado" : ""}">
+        <td style="${p.estado === "pagado" ? "" : p.dias < 0 ? "color:var(--peligro)" : p.dias <= 3 ? "color:var(--aviso)" : ""}"><b>${esc(new Date(p.limite + "T12:00").toLocaleDateString("es", { day: "numeric", month: "short" }))}</b>
+          <div class="ayuda">${p.estado === "pagado" ? "pagado ✔" : cuando(p.dias)}</div></td>
+        <td title="${esc(p.ruta)}"><b>${esc(p.proveedor)}</b><div class="ayuda">${esc(p.nombre)}${p.manual ? "añadido a mano" : ""}</div></td>
+        <td><b>${pesos(p.total)}</b></td>
+        <td style="white-space:nowrap">${p.estado === "pagado" ? `<button class="chico" data-pg="${esc(p.clave)}" data-estado="pendiente">Deshacer</button>`
+          : `<button class="chico prim" data-pg="${esc(p.clave)}" data-estado="pagado">Ya lo pagué</button>`}
+          ${p.ruta && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(p.ruta)}">Abrir carpeta</button>` : ""}
+          ${p.manual ? `<button class="chico" data-pg-borrar="${esc(p.clave)}">Borrar</button>` : `<button class="chico" data-pg="${esc(p.clave)}" data-estado="ignorado" title="No es un recibo por pagar">No es un pago</button>`}</td></tr>`).join("")}
+    </table></div>` : `<p class="ayuda">${r.ultimo_escaneo ? "No hay pagos pendientes." : "Todavía no he terminado de leer tus recibos."}</p>`}`;
+}
+$("#pagos").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "pgEscanear") { await api("/api/pagos/escanear"); setTimeout(sondearProcesos, 300); cargarPagos(); }
+    else if (t.id === "pgAgregar") {
+      if (!$("#pgFecha").value) { aviso("Pon la fecha límite."); return; }
+      Object.assign(pag.res, await api("/api/pagos/agregar", { proveedor: $("#pgProv").value, limite: $("#pgFecha").value, total: $("#pgMonto").value }));
+      pintarPagos();
+    } else if (t.dataset.pg) { Object.assign(pag.res, await api("/api/pagos/cambiar", { clave: t.dataset.pg, estado: t.dataset.estado })); pintarPagos(); if (t.dataset.estado === "pagado") aviso("Marcado como pagado."); }
+    else if (t.dataset.pgBorrar) { Object.assign(pag.res, await api("/api/pagos/borrar", { clave: t.dataset.pgBorrar })); pintarPagos(); }
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+  } catch (err) { aviso("Error: " + err.message); }
+});
+
+// ---------------------------------------------------------------- papelera inteligente
+async function cargarRetenidos() {
+  const { retenidos } = await api("/api/retenidos");
+  $("#retenidos").style.display = retenidos.length ? "" : "none";
+  $("#retenidos").innerHTML = `
+    <h2>🛡 Papelera inteligente <span class="etiqueta ambar">${retenidos.length}</span></h2>
+    <p class="ayuda">Un servicio quería mandar esto a la papelera, pero lo abriste hace poco o no tienes otra copia. Decide tú; mientras tanto, no se toca.</p>
+    <div class="resultado" style="max-height:none"><table>${retenidos.map(r => `<tr>
+      <td><b>${esc(nombreCorto(r.ruta))}</b><div class="ayuda">${esc(r.ruta)}${r.existe ? "" : " (ya no está)"}</div></td>
+      <td><span class="etiqueta ambar">${esc(r.motivo)}</span><div class="ayuda">${esc(r.servicio)} · ${mb(r.bytes || 0)}</div></td>
+      <td style="white-space:nowrap"><button class="chico" data-ret="${esc(r.id)}" data-borrar="1">Sí, a la papelera</button>
+        <button class="chico prim" data-ret="${esc(r.id)}">Conservar</button>
+        ${r.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(r.ruta)}">Abrir carpeta</button>` : ""}</td></tr>`).join("")}</table></div>`;
+}
+$("#retenidos").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.dataset.ret) { await api("/api/retenidos/decidir", { id: t.dataset.ret, borrar: !!t.dataset.borrar }); aviso(t.dataset.borrar ? "Enviado a la papelera de GESTOR." : "Se queda donde está."); cargarRetenidos(); cargarPapelera(); }
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+  } catch (err) { aviso("Error: " + err.message); }
+});
+
+// ---------------------------------------------------------------- adjuntos de Outlook
+let cor = { res: null };
+async function cargarCorreo() {
+  cor.res = await api("/api/correo");
+  pintarCorreo();
+  if (cor.res.trabajo && cor.res.trabajo.estado === "en marcha") setTimeout(() => vistaActual === "Correo" && cargarCorreo(), 2000);
+}
+function pintarCorreo() {
+  const c = cor.res, u = c.ultimo || {}, enMarcha = c.trabajo && c.trabajo.estado === "en marcha";
+  $("#correo").innerHTML = `
+    <h2>Adjuntos de correo</h2>
+    <p class="ayuda">Cada 15 minutos GESTOR mira los correos nuevos de Outlook y guarda sus adjuntos según quién te los envió: en una carpeta por contacto o en la que elijas para cada remitente.
+      Funciona con Outlook clásico (el de Office). El «nuevo Outlook» y WhatsApp no dejan que otro programa sepa quién envió un archivo: los de WhatsApp se siguen ordenando con la procedencia «WhatsApp» en tus servicios.</p>
+    ${c.windows ? "" : `<p class="ayuda"><b>Solo funciona en Windows.</b></p>`}
+    <div class="fila"><label><input type="checkbox" id="crActivo" ${c.activo ? "checked" : ""}> <b>Guardar los adjuntos de Outlook automáticamente</b></label></div>
+    <div class="fila"><span>Carpeta base:</span><code style="flex:1">${esc(c.carpeta)}</code>${datos.en_red ? "" : `<button class="chico" id="crCarpeta">Cambiar…</button>`}</div>
+    <div class="fila"><label><input type="checkbox" id="crContacto" ${c.por_contacto ? "checked" : ""}> Una subcarpeta por contacto para los demás remitentes</label>
+      <label>La primera vez, revisar los últimos <input type="number" id="crDias" min="1" max="365" value="${c.dias_atras}"> días</label></div>
+    <section><h3>Reglas por remitente</h3>
+      <p class="ayuda">Si el correo o el nombre del remitente contiene el texto, el adjunto va a esa carpeta. Por ejemplo: <code>cfe.gob.mx</code> → Documentos\\Casa\\Luz.</p>
+      ${c.reglas.map((r, i) => `<div class="fila"><input type="text" value="${esc(r.remitente)}" data-cr-rem="${i}" placeholder="correo o nombre" style="flex:1">
+        <span>→</span><input type="text" value="${esc(r.carpeta)}" data-cr-car="${i}" placeholder="carpeta" style="flex:2">
+        ${datos.en_red ? "" : `<button class="chico" data-cr-elegir="${i}">Elegir…</button>`}<button class="chico peligro" data-cr-quitar="${i}">✕</button></div>`).join("")}
+      <div class="fila"><button class="chico" id="crAnadir">+ Añadir regla</button><button class="prim" id="crGuardar">Guardar</button></div>
+    </section>
+    <section><h3>Última revisión</h3>
+      ${u.fecha ? `<p>${esc(fechaBonita(u.fecha))}: ${u.revisados || 0} correos revisados, <b>${u.guardados || 0} adjuntos guardados</b>.${u.error ? ` <span style="color:var(--peligro)">${esc(u.error)}</span>` : ""}</p>` : `<p class="ayuda">Todavía no se ha revisado.</p>`}
+      <button id="crRevisar" ${enMarcha || !c.windows ? "disabled" : ""}>${enMarcha ? "Revisando Outlook…" : "Revisar ahora"}</button>
+    </section>`;
+}
+function leerCorreo() {
+  const c = cor.res;
+  c.reglas.forEach((r, i) => { const a = $(`[data-cr-rem="${i}"]`), b = $(`[data-cr-car="${i}"]`); if (a) r.remitente = a.value; if (b) r.carpeta = b.value; });
+  return { activo: $("#crActivo").checked, por_contacto: $("#crContacto").checked, dias_atras: +$("#crDias").value || 30, reglas: c.reglas, carpeta: c.carpeta };
+}
+$("#correo").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "crAnadir") { leerCorreo(); cor.res.reglas.push({ remitente: "", carpeta: "" }); pintarCorreo(); }
+    else if (t.dataset.crQuitar !== undefined) { leerCorreo(); cor.res.reglas.splice(+t.dataset.crQuitar, 1); pintarCorreo(); }
+    else if (t.dataset.crElegir !== undefined) { leerCorreo(); const r = await api("/api/elegir-carpeta", {}); if (r.carpeta) { cor.res.reglas[+t.dataset.crElegir].carpeta = r.carpeta; pintarCorreo(); } }
+    else if (t.id === "crCarpeta") { leerCorreo(); const r = await api("/api/elegir-carpeta", { inicial: cor.res.carpeta }); if (r.carpeta) { cor.res.carpeta = r.carpeta; pintarCorreo(); } }
+    else if (t.id === "crGuardar") { Object.assign(cor.res, await api("/api/correo/guardar", leerCorreo())); pintarCorreo(); aviso("Guardado."); }
+    else if (t.id === "crRevisar") { Object.assign(cor.res, await api("/api/correo/guardar", leerCorreo())); await api("/api/correo/revisar"); setTimeout(sondearProcesos, 300); cargarCorreo(); }
+  } catch (err) { aviso("Error: " + err.message); }
+});
+$("#correo").addEventListener("change", async e => {
+  if (e.target.id !== "crActivo") return;
+  try { Object.assign(cor.res, await api("/api/correo/guardar", leerCorreo())); pintarCorreo(); aviso(e.target.checked ? "Activado." : "Desactivado."); } catch (err) { aviso("Error: " + err.message); }
+});
+
+// ---------------------------------------------------------------- informes
+async function cargarInformes() {
+  const r = await api("/api/informes");
+  const previo = new Date(); previo.setDate(0);
+  const mes = `${previo.getFullYear()}-${String(previo.getMonth() + 1).padStart(2, "0")}`;
+  $("#informes").innerHTML = `
+    <h2>Informe mensual en PDF</h2>
+    <p class="ayuda">El día 1 de cada mes GESTOR crea un PDF con lo que se ordenó, el espacio liberado, los gastos por proveedor, los pagos pendientes y los vencimientos.
+      Se guardan en <code>${esc(r.carpeta)}</code>.</p>
+    <div class="fila"><label><input type="checkbox" id="infAuto" ${datos.ajustes.informe_mensual !== false ? "checked" : ""}> Crear el informe cada mes</label></div>
+    <div class="fila"><input type="month" id="infMes" value="${mes}"><button class="prim" id="infGenerar">Crear el informe de ese mes</button></div>
+    ${r.informes.length ? `<div class="resultado"><table>${r.informes.map(i => `<tr><td>📄 ${esc(i.nombre)}</td><td class="ayuda">${mb(i.bytes)}</td>
+      <td style="text-align:right">${datos.en_red ? "" : `<button class="chico" data-inf-abrir="${esc(i.ruta)}">Abrir</button><button class="chico" data-abrir-ruta="${esc(i.ruta)}">Abrir carpeta</button>`}</td></tr>`).join("")}</table></div>`
+      : `<p class="ayuda">Todavía no hay informes.</p>`}`;
+}
+$("#informes").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "infGenerar") {
+      const [anio, mes] = ($("#infMes").value || "").split("-");
+      const r = await api("/api/informe/generar", anio ? { anio, mes } : {});
+      aviso("Informe creado."); cargarInformes();
+      if (!datos.en_red) await api("/api/abrir-archivo", { ruta: r.ruta });
+    } else if (t.dataset.infAbrir) await api("/api/abrir-archivo", { ruta: t.dataset.infAbrir });
+    else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+  } catch (err) { aviso("Error: " + err.message); }
+});
+$("#informes").addEventListener("change", e => { if (e.target.id === "infAuto") guardarPreferencias({ informe_mensual: e.target.checked }); });
+
+// ---------------------------------------------------------------- actualizaciones
+let actu = null;
+async function comprobarActualizacion(forzar) {
+  try { actu = await api(forzar ? "/api/actualizacion/comprobar" : "/api/actualizacion"); } catch (e) { return; }
+  $("#bandaActualizar").classList.toggle("on", !!actu.nueva && !datos.en_red);
+  $("#actuTexto").textContent = actu.nueva ? `GESTOR ${actu.version} está disponible (tienes la ${actu.actual}).` : "";
+  pintarActualizacionAjustes();
+  if (forzar) aviso(actu.error ? "No pude consultar: " + actu.error : actu.nueva ? `Hay una versión nueva: ${actu.version}.` : `Tienes la última versión (${actu.actual}).`);
+}
+function pintarActualizacionAjustes() {
+  const el = $("#actuEstado"); if (!el || !actu) return;
+  el.innerHTML = actu.nueva ? `<b>Versión nueva: ${esc(actu.version)}</b> (tienes la ${esc(actu.actual)}). <button class="chico prim" data-actu-instalar>Actualizar ahora</button>`
+    : `Tienes la ${esc(actu.actual)}${actu.t ? `, revisado ${esc(fechaBonita(new Date(actu.t * 1000).toISOString()))}` : ""}.`;
+}
+async function instalarActualizacion() {
+  if (!actu || !actu.nueva) return;
+  if (!actu.puede_instalarse) { window.open(actu.pagina, "_blank"); aviso("Esta copia no se instaló con el instalador: descárgala desde la página."); return; }
+  if (!confirm(`¿Instalar GESTOR ${actu.version}? Se respalda la base de datos, se cierra el panel unos segundos y vuelve a abrirse solo.`)) return;
+  setTimeout(sondearProcesos, 400);
+  const r = await api("/api/actualizacion/instalar");
+  aviso(r.mensaje);
+}
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.actuInstalar !== undefined) instalarActualizacion().catch(x => aviso("Error: " + x.message));
+  else if (t.id === "actuNotas" && actu) alert(`Novedades de GESTOR ${actu.version}:\n\n${actu.notas || "Sin notas."}`);
+  else if (t.id === "actuBuscar") comprobarActualizacion(true);
+});
+
 (async () => {
   datos = await api("/api/inicio");
   aplicarTema(datos.ajustes.tema); aplicarCuaderno((datos.ajustes.tema || {}).cuaderno);
@@ -2091,6 +2574,7 @@ $("#respaldo").addEventListener("click", async e => {
   pintarLista(); pintarProgramacion(); pintarPreferencias(); cargarAprendido();
   if (datos.servicios.length) abrir(JSON.parse(JSON.stringify(datos.servicios[0].servicio)));
   if (datos.primera_vez) mostrarVista("Asistente"); else cargarInicio();
+  if (!datos.en_red) comprobarActualizacion(false);
   setInterval(() => { if (vistaActual === "Inicio" && !document.hidden) cargarInicio(); }, 60000);
 })();
 </script>

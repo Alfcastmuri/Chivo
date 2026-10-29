@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -592,13 +592,25 @@ def _texto(ruta, _mtime):
 
 
 def texto_de(ruta):
-    """Texto de un PDF (primeras páginas), DOCX o archivo de texto. Vacío si no se puede leer."""
-    if os.path.splitext(ruta)[1].lower() not in EXT_CON_TEXTO:
+    """Texto de un PDF (primeras páginas), DOCX o archivo de texto. Vacío si no se puede leer.
+
+    Las fotos y los PDF escaneados se leen con el OCR de Windows (ver ocr.py)."""
+    extension = os.path.splitext(ruta)[1].lower()
+    if extension not in EXT_CON_TEXTO:
+        if ES_WINDOWS:
+            import ocr
+            if extension in ocr.EXT_IMAGEN and ocr.activo():
+                return ocr.texto(ruta)
         return ""
     try:
-        return _texto(ruta, os.path.getmtime(ruta))
+        texto = _texto(ruta, os.path.getmtime(ruta))
     except OSError:
         return ""
+    if extension == ".pdf" and ES_WINDOWS and len(texto.strip()) < 40:
+        import ocr
+        if ocr.activo():
+            return ocr.texto(ruta) or texto
+    return texto
 
 
 def _contenido_cumple(c, ruta):
@@ -680,8 +692,8 @@ def _datos_factura(ruta, _mtime, mis_rfc):
     vacio = {"es_factura": False, "rfc": "", "proveedor": "", "rfc_receptor": "", "fecha": "", "total": "", "folio": ""}
     if extension == ".xml":
         return _cfdi_xml(ruta) or vacio
-    if extension != ".pdf":
-        return vacio
+    if extension not in (".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"):
+        return vacio  # las fotos de recibos solo tienen texto si el OCR de Windows está activo
     # El PDF de una factura suele ir acompañado de su XML con el mismo nombre.
     for ext in (".xml", ".XML"):
         gemelo = os.path.splitext(ruta)[0] + ext
@@ -1120,6 +1132,84 @@ def purgar_papelera(todo=False, ids=None):
             quedan.append(e)
     escribir_json(ARCHIVO_PAPELERA, quedan)
     return {"borrados": borrados, "bytes": liberados}
+
+
+# --------------------------------------------------------------------------- papelera inteligente
+
+ARCHIVO_RETENIDOS = os.path.join(DATOS, "retenidos.json")
+DIAS_USO_RECIENTE = 14
+_CATEGORIAS_PERSONALES = ("Imágenes", "Vídeos", "Música", "Documentos", "Hojas de cálculo", "Presentaciones")
+
+
+def motivo_para_retener(op, ahora=None):
+    """Por qué no conviene que un servicio mande este archivo a la papelera sin preguntarte (o None).
+
+    - lo abriste hace poco (menos de 14 días);
+    - es un documento, foto, vídeo... y no hay otra copia en ninguna carpeta del mapa de archivos.
+    Los duplicados idénticos y los archivados en ZIP nunca se retienen: siempre queda una copia.
+    """
+    if op.get("accion") != "papelera" or op.get("duplicado") or op.get("carpeta"):
+        return None
+    if not cargar_ajustes().get("papelera_inteligente", True):
+        return None
+    ruta = op["origen"]
+    try:
+        st = os.stat(ruta)
+    except OSError:
+        return None
+    clave = f"{_norm(ruta)}|{int(st.st_mtime)}"
+    if any(r.get("clave") == clave and r.get("estado") == "borrar" for r in leer_json(ARCHIVO_RETENIDOS, [])):
+        return None  # ya dijiste que sí se puede borrar
+    ahora = ahora or time.time()
+    abierto = st.st_atime if st.st_atime > st.st_mtime + 60 else 0
+    if ahora - abierto < DIAS_USO_RECIENTE * 86400:
+        return f"Lo abriste hace {max(0, int((ahora - abierto) / 86400))} días"
+    if categoria_de(os.path.splitext(ruta)[1].lower()) in _CATEGORIAS_PERSONALES:
+        try:
+            import mapa
+            if mapa.config()["activo"] and bd.contar_archivos()["archivos"] and \
+                    not bd.hay_otra_copia(ruta, os.path.basename(ruta), st.st_size):
+                return "Es la única copia que tienes"
+        except Exception:
+            pass
+    return None
+
+
+def retener(op, servicio, motivo):
+    """Apunta el archivo para que decidas tú. Devuelve True si es nuevo (para avisar una sola vez)."""
+    try:
+        st = os.stat(op["origen"])
+    except OSError:
+        return False
+    clave = f'{_norm(op["origen"])}|{int(st.st_mtime)}'
+    lista = leer_json(ARCHIVO_RETENIDOS, [])
+    if any(r.get("clave") == clave for r in lista):
+        return False
+    lista.append({"id": nuevo_id(), "clave": clave, "ruta": op["origen"], "bytes": st.st_size, "motivo": motivo,
+                  "servicio": servicio.get("nombre", ""), "servicio_id": servicio.get("id", ""),
+                  "fecha": dt.datetime.now().isoformat(timespec="seconds"), "estado": "pendiente"})
+    escribir_json(ARCHIVO_RETENIDOS, lista[-500:])
+    return True
+
+
+def retenidos():
+    return [dict(r, existe=os.path.exists(r["ruta"])) for r in reversed(leer_json(ARCHIVO_RETENIDOS, []))
+            if r.get("estado") == "pendiente"]
+
+
+def decidir_retenido(rid, borrar):
+    """borrar=True: a la papelera de GESTOR ahora. False: se conserva y ese servicio ya no lo toca."""
+    lista = leer_json(ARCHIVO_RETENIDOS, [])
+    r = next((x for x in lista if x["id"] == rid), None)
+    if not r:
+        return {"ok": False, "mensaje": "Ya no está en la lista."}
+    r["estado"] = "borrar" if borrar else "conservar"
+    escribir_json(ARCHIVO_RETENIDOS, lista)
+    if borrar and os.path.exists(r["ruta"]):
+        op = {"accion": "papelera", "origen": r["ruta"], "destino": "", "bytes": r.get("bytes", 0)}
+        op["papelera_id"] = quitar(r["ruta"], "regla")
+        indexar({"nombre": r.get("servicio") or "Papelera inteligente"}, [op], quien="tu")
+    return {"ok": True}
 
 
 # --------------------------------------------------------------------------- limpiar nombres
@@ -1597,10 +1687,15 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
     plan, avisos = planificar(servicio, esperar_segundos=esperar_segundos, ya_hechos=ya_hechos)
     if simular:
         return {"simulado": True, "operaciones": plan, "avisos": avisos}
-    hechas, errores = [], []
+    hechas, errores, retenidos = [], [], []
     avance(hechos=0, total=len(plan), etapa="Moviendo archivos")
     for op in plan:
         avance(sumar=1)
+        motivo = motivo_para_retener(op)
+        if motivo:
+            if retener(op, servicio, motivo):
+                retenidos.append(op)
+            continue
         try:
             aplicar(op)
             hechas.append(op)
@@ -1611,6 +1706,9 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
         "fecha": dt.datetime.now().isoformat(timespec="seconds"),
         "operaciones": hechas, "errores": errores, "avisos": avisos, "deshecho": False,
     }
+    if retenidos:
+        avisar("Papelera inteligente", f"No envié a la papelera {len(retenidos)} archivo(s) que usaste hace poco o que "
+               "no tienen otra copia. Decide tú en el panel (Papelera).")
     if hechas and servicio.get("borrar_carpetas_vacias"):
         registro["carpetas_borradas"] = borrar_carpetas_vacias(servicio, hechas)
     if hechas or errores:
@@ -2011,7 +2109,11 @@ def indexar(servicio, operaciones, quien="gestor"):
     try:
         import mapa
         if mapa.config()["activo"]:
-            mapa.tras_operaciones(operaciones)
+            mapa.tras_operaciones(operaciones)  # también mueve etiquetas y notas
+        else:
+            for op in operaciones:
+                if op.get("accion") in ("mover", "renombrar") and op.get("destino"):
+                    bd.seguir(op["origen"], op["destino"])
     except Exception:
         pass
 

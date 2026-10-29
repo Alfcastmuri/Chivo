@@ -730,5 +730,117 @@ class PruebaCombinarYMapa(unittest.TestCase):
         nucleo.guardar_ajustes(ajustes)
 
 
+class PruebaVersion07(unittest.TestCase):
+    def setUp(self):
+        self.raiz = tempfile.mkdtemp()
+
+    def escribir(self, ruta, contenido=b"x", hace_dias=0):
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "wb") as f:
+            f.write(contenido)
+        if hace_dias:
+            t = time.time() - hace_dias * 86400
+            os.utime(ruta, (t, t))
+        return ruta
+
+    def test_etiquetas_siguen_al_archivo(self):
+        import mapa
+        a = self.escribir(os.path.join(self.raiz, "Garantia tele.pdf"))
+        nucleo.bd.poner_etiqueta(a, "garantía")
+        nucleo.bd.poner_nota(a, "Comprada en Liverpool")
+        nuevo = os.path.join(self.raiz, "Casa", "Garantia tele.pdf")
+        nucleo.indexar({"nombre": "S"}, [{"accion": "mover", "origen": a, "destino": nuevo}])
+        self.assertEqual(nucleo.bd.etiquetas_de([nuevo])[nuevo], {"etiquetas": ["garantía"], "nota": "Comprada en Liverpool"})
+        self.assertEqual(nucleo.bd.buscar_etiquetados("garantia"), [nuevo])  # sin acentos
+        self.assertEqual(nucleo.bd.buscar_etiquetados("liverpool"), [nuevo])
+        self.assertEqual([r["ruta"] for r in mapa.buscar("", etiqueta="garantía")], [nuevo])
+        nucleo.bd.quitar_etiqueta(nuevo, "garantía")
+        self.assertEqual(nucleo.bd.buscar_etiquetados("", exacta="garantía"), [])
+
+    def test_recibo_con_fecha_limite(self):
+        import pagos
+        texto = "COMISION FEDERAL DE ELECTRICIDAD\nTOTAL A PAGAR: $1,234.50\nFECHA LIMITE DE PAGO: 15 NOV 26\n"
+        self.assertEqual(pagos.fecha_limite(texto), dt.date(2026, 11, 15))
+        self.assertEqual(pagos.monto(texto), 1234.5)
+        self.assertEqual(pagos.fecha_limite("Pague antes del 03/12/2026"), dt.date(2026, 12, 3))
+        self.assertEqual(pagos.proveedor_de("/x/recibo.pdf", "Telmex - estado de cuenta", {}), "Telmex")
+        ruta = self.escribir(os.path.join(self.raiz, "recibo luz.txt"), texto.encode())
+        pagos.EXT.add(".txt")
+        try:
+            r = pagos.analizar(ruta)
+        finally:
+            pagos.EXT.discard(".txt")
+        self.assertEqual((r["tipo"], r["total"], r["limite"]), ("pago", 1234.5, "2026-11-15"))
+
+    def test_lista_y_marcar_pagado(self):
+        import pagos
+        hoy = dt.date.today()
+        ruta = self.escribir(os.path.join(self.raiz, "cfe.pdf"))
+        d = pagos.cargar()
+        d["archivos"] = {ruta: {"tipo": "pago", "proveedor": "CFE", "total": 100.0, "fecha": "",
+                                "limite": (hoy + dt.timedelta(days=2)).isoformat(), "mtime": 1}}
+        pagos.guardar(d)
+        lista = pagos.lista(hoy)
+        self.assertEqual(lista["pendiente"], 100.0)
+        self.assertEqual(pagos.texto_aviso(lista["pagos"][0]), f"CFE vence el {(hoy + dt.timedelta(days=2)).day}, son $100.00.")
+        pagos._etiquetar()
+        self.assertIn("pendiente de pagar", nucleo.bd.etiquetas_de([ruta])[ruta]["etiquetas"])
+        pagos.cambiar(lista["pagos"][0]["clave"], "pagado")
+        self.assertEqual(pagos.lista(hoy)["pendiente"], 0)
+        self.assertEqual(nucleo.bd.etiquetas_de([ruta])[ruta]["etiquetas"], ["pagado"])
+        gastos = pagos.gastos(hoy - dt.timedelta(days=1), hoy + dt.timedelta(days=30))
+        self.assertEqual(gastos, [{"proveedor": "CFE", "total": 100.0, "n": 1}])
+
+    def test_papelera_inteligente(self):
+        ruta = self.escribir(os.path.join(self.raiz, "abierto.zip"), b"z", hace_dias=40)
+        op = {"accion": "papelera", "origen": ruta, "destino": ""}
+        self.assertIsNone(nucleo.motivo_para_retener(op))
+        t = time.time() - 40 * 86400
+        os.utime(ruta, (time.time() - 3600, t))  # abierto hace una hora
+        self.assertIn("Lo abriste", nucleo.motivo_para_retener(op))
+        self.assertIsNone(nucleo.motivo_para_retener(dict(op, duplicado=True)))
+        servicio = {"id": "s1", "nombre": "Limpieza", "origenes": [self.raiz], "activo": True,
+                    "reglas": [{"si": {"extensiones": ".zip"}, "accion": "papelera"}]}
+        r = nucleo.ejecutar_servicio(servicio)
+        self.assertTrue(os.path.exists(ruta), r)
+        ret = [x for x in nucleo.retenidos() if x["ruta"] == ruta]
+        self.assertEqual(len(ret), 1)
+        nucleo.decidir_retenido(ret[0]["id"], borrar=True)
+        self.assertFalse(os.path.exists(ruta))
+
+    def test_informe_pdf(self):
+        import informe
+        destino = os.path.join(self.raiz, "informe.pdf")
+        r = informe.generar(ruta=destino)
+        self.assertTrue(r["ok"])
+        with open(destino, "rb") as f:
+            contenido = f.read()
+        self.assertTrue(contenido.startswith(b"%PDF-1.4") and contenido.rstrip().endswith(b"%%EOF"))
+        self.assertIn(b"Informe de GESTOR", contenido)
+
+    def test_mapa_del_disco(self):
+        import disco
+        self.escribir(os.path.join(self.raiz, "grande.bin"), b"g" * 50000)
+        for i in range(30):
+            self.escribir(os.path.join(self.raiz, "sub", f"p{i}.txt"), b"p")
+        r = disco.analizar(self.raiz)
+        self.assertEqual((r["bytes"], r["archivos"]), (50030, 31))
+        nombre, tam, _, hijos, _ = r["arbol"]
+        self.assertEqual(tam, 50030)
+        self.assertEqual(hijos[0][:3], ["grande.bin", 50000, ".bin"])
+        sub = next(h for h in hijos if h[0] == "sub")
+        self.assertEqual([h[2] for h in sub[3]], ["~"])  # los 30 archivos pequeños van en un solo bloque
+        self.assertEqual(sub[3][0][4], 30)
+
+    def test_version_y_correo(self):
+        import actualizar
+        import correo
+        self.assertGreater(actualizar.version_tupla("v0.10.0"), actualizar.version_tupla("0.9.3"))
+        c = {**correo.POR_DEFECTO, "carpeta": self.raiz, "reglas": [{"remitente": "cfe.gob.mx", "carpeta": "/luz"}]}
+        self.assertEqual(correo.destino_para({"correo": "avisos@cfe.gob.mx", "remitente": "CFE"}, c), "/luz")
+        self.assertEqual(correo.destino_para({"correo": "juan@x.com", "remitente": "Juan Pérez"}, c),
+                         os.path.join(self.raiz, "Juan Pérez"))
+
+
 if __name__ == "__main__":
     unittest.main()
