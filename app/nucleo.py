@@ -42,19 +42,74 @@ ARCHIVO_AVISOS = os.path.join(DATOS, "avisos.jsonl")
 CARPETA_REGISTRO = os.path.join(DATOS, "registro")
 MAX_REGISTROS_POR_SERVICIO = 1000
 
+# Tipos de archivo por extensión. Cada extensión pertenece a un solo tipo. Se pueden añadir más
+# (o cambiar el tipo de una) en el panel: Personalizar → Tipos de archivo (ajuste "extensiones_propias").
 CATEGORIAS = {
-    "Imágenes": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".heic", ".heif",
-                 ".tif", ".tiff", ".svg", ".ico", ".raw", ".cr2", ".nef", ".arw", ".dng"],
-    "Vídeos": [".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm", ".m4v", ".3gp", ".mpg", ".mpeg"],
-    "Música": [".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma", ".opus"],
-    "Documentos": [".pdf", ".doc", ".docx", ".odt", ".rtf", ".txt", ".md", ".epub"],
-    "Hojas de cálculo": [".xls", ".xlsx", ".xlsm", ".ods", ".csv"],
-    "Presentaciones": [".ppt", ".pptx", ".odp", ".key"],
-    "Comprimidos": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso"],
-    "Instaladores": [".exe", ".msi", ".msix", ".appx", ".bat", ".cmd"],
-    "Código": [".py", ".js", ".ts", ".html", ".css", ".json", ".xml", ".java", ".c", ".cpp",
-               ".cs", ".php", ".sql", ".ps1", ".sh", ".yml", ".yaml"],
-    "Accesos directos": [".lnk", ".url"],
+    "Imágenes": [".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".apng", ".gif", ".bmp", ".dib", ".webp", ".heic", ".heif",
+                 ".avif", ".jxl", ".jp2", ".j2k", ".tif", ".tiff", ".svg", ".svgz", ".ico", ".icns", ".cur", ".tga",
+                 ".pcx", ".ppm", ".pgm", ".pbm", ".pnm", ".exr", ".hdr", ".dds", ".emf", ".wmf", ".raw", ".cr2", ".cr3",
+                 ".crw", ".nef", ".nrw", ".arw", ".srf", ".sr2", ".dng", ".orf", ".rw2", ".raf", ".pef", ".srw", ".x3f",
+                 ".3fr", ".erf", ".kdc", ".mrw", ".dcr", ".mef", ".mos", ".iiq", ".rwl"],
+    "Vídeos": [".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".f4v", ".webm", ".m4v", ".3gp", ".3g2", ".mpg", ".mpeg",
+               ".m2v", ".mpe", ".m2ts", ".mts", ".vob", ".ogv", ".rm", ".rmvb", ".asf", ".divx", ".xvid", ".mxf", ".dv",
+               ".insv", ".lrv", ".h264", ".h265", ".hevc", ".swf", ".qt", ".yuv"],
+    "Música": [".mp3", ".wav", ".flac", ".aac", ".ogg", ".oga", ".m4a", ".m4b", ".m4r", ".wma", ".opus", ".aiff", ".aif",
+               ".aifc", ".alac", ".ape", ".wv", ".mka", ".mid", ".midi", ".kar", ".amr", ".ac3", ".dts", ".caf", ".ra",
+               ".au", ".snd", ".dsf", ".dff", ".mpc", ".tta", ".spx", ".weba", ".mod", ".xm", ".it", ".s3m"],
+    "Documentos": [".pdf", ".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm", ".odt", ".ott", ".fodt", ".rtf", ".txt",
+                   ".md", ".markdown", ".rst", ".tex", ".pages", ".wpd", ".wps", ".xps", ".oxps", ".hwp", ".abw", ".sxw",
+                   ".nfo", ".log", ".one", ".onepkg", ".gdoc", ".vsd", ".vsdx", ".pub", ".mpp", ".odg", ".ofd"],
+    "Hojas de cálculo": [".xls", ".xlsx", ".xlsm", ".xlsb", ".xlt", ".xltx", ".xltm", ".ods", ".ots", ".fods", ".csv",
+                         ".tsv", ".numbers", ".dif", ".slk", ".gsheet", ".qif", ".ofx", ".xlr"],
+    "Presentaciones": [".ppt", ".pptx", ".pptm", ".pps", ".ppsx", ".ppsm", ".pot", ".potx", ".potm", ".odp", ".otp",
+                       ".fodp", ".key", ".sxi", ".gslides", ".prezi"],
+    "Comprimidos": [".zip", ".zipx", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".tbz2", ".xz", ".txz", ".zst", ".lz",
+                    ".lzma", ".lz4", ".z", ".cab", ".arj", ".lzh", ".lha", ".ace", ".sit", ".sitx", ".iso", ".wim",
+                    ".cpio", ".ar", ".r00", ".001", ".pea", ".uue"],
+    "Instaladores": [".exe", ".msi", ".msp", ".msu", ".msix", ".msixbundle", ".appx", ".appxbundle", ".appinstaller",
+                     ".bat", ".cmd", ".com", ".scr", ".apk", ".xapk", ".apkm", ".aab", ".ipa", ".deb", ".rpm", ".pkg",
+                     ".dmg", ".mpkg", ".appimage", ".flatpak", ".snap", ".run", ".vsix", ".crx", ".xpi", ".oxt"],
+    "Código": [".py", ".pyw", ".pyi", ".ipynb", ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".html",
+               ".htm", ".xhtml", ".css", ".scss", ".sass", ".less", ".json", ".jsonc", ".json5", ".xml", ".xsl", ".xsd",
+               ".java", ".class", ".jar", ".war", ".kt", ".kts", ".scala", ".groovy", ".gradle", ".c", ".h", ".cpp",
+               ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".cs", ".csproj", ".sln", ".vcxproj", ".xaml", ".razor", ".cshtml",
+               ".vb", ".vbs", ".fs", ".fsx", ".go", ".rs", ".rb", ".erb", ".php", ".phtml", ".swift", ".m", ".mm",
+               ".dart", ".lua", ".pl", ".pm", ".r", ".rmd", ".jl", ".sql", ".ps1", ".psm1", ".psd1", ".sh", ".bash",
+               ".zsh", ".fish", ".asm", ".s", ".hs", ".elm", ".ex", ".exs", ".erl", ".clj", ".cljs", ".nim", ".zig",
+               ".sol", ".tf", ".hcl", ".yml", ".yaml", ".toml", ".ini", ".cfg", ".conf", ".env", ".properties", ".reg",
+               ".proto", ".graphql", ".gql", ".cmake", ".mk", ".dockerfile", ".patch", ".diff", ".lock", ".jsp",
+               ".asp", ".aspx", ".twig", ".liquid", ".ahk", ".au3", ".applescript", ".vba", ".bas", ".pas", ".f90",
+               ".for", ".cob", ".ada", ".d", ".v", ".sv", ".ino", ".pde", ".gd", ".shader", ".glsl", ".hlsl"],
+    "Accesos directos": [".lnk", ".url", ".webloc", ".desktop", ".website"],
+    "Diseño": [".psd", ".psb", ".ai", ".ait", ".eps", ".indd", ".indt", ".idml", ".xd", ".fig", ".sketch", ".cdr",
+               ".afdesign", ".afphoto", ".afpub", ".xcf", ".kra", ".clip", ".procreate", ".pxm", ".pdn", ".ase",
+               ".aco", ".abr", ".atn", ".cpt", ".sai", ".qxp", ".fla", ".ora", ".lrcat", ".xmp", ".cube", ".3dl"],
+    "3D y CAD": [".stl", ".obj", ".mtl", ".fbx", ".blend", ".dae", ".3ds", ".max", ".ma", ".mb", ".c4d", ".gltf", ".glb",
+                 ".3mf", ".usd", ".usdz", ".ply", ".x3d", ".dwg", ".dxf", ".dwf", ".dgn", ".step", ".stp", ".iges", ".igs",
+                 ".skp", ".sldprt", ".sldasm", ".slddrw", ".ipt", ".iam", ".idw", ".f3d", ".rvt", ".rfa", ".ifc", ".3dm",
+                 ".catpart", ".prt", ".gcode", ".ufp", ".lys", ".chitubox", ".scad", ".fcstd", ".ztl", ".spp"],
+    "Fuentes": [".ttf", ".otf", ".ttc", ".woff", ".woff2", ".eot", ".fon", ".fnt", ".pfb", ".pfm", ".afm", ".bdf",
+                ".pcf", ".sfd", ".dfont"],
+    "Libros y cómics": [".epub", ".mobi", ".azw", ".azw3", ".kfx", ".fb2", ".djvu", ".djv", ".cbz", ".cbr", ".cb7",
+                        ".cbt", ".ibooks", ".lit", ".lrf", ".pdb", ".prc", ".acsm"],
+    "Correo y contactos": [".eml", ".emlx", ".msg", ".oft", ".pst", ".ost", ".mbox", ".mbx", ".vcf", ".vcard", ".ics",
+                           ".ical", ".vcs", ".nws", ".olm"],
+    "Bases de datos": [".db", ".db3", ".sqlite", ".sqlite3", ".mdb", ".accdb", ".accde", ".dbf", ".sdf", ".frm",
+                       ".ibd", ".myd", ".myi", ".ndf", ".mdf", ".ldf", ".kdbx", ".kdb", ".realm", ".fdb", ".gdb",
+                       ".odb", ".nsf", ".fp7", ".fmp12"],
+    "Subtítulos": [".srt", ".vtt", ".ass", ".ssa", ".sub", ".sbv", ".idx", ".smi", ".sami", ".ttml", ".dfxp", ".lrc"],
+    "Discos virtuales": [".vmdk", ".vdi", ".vhdx", ".ova", ".ovf", ".qcow2", ".qcow", ".img", ".hdd", ".pvm", ".vmx",
+                         ".vbox", ".avhdx", ".vhd", ".nrg", ".mds", ".bin", ".cue", ".ccd", ".toast", ".dsk"],
+    "Proyectos de audio y vídeo": [".prproj", ".aep", ".aet", ".drp", ".veg", ".kdenlive", ".mlt", ".wfp", ".camproj",
+                                   ".tscproj", ".fcpbundle", ".imovieproj", ".als", ".alp", ".flp", ".logicx", ".ptx",
+                                   ".aup", ".aup3", ".band", ".cpr", ".rpp", ".sesx", ".omf", ".aaf", ".edl", ".mogrt"],
+    "Certificados y firmas": [".cer", ".crt", ".pem", ".der", ".pfx", ".p12", ".p7b", ".p7c", ".p7s", ".csr", ".req",
+                              ".sig", ".asc", ".gpg", ".pgp", ".ppk", ".jks", ".keystore"],
+    "Mapas y GPS": [".gpx", ".kml", ".kmz", ".geojson", ".shp", ".shx", ".fit", ".tcx", ".osm", ".mbtiles",
+                    ".gpkg", ".qgs", ".qgz"],
+    "Torrents": [".torrent", ".magnet", ".metalink", ".nzb"],
+    "Sistema": [".dll", ".sys", ".drv", ".ocx", ".cpl", ".msc", ".efi", ".inf", ".cat", ".mui", ".tlb", ".so", ".dylib",
+                ".ko", ".dat", ".tmp", ".temp", ".bak", ".old", ".dmp", ".etl", ".evtx", ".pf", ".blf", ".regtrans-ms"],
 }
 
 # Archivos que ningún servicio toca: descargas a medias, accesos directos, archivos del sistema.
@@ -790,11 +845,55 @@ def datos_factura(ruta):
 
 # --------------------------------------------------------------------------- reglas
 
+_TIPOS_CACHE = {"t": 0, "por_ext": {}, "tipos": {}}
+
+
+def _tipos():
+    """{extensión: tipo} con las extensiones propias por encima de las de GESTOR (se relee cada pocos segundos)."""
+    if time.time() - _TIPOS_CACHE["t"] > 5:
+        propias = cargar_ajustes().get("extensiones_propias") or {}
+        tipos = {k: [e for e in v if e not in propias] for k, v in CATEGORIAS.items()}
+        for ext, tipo in sorted(propias.items()):
+            tipos.setdefault(tipo, []).append(ext)
+        por_ext = {}
+        for tipo, extensiones in tipos.items():
+            for e in extensiones:
+                por_ext.setdefault(e, tipo)
+        _TIPOS_CACHE.update(t=time.time(), por_ext=por_ext, tipos=tipos)
+    return _TIPOS_CACHE
+
+
+def categorias():
+    """{tipo: [extensiones]}: los de GESTOR y los que creaste tú."""
+    return _tipos()["tipos"]
+
+
 def categoria_de(extension):
-    for nombre, extensiones in CATEGORIAS.items():
-        if extension in extensiones:
-            return nombre
-    return "Otros"
+    return _tipos()["por_ext"].get((extension or "").lower(), "Otros")
+
+
+def normalizar_extension(texto):
+    e = "." + (texto or "").strip().lower().lstrip("*").lstrip(".")
+    if not re.fullmatch(r"\.[a-z0-9_\-+~]{1,20}", e):
+        raise ValueError(f"«{texto}» no parece una extensión (por ejemplo: .dwg).")
+    return e
+
+
+def guardar_extensiones_propias(cambios, quitar=()):
+    """cambios: {".ext": "Tipo"}; quitar: extensiones que vuelven a su tipo original."""
+    ajustes = cargar_ajustes()
+    propias = dict(ajustes.get("extensiones_propias") or {})
+    for ext, tipo in cambios.items():
+        tipo = " ".join(str(tipo or "").split())[:40]
+        if not tipo or tipo == "Otros":
+            raise ValueError("Elige o escribe un tipo de archivo.")
+        propias[normalizar_extension(ext)] = tipo
+    for ext in quitar:
+        propias.pop(normalizar_extension(ext), None)
+    ajustes["extensiones_propias"] = propias
+    guardar_ajustes(ajustes)
+    _TIPOS_CACHE["t"] = 0
+    return propias
 
 
 def _lista_ext(valor):

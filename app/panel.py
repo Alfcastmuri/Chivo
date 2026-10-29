@@ -403,7 +403,7 @@ class Manejador(BaseHTTPRequestHandler):
 
     def _api(self, ruta, datos):
         if ruta == "/api/inicio":
-            return {"servicios": servicios_con_estado(), "categorias": list(nucleo.CATEGORIAS) + ["Otros"],
+            return {"servicios": servicios_con_estado(), "categorias": list(nucleo.categorias()) + ["Otros"],
                     "procedencias": nucleo.PROCEDENCIAS, "pillow": nucleo.pillow_disponible(),
                     "pypdf": nucleo.pypdf_disponible(), "watchdog": watchdog_disponible(),
                     "carpetas_rapidas": nucleo.carpetas_rapidas(), "ajustes": nucleo.cargar_ajustes(),
@@ -569,6 +569,19 @@ class Manejador(BaseHTTPRequestHandler):
             return en_segundo_plano("mapa", mapa.escanear)
         if ruta == "/api/mapa/buscar":
             return {"archivos": mapa.buscar(datos.get("texto", ""))}
+        if ruta == "/api/tipos":
+            return {"tipos": nucleo.categorias(), "propias": nucleo.cargar_ajustes().get("extensiones_propias") or {},
+                    "originales": list(nucleo.CATEGORIAS)}
+        if ruta == "/api/tipos/guardar":
+            cambios = dict(datos.get("cambios") or {})
+            for linea in str(datos.get("lista") or "").splitlines():  # "dwg, Planos" o ".dwg;Planos" por renglón
+                partes = [p.strip() for p in linea.replace(";", ",").replace("\t", ",").split(",") if p.strip()]
+                if len(partes) >= 2 and not partes[0].lower().startswith(("extension", "extensión")):
+                    for ext in partes[0].split():
+                        cambios[ext] = partes[1]
+            propias = nucleo.guardar_extensiones_propias(cambios, datos.get("quitar") or [])
+            return {"ok": True, "anadidas": len(cambios), "tipos": nucleo.categorias(), "propias": propias,
+                    "originales": list(nucleo.CATEGORIAS)}
         if ruta == "/api/etiquetas":
             return {"etiquetas": nucleo.bd.todas_las_etiquetas()}
         if ruta == "/api/etiquetas/poner":

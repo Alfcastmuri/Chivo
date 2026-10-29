@@ -201,6 +201,15 @@ details.mas .caja button { text-align: left; border-color: transparent; }
 .tm-sel { min-height: 54px; padding: 8px 2px; }
 .tm-camino a { color: var(--acento); text-decoration: none; font-weight: 600; }
 .tm-color { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; }
+.tipo-caja { border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.tipo-caja h4 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.exts { display: flex; flex-wrap: wrap; gap: 4px; }
+.exts code { font-size: 12px; padding: 1px 6px; border-radius: 5px; background: var(--fondo); }
+.exts code.propia { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+.exts code.propia .x { cursor: pointer; margin-left: 4px; }
+.tm-leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 8px; font-size: 12.5px; }
+.tm-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.tm-marco { background: var(--panel) !important; }
 tr.pagado td { opacity: .6; }
 .mapa-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin: 4px 0 8px; border: 1px solid var(--borde); border-radius: 8px; background: var(--fondo); }
 /* ---------------- modo cuaderno */
@@ -287,6 +296,7 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
   <button data-vista="Estadisticas">Estadísticas e informes</button>
   <div class="grupo-nav">Personalizar</div>
   <button data-vista="Colores">🎨 Colores</button>
+  <button data-vista="Tipos">🗂 Tipos de archivo</button>
 </nav>
 <div class="contenido">
 <main class="vista simple on" id="vistaInicio"><div id="inicio"><div class="vacio">Cargando…</div></div></main>
@@ -310,6 +320,7 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
 <main class="vista simple" id="vistaAsistente"><div class="caja editor" id="asistente"></div></main>
 <main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
 <main class="vista simple" id="vistaPapelera"><div class="caja editor" id="retenidos" style="display:none"></div><div class="caja editor" id="papelera"></div></main>
+<main class="vista simple" id="vistaTipos"><div class="caja editor" id="tipos"></div></main>
 <main class="vista simple" id="vistaColores"><div class="caja editor" id="colores"></div></main>
 <main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div><div class="caja editor" id="informes"></div></main>
 </div>
@@ -964,7 +975,7 @@ function mostrarVista(nombre) {
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
   ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: () => { cargarDisco(); cargarEspacio(); }, Vencimientos: () => { cargarPagos(); cargarVencimientos(); },
-     Linea: cargarLinea, Correo: cargarCorreo, Respaldo: () => { cargarRespaldo(); cargarCopias(); },
+     Linea: cargarLinea, Correo: cargarCorreo, Tipos: cargarTipos, Respaldo: () => { cargarRespaldo(); cargarCopias(); },
      Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: () => { cargarRetenidos(); cargarPapelera(); },
      Copias: cargarCopias, Estadisticas: () => { cargarEstadisticas(); cargarInformes(); } }[nombre] || (() => { }))();
 }
@@ -1253,6 +1264,7 @@ function aplicarTema(tema) {
   Object.entries(v).forEach(([k, x]) => document.documentElement.style.setProperty(k, x));
   document.documentElement.style.colorScheme = oscuro ? "dark" : "light";
   try { localStorage.setItem("gestorTema", JSON.stringify(v)); } catch (e) { }
+  try { if (tm.res) { coloresTm(); if (vistaActual === "Espacio") pintarDisco(); } } catch (e) { }
 }
 oscuroDelSistema.addEventListener("change", () => aplicarTema(datos && datos.ajustes.tema));
 try { const v = JSON.parse(localStorage.getItem("gestorTema") || "null"); if (v) Object.entries(v).forEach(([k, x]) => document.documentElement.style.setProperty(k, x)); } catch (e) { }
@@ -2229,8 +2241,6 @@ $("#linea").addEventListener("click", async e => {
 });
 
 // ---------------------------------------------------------------- mapa del disco (estilo WinDirStat)
-const COLORES_TM = [[64, 105, 240], [235, 64, 64], [64, 200, 64], [240, 210, 40], [40, 200, 220], [210, 64, 220], [255, 140, 30], [150, 100, 255],
-  [120, 200, 120], [250, 120, 170], [140, 140, 255], [200, 160, 90]];
 let tm = { res: null, raiz: null, camino: [], hojas: [], colorExt: {}, sel: null, sondeo: null, lugares: [] };
 async function cargarDisco() {
   const r = await api("/api/disco", { con_ultimo: !tm.res });
@@ -2249,15 +2259,37 @@ async function cargarDisco() {
   }, 1500);
 }
 function prepararTm() {
-  tm.raiz = tm.res.arbol; tm.camino = [tm.raiz]; tm.sel = null; tm.colorExt = {};
-  tm.res.tipos.slice(0, COLORES_TM.length).forEach((t, i) => tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] = COLORES_TM[i]);
+  tm.raiz = tm.res.arbol; tm.camino = [tm.raiz]; tm.sel = null;
+  coloresTm();
+}
+// Colores planos y mates sacados del tema: un tono por tipo de archivo (repartidos desde el color de acento)
+// y, dentro de cada tipo, la misma familia un poco más clara u oscura por extensión.
+function coloresTm() {
+  if (!tm.res) return;
+  const css = getComputedStyle(document.documentElement);
+  const acento = css.getPropertyValue("--acento").trim() || "#2f6fde";
+  const oscuro = document.documentElement.style.colorScheme === "dark" || (!document.documentElement.style.colorScheme && oscuroDelSistema.matches);
+  const [h0] = hsl(acento);
+  const porTipo = {};
+  tm.res.tipos.forEach(t => (porTipo[t[3]] ||= []).push(t));
+  const orden = Object.entries(porTipo).map(([k, v]) => [k, v.reduce((a, t) => a + t[1], 0), v]).sort((a, b) => b[1] - a[1]);
+  tm.colorTipo = {}; tm.colorExt = {}; tm.ordenTipos = orden.map(([k, b]) => [k, b]);
+  const L = oscuro ? 46 : 64, S = oscuro ? 30 : 34;
+  orden.forEach(([tipo, , exts], i) => {
+    const gris = tipo === "Otros" || tipo === "Sistema";
+    const h = (h0 + i * 137.508) % 360, s = gris ? 6 : S;
+    tm.colorTipo[tipo] = `hsl(${h.toFixed(0)} ${s}% ${L}%)`;
+    exts.forEach((t, k) => tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] = `hsl(${h.toFixed(0)} ${s}% ${L + ((k % 5) - 2) * 4}%)`);
+  });
+  tm.fondo = css.getPropertyValue("--panel").trim() || "#fff";
+  tm.chicos = oscuro ? "hsl(0 0% 32%)" : "hsl(0 0% 84%)";
 }
 function pintarDisco() {
   const r = tm.res, enMarcha = tm.trabajo && tm.trabajo.estado === "en marcha";
   const actual = tm.camino[tm.camino.length - 1];
   $("#discoMapa").innerHTML = `
     <h2>Mapa del disco</h2>
-    <p class="ayuda">Cada rectángulo es un archivo, de tamaño proporcional a lo que ocupa y con el color de su tipo, como en WinDirStat.
+    <p class="ayuda">Cada rectángulo es un archivo, de tamaño proporcional a lo que ocupa y con el color de su tipo, como en WinDirStat (los colores salen de tu tema).
       Los bloques grandes son los que más espacio te quitan. Haz clic en uno para ver qué es; doble clic para entrar en su carpeta.</p>
     <div class="fila">${tm.lugares.map(l => `<button class="chico" data-tm-medir="${esc(l.ruta)}" ${enMarcha ? "disabled" : ""}>${esc(l.nombre)}${l.total ? ` <span class="ayuda">(${mb(l.total - l.libre)} usados)</span>` : ""}</button>`).join("")}
       ${datos.en_red ? "" : `<button class="chico" id="tmElegir" ${enMarcha ? "disabled" : ""}>Elegir carpeta…</button>`}
@@ -2266,11 +2298,13 @@ function pintarDisco() {
         <span class="ayuda">· ${mb(actual[1])} · ${(actual[4] || 0).toLocaleString("es")} archivos · medido ${esc(fechaBonita(r.fecha))} en ${r.segundos} s</span></div>
       <div class="tm-marco"><canvas id="tmLienzo"></canvas><div class="tm-info" id="tmInfo"></div></div>
       <div id="tmSel" class="tm-sel">${pintarSelTm()}</div>
-      <section><h3>Tipos de archivo</h3><div class="resultado" style="max-height:260px"><table>
-        <tr><th></th><th>Tipo</th><th>Ocupa</th><th>%</th><th>Archivos</th></tr>
-        ${r.tipos.slice(0, 30).map(t => { const c = tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] || [170, 170, 170];
-          return `<tr><td><span class="tm-color" style="background:rgb(${c})"></span></td><td><b>${esc(t[0])}</b> <span class="ayuda">${esc(t[3])}</span></td><td>${mb(t[1])}</td>
-          <td>${(t[1] * 100 / (r.bytes || 1)).toFixed(1)} %</td><td>${t[2].toLocaleString("es")}</td></tr>`; }).join("")}
+      <div class="tm-leyenda">${(tm.ordenTipos || []).map(([t, b]) => `<span><i class="tm-color" style="background:${tm.colorTipo[t]}"></i>${esc(t)} <span class="ayuda">${mb(b)}</span></span>`).join("")}
+        <span><i class="tm-color" style="background:${tm.chicos}"></i>Archivos pequeños agrupados</span></div>
+      <section><h3>Extensiones <button class="chico" data-ir="Tipos">Editar tipos de archivo</button></h3><div class="resultado" style="max-height:300px"><table>
+        <tr><th></th><th>Extensión</th><th>Tipo</th><th>Ocupa</th><th>%</th><th>Archivos</th></tr>
+        ${r.tipos.slice(0, 60).map(t => `<tr><td><span class="tm-color" style="background:${tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] || tm.chicos}"></span></td>
+          <td><b>${esc(t[0])}</b></td><td class="ayuda">${esc(t[3])}</td><td>${mb(t[1])}</td>
+          <td>${(t[1] * 100 / (r.bytes || 1)).toFixed(1)} %</td><td>${t[2].toLocaleString("es")}</td></tr>`).join("")}
       </table></div></section>` : `<p class="ayuda">${enMarcha ? "" : "Elige qué medir: tu carpeta de usuario es rápida; un disco entero tarda más."}</p>`}`;
   if (r) requestAnimationFrame(dibujarTm);
 }
@@ -2289,67 +2323,58 @@ function rutaTm(cadena) {
 function dibujarTm() {
   const lienzo = $("#tmLienzo"); if (!lienzo) return;
   const W = Math.max(200, Math.floor(lienzo.parentElement.clientWidth)), H = Math.max(260, Math.min(560, Math.floor(W * 0.55)));
-  lienzo.width = W; lienzo.height = H;
-  const ctx = lienzo.getContext("2d"), img = ctx.createImageData(W, H), px = img.data;
-  const luz = [-0.09759, -0.19518, 0.9759], ALTURA = 0.38, F = 0.75;
-  tm.hojas = [];
-  const raiz = tm.camino[tm.camino.length - 1];
-  const prefijo = tm.camino.slice(0, -1);
-  // Treemap «squarified» con relieve (cushion) como WinDirStat.
-  function cresta(s, x1, x2, y1, y2, h) {
-    s[0] += -4 * h / (x2 - x1); s[1] += 4 * h * (x2 + x1) / (x2 - x1);
-    s[2] += -4 * h / (y2 - y1); s[3] += 4 * h * (y2 + y1) / (y2 - y1);
-  }
-  function pintar(x1, y1, x2, y2, s, color) {
-    const xa = Math.round(x1), xb = Math.round(x2), ya = Math.round(y1), yb = Math.round(y2);
-    for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) {
-      const nx = -(2 * s[0] * (x + .5) + s[1]), ny = -(2 * s[2] * (y + .5) + s[3]);
-      const cos = (nx * luz[0] + ny * luz[1] + luz[2]) / Math.sqrt(nx * nx + ny * ny + 1);
-      const k = 0.2 + 0.95 * Math.max(0, cos), i = (y * W + x) * 4;
-      px[i] = Math.min(255, color[0] * k); px[i + 1] = Math.min(255, color[1] * k); px[i + 2] = Math.min(255, color[2] * k); px[i + 3] = 255;
-    }
-  }
-  function colorDe(n) { return n[2] === "~" ? [190, 190, 190] : tm.colorExt[n[2] || ""] || [160, 160, 160]; }
-  function nodo(n, x1, y1, x2, y2, s, h, cadena) {
-    s = s.slice(); cresta(s, x1, x2, y1, y2, h);
+  const dpr = window.devicePixelRatio || 1;
+  lienzo.width = W * dpr; lienzo.height = H * dpr; lienzo.style.height = H + "px";
+  const ctx = lienzo.getContext("2d"); ctx.scale(dpr, dpr);
+  ctx.fillStyle = tm.fondo; ctx.fillRect(0, 0, W, H);
+  tm.hojas = []; tm.W = W; tm.H = H;
+  const raiz = tm.camino[tm.camino.length - 1], prefijo = tm.camino.slice(0, -1);
+  const colorDe = n => n[2] === "~" ? tm.chicos : tm.colorExt[n[2] || ""] || tm.chicos;
+  const carpetas = [];
+  // Treemap «squarified» (como WinDirStat), con colores planos y una línea fina entre bloques.
+  function nodo(n, x1, y1, x2, y2, cadena, nivel) {
     const hijos = (n[3] || []).filter(c => c[1] > 0);
     if (!hijos.length || (x2 - x1) < 3 || (y2 - y1) < 3) {
-      pintar(x1, y1, x2, y2, s, n[3] ? [150, 150, 150] : colorDe(n));
+      ctx.fillStyle = n[3] ? tm.chicos : colorDe(n);
+      ctx.fillRect(x1 + .5, y1 + .5, Math.max(0, x2 - x1 - 1), Math.max(0, y2 - y1 - 1));
       tm.hojas.push({ x1, y1, x2, y2, nodo: n, cadena });
       return;
     }
+    if (nivel === 1) carpetas.push([x1, y1, x2, y2]);
     let x = x1, y = y1, w = x2 - x1, alto = y2 - y1, i = 0;
     const escala = w * alto / hijos.reduce((t, c) => t + c[1], 0);
     while (i < hijos.length) {
       const lado = Math.min(w, alto); let fila = [], suma = 0, peor = Infinity;
       for (let j = i; j < hijos.length; j++) {
-        const a = hijos[j][1] * escala, ns = suma + a;
-        const mx = Math.max(a, fila.length ? fila[0] : a), mn = a;
-        const p = Math.max(lado * lado * mx / (ns * ns), ns * ns / (lado * lado * mn));
+        const a = hijos[j][1] * escala, ns = suma + a, mx = fila.length ? fila[0] : a;
+        const p = Math.max(lado * lado * mx / (ns * ns), ns * ns / (lado * lado * a));
         if (fila.length && p > peor) break;
         fila.push(a); suma = ns; peor = p;
       }
       const grosor = suma / lado; let pos = 0;
       fila.forEach((a, k) => {
         const largo = a / grosor, c = hijos[i + k];
-        if (w >= alto) nodo(c, x, y + pos, x + grosor, y + pos + largo, s, h * F, cadena.concat([c]));
-        else nodo(c, x + pos, y, x + pos + largo, y + grosor, s, h * F, cadena.concat([c]));
+        if (w >= alto) nodo(c, x, y + pos, x + grosor, y + pos + largo, cadena.concat([c]), nivel + 1);
+        else nodo(c, x + pos, y, x + pos + largo, y + grosor, cadena.concat([c]), nivel + 1);
         pos += largo;
       });
       if (w >= alto) { x += grosor; w -= grosor; } else { y += grosor; alto -= grosor; }
       i += fila.length;
     }
   }
-  nodo(raiz, 0, 0, W, H, [0, 0, 0, 0], ALTURA, prefijo.concat([raiz]));
-  ctx.putImageData(img, 0, 0);
+  nodo(raiz, 0, 0, W, H, prefijo.concat([raiz]), 0);
+  // Las carpetas del primer nivel, con un borde algo más marcado para ver dónde empieza cada una.
+  ctx.strokeStyle = tm.fondo; ctx.lineWidth = 2.5;
+  carpetas.forEach(([a, b, c, d]) => ctx.strokeRect(a, b, c - a, d - b));
   if (tm.sel && tm.sel.hoja) {
-    const hj = tm.sel.hoja; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(hj.x1 + 1, hj.y1 + 1, hj.x2 - hj.x1 - 2, hj.y2 - hj.y1 - 2);
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.strokeRect(hj.x1 + .5, hj.y1 + .5, hj.x2 - hj.x1 - 1, hj.y2 - hj.y1 - 1);
+    const hj = tm.sel.hoja;
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--texto").trim() || "#000"; ctx.lineWidth = 2;
+    ctx.strokeRect(hj.x1 + 1, hj.y1 + 1, hj.x2 - hj.x1 - 2, hj.y2 - hj.y1 - 2);
   }
 }
 function hojaEn(ev) {
   const l = $("#tmLienzo"), b = l.getBoundingClientRect();
-  const x = (ev.clientX - b.left) * l.width / b.width, y = (ev.clientY - b.top) * l.height / b.height;
+  const x = (ev.clientX - b.left) * tm.W / b.width, y = (ev.clientY - b.top) * tm.H / b.height;
   return tm.hojas.find(h => x >= h.x1 && x < h.x2 && y >= h.y1 && y < h.y2);
 }
 function seleccionTm(h) {
@@ -2382,6 +2407,7 @@ $("#discoMapa").addEventListener("click", async e => {
     else if (t.id === "tmElegir") { const r = await api("/api/elegir-carpeta", {}); if (r.carpeta) { await api("/api/disco/analizar", { ruta: r.carpeta }); cargarDisco(); } }
     else if (t.id === "tmCancelar") { await api("/api/disco/cancelar"); aviso("Cancelando…"); }
     else if (t.dataset.tmSubir !== undefined) { e.preventDefault(); tm.camino = tm.camino.slice(0, +t.dataset.tmSubir + 1); tm.sel = null; pintarDisco(); }
+    else if (t.dataset.ir) mostrarVista(t.dataset.ir);
     else if (t.dataset.tmEntrar !== undefined && tm.sel) { tm.camino = tm.sel.hoja.cadena.slice(0, tm.camino.length + 1); tm.sel = null; pintarDisco(); }
     else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
   } catch (err) { aviso("Error: " + err.message); }
@@ -2563,6 +2589,65 @@ document.addEventListener("click", e => {
   if (t.dataset.actuInstalar !== undefined) instalarActualizacion().catch(x => aviso("Error: " + x.message));
   else if (t.id === "actuNotas" && actu) alert(`Novedades de GESTOR ${actu.version}:\n\n${actu.notas || "Sin notas."}`);
   else if (t.id === "actuBuscar") comprobarActualizacion(true);
+});
+
+// ---------------------------------------------------------------- tipos de archivo
+let tipos = { res: null, filtro: "" };
+async function cargarTipos() { tipos.res = await api("/api/tipos"); pintarTipos(); }
+function pintarTipos() {
+  const r = tipos.res, f = tipos.filtro.trim().toLowerCase().replace(/^\*?\.?/, "");
+  const lista = Object.entries(r.tipos).filter(([t, ex]) => ex.length || r.originales.includes(t));
+  const total = lista.reduce((a, [, ex]) => a + ex.length, 0);
+  const visibles = lista.map(([t, ex]) => [t, f ? ex.filter(e => e.includes(f)) : ex, f && t.toLowerCase().includes(f)])
+    .filter(([, ex, porNombre]) => !f || ex.length || porNombre);
+  $("#tipos").innerHTML = `
+    <h2>Tipos de archivo</h2>
+    <p class="ayuda">GESTOR reconoce ${total.toLocaleString("es")} extensiones en ${lista.length} tipos. El tipo decide la carpeta <code>{categoria}</code>, las reglas «por tipo», el color en el mapa del disco y las estadísticas.
+      Añade las que te falten o cambia el tipo de una; las tuyas salen resaltadas y puedes quitarlas con ✕ para volver a la original.</p>
+    <section><h3>Añadir extensiones</h3>
+      <div class="fila"><input type="text" id="tpExt" placeholder=".dwg .rvt .skp" style="flex:1;min-width:160px">
+        <select id="tpTipo">${lista.map(([t]) => `<option>${esc(t)}</option>`).join("")}<option value="__nuevo">Nuevo tipo…</option></select>
+        <input type="text" id="tpNuevo" placeholder="Nombre del tipo nuevo" style="display:none;flex:1;min-width:140px">
+        <button class="prim" id="tpAnadir">Añadir</button></div>
+      <div class="fila"><label class="chip" style="cursor:pointer">📄 Subir una lista (.csv o .txt)… <input type="file" id="tpArchivo" accept=".csv,.txt,text/plain,text/csv" hidden></label>
+        <span class="ayuda">Un renglón por extensión: <code>.dwg, Planos</code> (también vale con punto y coma o tabulador).</span></div>
+    </section>
+    <section><h3>Todos los tipos</h3>
+      <div class="fila"><input type="text" id="tpBuscar" placeholder="Buscar una extensión o un tipo: mkv, cad, fuentes…" value="${esc(tipos.filtro)}" style="flex:1"></div>
+      ${visibles.map(([t, ex]) => `<div class="tipo-caja"><h4>${esc(t)} <span class="ayuda">${ex.length} extensiones</span>${r.originales.includes(t) ? "" : `<span class="etiqueta verde">tuyo</span>`}</h4>
+        <div class="exts">${ex.map(e => r.propias[e] ? `<code class="propia" title="Añadida por ti">${esc(e)}<span class="x" data-tp-quitar="${esc(e)}" title="Quitar">✕</span></code>` : `<code>${esc(e)}</code>`).join("")}</div></div>`).join("")
+        || `<p class="ayuda">Ninguna extensión coincide. Añádela arriba.</p>`}
+    </section>`;
+}
+async function guardarTipos(cuerpo, mensaje) {
+  const r = await api("/api/tipos/guardar", cuerpo);
+  tipos.res = r; pintarTipos(); aviso(mensaje(r));
+  datos.categorias = Object.keys(r.tipos).concat(["Otros"]);
+}
+$("#tipos").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "tpAnadir") {
+      const tipo = $("#tpTipo").value === "__nuevo" ? $("#tpNuevo").value.trim() : $("#tpTipo").value;
+      const exts = $("#tpExt").value.split(/[\s,;]+/).filter(Boolean);
+      if (!exts.length) { aviso("Escribe una o varias extensiones."); return; }
+      if (!tipo) { aviso("Escribe el nombre del tipo nuevo."); return; }
+      await guardarTipos({ cambios: Object.fromEntries(exts.map(x => [x, tipo])) }, () => `${plural(exts.length, "extensión añadida", "extensiones añadidas")} a ${tipo}.`);
+    } else if (t.dataset.tpQuitar) await guardarTipos({ quitar: [t.dataset.tpQuitar] }, () => `${t.dataset.tpQuitar} vuelve a su tipo original.`);
+  } catch (err) { aviso("Error: " + err.message); }
+});
+$("#tipos").addEventListener("change", async e => {
+  const t = e.target;
+  if (t.id === "tpTipo") { $("#tpNuevo").style.display = t.value === "__nuevo" ? "" : "none"; if (t.value === "__nuevo") $("#tpNuevo").focus(); }
+  else if (t.id === "tpArchivo" && t.files[0]) {
+    try { await guardarTipos({ lista: await t.files[0].text() }, r => `${plural(r.anadidas, "extensión cargada", "extensiones cargadas")} de la lista.`); }
+    catch (err) { aviso("Error: " + err.message); }
+  }
+});
+$("#tipos").addEventListener("input", e => {
+  if (e.target.id !== "tpBuscar") return;
+  tipos.filtro = e.target.value; const pos = e.target.selectionStart; pintarTipos();
+  const i = $("#tpBuscar"); i.focus(); i.setSelectionRange(pos, pos);
 });
 
 (async () => {

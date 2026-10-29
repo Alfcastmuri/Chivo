@@ -832,6 +832,18 @@ class PruebaVersion07(unittest.TestCase):
         self.assertEqual([h[2] for h in sub[3]], ["~"])  # los 30 archivos pequeños van en un solo bloque
         self.assertEqual(sub[3][0][4], 30)
 
+    def test_extensiones_propias(self):
+        self.assertEqual(nucleo.categoria_de(".dwg"), "3D y CAD")
+        self.assertEqual(nucleo.categoria_de(".MKV"), "Vídeos")
+        nucleo.guardar_extensiones_propias({"dwg": "Planos", "*.ABC": "Planos"})
+        self.assertEqual(nucleo.categoria_de(".dwg"), "Planos")
+        self.assertEqual(nucleo.categoria_de(".abc"), "Planos")
+        self.assertNotIn(".dwg", nucleo.categorias()["3D y CAD"])
+        nucleo.guardar_extensiones_propias({}, quitar=[".dwg", ".abc"])
+        self.assertEqual(nucleo.categoria_de(".dwg"), "3D y CAD")
+        with self.assertRaises(ValueError):
+            nucleo.normalizar_extension("no vale/")
+
     def test_version_y_correo(self):
         import actualizar
         import correo
