@@ -395,6 +395,32 @@ body.cuaderno button.on-chip { background: var(--acento); }
 .editor-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 8px; }
 .desde-img { display: grid; grid-template-columns: 160px 1fr; gap: 16px; align-items: center; margin-top: 8px; }
 .desde-img img { width: 160px; height: 120px; object-fit: contain; border-radius: 12px; background: var(--panel); box-shadow: var(--sombra-chica); }
+/* ---------------- 0.9.2: avisos que no estorban, cajas simétricas, todo centrado y pestañas del mismo tamaño */
+.toast { pointer-events: auto; cursor: pointer; }
+.proc { cursor: pointer; }
+body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var(--peligro) !important; color: #fff !important; box-shadow: 0 6px 16px color-mix(in srgb, var(--peligro) 35%, transparent); }
+.marco { max-width: none; min-height: calc(100vh - 64px); }
+.contenido { display: flex; flex-direction: column; min-height: calc(100vh - 64px); padding: 0 8px; }
+.contenido > main.vista.on { width: 100%; max-width: 1480px; margin: auto; }
+.subnav { justify-content: center; }
+.vista.simple { max-width: 1480px; }
+/* cuadrículas simétricas: columnas iguales y cajas de una misma fila con la misma altura */
+.tablero { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.tablero > * { height: 100%; }
+@media (max-width: 1100px) { .tablero { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .tablero { grid-template-columns: 1fr; } }
+.tablero .ancha { grid-column: 1 / -1; }
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpis > * { height: 100%; }
+/* pestañas: todas del mismo ancho, y los paneles que se sobreponen con la misma altura */
+.pestanas-int, .subnav.on { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.pestanas-int button, .subnav button { width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subnav.on { max-width: 1480px; width: 100%; margin: 0 auto; padding: 18px 8px 0; }
+@media (max-width: 860px) {
+  .pestanas-int, .subnav.on { grid-auto-columns: minmax(150px, 1fr); overflow-x: auto; }
+}
+.paletas { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.paleta { height: 100%; }
 </style>
 </head>
 <body>
@@ -448,7 +474,7 @@ body.cuaderno button.on-chip { background: var(--acento); }
     <div class="pestanas-int" data-tabs="ajustes">
       <button type="button" data-tab="general" class="on">General</button><button type="button" data-tab="horario">Programación</button>
       <button type="button" data-tab="inteligencia">Inteligencia</button><button type="button" data-tab="celular">Celular</button>
-      <button type="button" data-tab="datos">Datos y seguridad</button></div>
+      <button type="button" data-tab="datos">Datos</button></div>
     <div data-pest="ajustes:general" class="on">
     <div class="tarjeta-op"><h4>Funcionamiento</h4>
     <div class="fila"><label><input type="checkbox" id="prefIcono"> Mostrar el icono junto al reloj</label></div>
@@ -537,7 +563,10 @@ body.cuaderno button.on-chip { background: var(--acento); }
     </div>
   </div>
 </div>
-<div class="toast" id="toast"></div>
+<div class="modal" id="modalConfirmar"><div class="caja" style="max-width:480px">
+  <h2 style="margin-top:0"></h2><div class="cuerpo"></div>
+  <div class="fila" style="justify-content:flex-end;margin:16px 0 0"><button data-no>Cancelar</button><button data-si class="prim">Sí</button></div></div></div>
+<div class="toast" id="toast" title="Toca para cerrar"></div>
 <div id="procesos" aria-live="polite"></div>
 
 <script>
@@ -593,7 +622,9 @@ async function api(ruta, cuerpo = {}) {
   if (!r.ok) throw new Error(j.error || "Error");
   return j;
 }
-function aviso(texto) { const t = $("#toast"); t.textContent = texto; t.classList.add("on"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 3000); }
+function aviso(texto) { const t = $("#toast"); t.textContent = texto; t.classList.add("on"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 2500); t._desde = Date.now(); }
+// Los avisos y las tarjetas de progreso se ocultan con un clic (en ellos o en cualquier otra parte).
+document.addEventListener("click", () => { const t = $("#toast"); if (t.classList.contains("on") && Date.now() - (t._desde || 0) > 250) t.classList.remove("on"); });
 const fechaBonita = iso => {
   if (!iso) return "";
   if (!/^\d{4}-/.test(iso)) return iso;
@@ -1196,6 +1227,28 @@ function cambiarPestana(clave, v) {
   document.querySelectorAll(`[data-tabs="${clave}"] [data-tab]`).forEach(b => b.classList.toggle("on", b.dataset.tab === v));
   document.querySelectorAll(`[data-pest^="${clave}:"]`).forEach(x => x.classList.toggle("on", x.dataset.pest === `${clave}:${v}`));
 }
+// Todos los paneles de un mismo grupo de pestañas miden lo mismo: al cambiar de pestaña nada salta de tamaño.
+function igualarPestanas() {
+  document.querySelectorAll("[data-tabs]").forEach(barra => {
+    const clave = barra.dataset.tabs, paneles = [...document.querySelectorAll(`[data-pest^="${clave}:"]`)];
+    const visible = paneles.find(p => p.classList.contains("on"));
+    if (!visible || !visible.offsetParent) return;
+    const ancho = visible.getBoundingClientRect().width;
+    paneles.forEach(p => p.style.minHeight = "");
+    let alto = 0;
+    paneles.forEach(p => {
+      if (p === visible) { alto = Math.max(alto, p.scrollHeight); return; }
+      const antes = p.style.cssText;
+      p.style.cssText += `;display:block!important;visibility:hidden;position:absolute;width:${ancho}px`;
+      alto = Math.max(alto, p.scrollHeight); p.style.cssText = antes;
+    });
+    if (paneles.length > 1) paneles.forEach(p => p.style.minHeight = alto + "px");
+  });
+}
+let igualando = 0;
+new MutationObserver(() => { clearTimeout(igualando); igualando = setTimeout(igualarPestanas, 120); })
+  .observe(document.body, { childList: true, subtree: true });
+window.addEventListener("resize", () => { clearTimeout(igualando); igualando = setTimeout(igualarPestanas, 200); });
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
   const c = b.closest("[data-tabs]"); if (c) { e.preventDefault(); e.stopPropagation(); cambiarPestana(c.dataset.tabs, b.dataset.tab); }
@@ -1407,6 +1460,9 @@ function pintarInicio() {
       return anillo(usado, x.letra, `${mb(x.libre)} libres`, bajo); }).join("")}</div>
     <div class="ayuda" style="margin-top:10px">Papelera de GESTOR: ${plural(d.papelera.n, "archivo", "archivos")} (${mb(d.papelera.bytes)}). <a href="#" data-ir="Papelera">Abrir</a></div>
   </div>`;
+  const tarjetaPapelera = `<div class="panelito ${d.retenidos ? "destacado" : ""}"><h3>Papelera <button class="chico ir" data-ir="Papelera">Abrir</button></h3>
+    <div class="cifras" style="grid-template-columns:1fr 1fr"><div><b>${d.papelera.n.toLocaleString("es")}</b><span>archivos</span></div><div><b>${mb(d.papelera.bytes)}</b><span>ocupan</span></div></div>
+    <div class="ayuda" style="margin-top:10px">${d.retenidos ? plural(d.retenidos, "archivo espera", "archivos esperan") + " tu decisión antes de borrarse." : `Se vacía sola a los ${datos.ajustes.retencion_dias || 30} días. Puedes restaurar cualquier cosa a su sitio.`}</div></div>`;
   const heroEstado = tarjetaEstado.replace('class="panelito ', 'class="panelito estado-hero ');
 
   const avisos = [];
@@ -1416,18 +1472,18 @@ function pintarInicio() {
   $("#inicio").innerHTML = `
     <div style="margin:0 2px 14px"><div class="saludo">${saludo}${datos.ajustes.nombre ? ", " + esc(datos.ajustes.nombre) : ""}</div>
       <div class="ayuda">${avisos.length ? avisos.map(esc).join(" ") : "Todo en orden. GESTOR sigue trabajando por ti."}</div></div>
-    ${pestanas("inicio", [["resumen", "Resumen"], ["actividad", "Actividad y gráficas"], ["equipo", "Discos, respaldo y horarios"], ["movimientos", "Últimos movimientos"]])}
+    ${pestanas("inicio", [["resumen", "Resumen"], ["actividad", "Actividad y gráficas"], ["equipo", "Discos, respaldo y papelera"], ["movimientos", "Últimos movimientos"]])}
     <div ${enPest("inicio", "resumen")}><div class="tablero">
       ${heroEstado}${tarjetaPend}${tarjetaPagos}
       ${kpis}
-      ${tarjetaVence}${tarjetaAtajos.replace("panelito ancha", "panelito doble")}
+      ${tarjetaVence}${tarjetaServicios}${tarjetaAtajos.replace("panelito ancha", "panelito")}
     </div></div>
     <div ${enPest("inicio", "actividad")}><div class="tablero">
-      ${tarjetaArea}${tarjetaTipos}
-      ${tarjetaPorServicio}${tarjetaActividad}
+      ${tarjetaArea.replace("panelito doble", "panelito ancha")}
+      ${tarjetaTipos}${tarjetaPorServicio}${tarjetaActividad}
     </div></div>
     <div ${enPest("inicio", "equipo")}><div class="tablero">
-      ${tarjetaDiscos2}${tarjetaServicios}${tarjetaRespaldo}
+      ${tarjetaDiscos2}${tarjetaRespaldo}${tarjetaPapelera}
     </div></div>
     <div ${enPest("inicio", "movimientos")}><div class="tablero">${tarjetaUltimos}</div></div>`;
 }
@@ -1945,14 +2001,14 @@ const reloj = seg => {
 };
 function pintarProcesos() {
   const ahora = (Date.now() + procs.desfase) / 1000;
-  const html = procs.lista.filter(p => !p.fin || ahora - p.fin < 8 && !procs.cerrados.has(p.id)).map(p => {
+  const html = procs.lista.filter(p => !procs.cerrados.has(p.id) && (!p.fin || ahora - p.fin < 3)).map(p => {
     const marcha = p.estado === "en marcha", trans = (p.fin || ahora) - (p.inicio || ahora);
     const pct = p.total ? Math.min(100, 100 * p.hechos / p.total) : null;
     const falta = marcha && pct > 3 && pct < 100 && trans > 3 ? trans * (100 - pct) / pct : null;
     const detalle = !marcha ? (p.estado === "error" ? "Error: " + esc(p.error || "") : "✓ Terminado")
       : esc(p.etapa || "Trabajando") + (p.total ? ` · ${p.hechos.toLocaleString("es")} de ${p.total.toLocaleString("es")} (${Math.floor(pct)} %)`
         : p.hechos ? ` · ${p.hechos.toLocaleString("es")} archivos` : "") + (falta ? ` · faltan ~${reloj(falta)}` : "");
-    return `<div class="proc ${marcha ? "" : "listo"} ${p.estado === "error" ? "mal" : ""}" data-proc="${esc(p.id)}" title="${marcha ? "" : "Toca para cerrar"}">
+    return `<div class="proc ${marcha ? "" : "listo"} ${p.estado === "error" ? "mal" : ""}" data-proc="${esc(p.id)}" title="Toca para ocultar${marcha ? " (sigue trabajando)" : ""}">
       <div class="proc-cab"><b>${esc(p.nombre)}</b><span class="reloj" title="Tiempo transcurrido">⏱ ${reloj(trans)}</span></div>
       <div class="barra ${marcha && pct === null ? "indef" : ""}"><div style="width:${marcha ? (pct ?? 35) : 100}%"></div></div>
       <div class="ayuda">${detalle}</div></div>`;
@@ -1969,7 +2025,7 @@ function actualizarCuentas() {
 }
 setInterval(() => { if (procs.lista.some(p => p.estado === "en marcha")) pintarProcesos(); actualizarCuentas(); }, 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) sondearProcesos(); });
-$("#procesos").addEventListener("click", e => { const p = e.target.closest(".proc.listo"); if (p) { procs.cerrados.add(p.dataset.proc); pintarProcesos(); } });
+$("#procesos").addEventListener("click", e => { const p = e.target.closest(".proc"); if (p) { procs.cerrados.add(p.dataset.proc); pintarProcesos(); } });
 
 // ---------------------------------------------------------------- modo cuaderno
 function aplicarCuaderno(si) {
@@ -2898,7 +2954,9 @@ function pintarSelTm() {
   return `<b>${esc(s.nodo[0])}</b> <span class="ayuda">${mb(s.nodo[1])}${esCarpeta ? ` · ${(s.nodo[4] || 0).toLocaleString("es")} archivos` : ""}</span>
     <div class="ayuda" style="word-break:break-all">${esc(s.ruta)}</div>
     <div class="fila" style="margin:6px 0 0">${datos.en_red || s.nodo[2] === "~" ? "" : `<button class="chico" data-abrir-ruta="${esc(s.ruta)}">Abrir carpeta</button>`}
-      ${s.carpeta && s.carpeta !== tm.camino[tm.camino.length - 1] ? `<button class="chico" data-tm-entrar>Entrar en ${esc(s.carpeta[0])}</button>` : ""}</div>`;
+      ${s.carpeta && s.carpeta !== tm.camino[tm.camino.length - 1] ? `<button class="chico" data-tm-entrar>Entrar en ${esc(s.carpeta[0])}</button>` : ""}
+      ${datos.en_red ? "" : `${s.nodo[2] !== "~" && !esCarpeta ? `<button class="chico peligro" data-tm-borrar="archivo">🗑 Borrar este archivo</button>` : ""}
+        ${s.carpeta ? `<button class="chico peligro" data-tm-borrar="carpeta">🗑 Borrar la carpeta ${esc(s.carpeta[0])}</button>` : ""}`}</div>`;
 }
 function rutaTm(cadena) {
   const sep = tm.res.raiz.includes("\\") ? "\\" : "/";
@@ -2994,8 +3052,47 @@ $("#discoMapa").addEventListener("click", async e => {
     else if (t.dataset.ir) mostrarVista(t.dataset.ir);
     else if (t.dataset.tmEntrar !== undefined && tm.sel) { tm.camino = tm.sel.hoja.cadena.slice(0, tm.camino.length + 1); tm.sel = null; pintarDisco(); }
     else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+    else if (t.dataset.tmBorrar && tm.sel) await borrarDelMapa(t.dataset.tmBorrar);
   } catch (err) { aviso("Error: " + err.message); }
 });
+async function borrarDelMapa(que) {
+  const s = tm.sel, cad = s.hoja.cadena;
+  // El nodo que se borra y su cadena de carpetas hasta la raíz.
+  const hasta = que === "carpeta" ? tm.camino.length + 1 : cad.length;
+  const cadena = cad.slice(0, hasta), nodo = cadena[cadena.length - 1], ruta = rutaTm(cadena);
+  const esCarpeta = que === "carpeta";
+  const papelera = (datos.ajustes.papelera || "gestor") === "windows" ? "la papelera de Windows" : "la papelera de GESTOR";
+  const ok = await confirmar({ titulo: esCarpeta ? "¿Borrar esta carpeta?" : "¿Borrar este archivo?",
+    texto: `<b>${esc(nodo[0])}</b> · ${mb(nodo[1])}${esCarpeta ? ` · ${(nodo[4] || 0).toLocaleString("es")} archivos` : ""}
+      <div class="ayuda" style="word-break:break-all;margin-top:4px">${esc(ruta)}</div>
+      <p>Irá a ${papelera}: podrás recuperarlo desde Proteger → Papelera${papelera.includes("GESTOR") ? ` durante ${datos.ajustes.retencion_dias || 30} días` : ""}.</p>`,
+    si: esCarpeta ? "Sí, borrar la carpeta" : "Sí, borrar el archivo", peligro: true });
+  if (!ok) return;
+  const r = await api("/api/disco/borrar", { ruta });
+  // Quitarlo del mapa sin volver a medir: se resta su tamaño a todas las carpetas que lo contienen.
+  const padre = cadena[cadena.length - 2];
+  if (padre && padre[3]) padre[3].splice(padre[3].indexOf(nodo), 1);
+  cadena.slice(0, -1).forEach(n => { n[1] -= nodo[1]; if (esCarpeta || n[4]) n[4] = Math.max(0, (n[4] || 0) - (esCarpeta ? (nodo[4] || 0) : 1)); });
+  tm.res.bytes -= nodo[1];
+  if (tm.camino.includes(nodo)) tm.camino = tm.camino.slice(0, tm.camino.indexOf(nodo));
+  tm.sel = null; pintarDisco();
+  aviso(`${esCarpeta ? "Carpeta enviada" : "Archivo enviado"} a ${r.papelera === "windows" ? "la papelera de Windows" : "la papelera de GESTOR"} (${mb(r.bytes)}).`);
+}
+// Ventana de confirmación propia (en lugar del confirm() del navegador).
+function confirmar({ titulo, texto, si = "Sí", no = "Cancelar", peligro = false }) {
+  return new Promise(resolver => {
+    const m = $("#modalConfirmar");
+    m.querySelector("h2").textContent = titulo; m.querySelector(".cuerpo").innerHTML = texto;
+    const bSi = m.querySelector("[data-si]"), bNo = m.querySelector("[data-no]");
+    bSi.textContent = si; bNo.textContent = no; bSi.className = peligro ? "prim peligro-lleno" : "prim";
+    const cerrar = v => { m.classList.remove("on"); document.removeEventListener("keydown", tecla); resolver(v); };
+    const tecla = e => { if (e.key === "Escape") cerrar(false); };
+    bSi.onclick = () => cerrar(true); bNo.onclick = () => cerrar(false);
+    m.onclick = e => { if (e.target === m) cerrar(false); };
+    document.addEventListener("keydown", tecla);
+    m.classList.add("on"); bNo.focus();
+  });
+}
 window.addEventListener("resize", () => { if (vistaActual === "Espacio" && tm.res) { clearTimeout(tm.rs); tm.rs = setTimeout(dibujarTm, 200); } });
 
 // ---------------------------------------------------------------- pagos

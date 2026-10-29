@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.9.1"
+VERSION = "0.9.2"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 

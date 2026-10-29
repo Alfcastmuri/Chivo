@@ -885,3 +885,24 @@ class PruebaUnSoloUso(PruebaServicio):
         nucleo.guardar_servicios([s])
         nucleo.ejecutar_y_anotar(s)
         self.assertTrue(nucleo.cargar_servicios()[0]["activo"])
+
+
+class PruebaBorrarDesdeElMapa(unittest.TestCase):
+    def test_solo_dentro_de_lo_medido_y_a_la_papelera(self):
+        import disco
+        raiz = tempfile.mkdtemp()
+        os.makedirs(os.path.join(raiz, "sub"))
+        with open(os.path.join(raiz, "sub", "x.bin"), "wb") as f:
+            f.write(b"0" * 5000)
+        fuera = tempfile.mkdtemp()
+        disco.analizar(raiz)
+        with self.assertRaises(ValueError):
+            disco.borrar(fuera)
+        with self.assertRaises(ValueError):
+            disco.borrar(raiz)
+        r = disco.borrar(os.path.join(raiz, "sub"))
+        self.assertEqual(r["bytes"], 5000)
+        self.assertFalse(os.path.exists(os.path.join(raiz, "sub")))
+        entrada = next(e for e in nucleo.listar_papelera() if e["origen"] == os.path.join(raiz, "sub"))
+        nucleo.restaurar(entrada["id"])
+        self.assertTrue(os.path.exists(os.path.join(raiz, "sub", "x.bin")))

@@ -32,7 +32,7 @@ import vencimientos
 
 PUERTO = int(os.environ.get("GESTOR_PUERTO", "8765"))
 PUERTO_RED = int(os.environ.get("GESTOR_PUERTO_RED", "8770"))  # panel para el celular (lo sirve el residente)
-SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes",
+SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/disco/borrar", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes",
                  "/api/abrir-archivo", "/api/actualizacion/instalar"}
 TOKEN = secrets.token_urlsafe(24)
 INACTIVIDAD_SEGUNDOS = 5 * 60
@@ -633,6 +633,8 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/disco/analizar":
             TRABAJOS.pop("disco-cancelar", None)
             return en_segundo_plano("disco", disco.analizar, datos["ruta"], lambda: bool(TRABAJOS.get("disco-cancelar")))
+        if ruta == "/api/disco/borrar":
+            return disco.borrar(datos.get("ruta", ""))
         if ruta == "/api/disco/cancelar":
             TRABAJOS["disco-cancelar"] = {"estado": "pedido"}
             return {"ok": True}

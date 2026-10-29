@@ -1,4 +1,11 @@
-## Novedades de GESTOR 0.9.1
+## Novedades de GESTOR 0.9.2
+
+- **Borrar desde el mapa del disco**: elige un archivo o una carpeta en el mapa y pulsa «Borrar». Una ventana te pregunta si estás seguro y te dice qué es, cuánto ocupa y dónde está. Va a la papelera, así que se puede recuperar.
+- **Los avisos ya no estorban**: los mensajes y las tarjetas de progreso se ocultan con un clic, y las terminadas desaparecen solas en 3 segundos.
+- **Todo simétrico y centrado**: cajas de igual ancho y alto en cada fila, el panel ocupa toda la pantalla y el contenido queda centrado en horizontal y en vertical.
+- **Pestañas del mismo tamaño**: todas las pestañas de una sección miden lo mismo, y su contenido también, para que nada salte al cambiar.
+
+## Lo que trajo la 0.9.1
 
 - **200 combinaciones de colores**: 100 nuevas en Profesionales, Salud, Naturales, Mexicanas, Retro, Elegantes, Dinámicas, Pastel e Inspiradas en marcas (estilo Coca-Cola, Amazon, Spotify, Mercado Libre, Oxxo y más).
 - **Vista previa en claro y en oscuro**: pasa el ratón por una combinación y ves cómo queda en los dos modos antes de pulsar «Aplicar».

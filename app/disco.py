@@ -108,3 +108,46 @@ def lugares():
         ruta = u["letra"] + "\\" if nucleo.ES_WINDOWS else u["letra"]
         salida.append({"nombre": f'Disco {u["letra"]}', "ruta": ruta, "total": u["total"], "libre": u["libre"]})
     return salida
+
+
+def _tamano(ruta):
+    if os.path.isfile(ruta):
+        return os.path.getsize(ruta)
+    total = 0
+    for raiz, _, archivos in os.walk(ruta):
+        for n in archivos:
+            try:
+                total += os.path.getsize(os.path.join(raiz, n))
+            except OSError:
+                pass
+    return total
+
+
+def borrar(ruta):
+    """Quita del disco lo elegido en el mapa: a la papelera de GESTOR (o la de Windows), así se puede recuperar.
+
+    Solo dentro de la carpeta medida, y nunca carpetas del sistema, la raíz de un disco, tu carpeta de usuario
+    o los datos de GESTOR.
+    """
+    res = ultimo() or {}
+    raiz = res.get("raiz") or ""
+    ruta = os.path.abspath(ruta or "")
+    if not raiz or not nucleo._dentro_de(ruta, raiz) or nucleo._norm(ruta) == nucleo._norm(raiz):
+        raise ValueError("Solo se puede borrar algo de dentro de la carpeta medida.")
+    permitida, _ = nucleo.revisar_carpeta(ruta)
+    protegidas = [os.path.expanduser("~"), nucleo.DATOS, os.path.splitdrive(ruta)[0] + os.sep]
+    if not permitida or any(nucleo._norm(ruta) == nucleo._norm(p) for p in protegidas) or nucleo._dentro_de(ruta, nucleo.DATOS):
+        raise ValueError("Esa carpeta está protegida: GESTOR no la borra.")
+    if not os.path.exists(ruta):
+        raise ValueError("Ya no existe (quizá la moviste o la borraste).")
+    tam = _tamano(ruta)
+    op = {"accion": "papelera", "origen": ruta, "destino": "", "bytes": tam, "carpeta": os.path.isdir(ruta)}
+    op["papelera_id"] = nucleo.quitar(ruta, "mapa del disco")
+    if op["papelera_id"]:  # en la papelera de GESTOR: el tamaño real de la carpeta, no el de su entrada
+        indice = nucleo.leer_json(nucleo.ARCHIVO_PAPELERA, [])
+        for e in indice:
+            if e["id"] == op["papelera_id"]:
+                e["bytes"] = tam
+        nucleo.escribir_json(nucleo.ARCHIVO_PAPELERA, indice)
+    nucleo.indexar({"nombre": "Mapa del disco"}, [op], quien="tu")
+    return {"ok": True, "bytes": tam, "papelera": "gestor" if op["papelera_id"] else "windows"}
