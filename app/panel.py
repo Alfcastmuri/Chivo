@@ -104,6 +104,46 @@ def elegir_carpeta(inicial=""):
     return os.path.normpath(ruta) if ruta else ""
 
 
+def watchdog_disponible():
+    try:
+        import watchdog  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def primera_vez():
+    ajustes = nucleo.cargar_ajustes()
+    return not ajustes.get("asistente_visto") and not any(s.get("activo") for s in nucleo.cargar_servicios())
+
+
+TRABAJO_DUPLICADOS = {"estado": "inactivo"}
+
+
+def iniciar_duplicados(carpetas, min_kb):
+    if TRABAJO_DUPLICADOS.get("estado") == "buscando":
+        return {"ok": False, "mensaje": "Ya hay una búsqueda en marcha."}
+    TRABAJO_DUPLICADOS.clear()
+    TRABAJO_DUPLICADOS.update(estado="buscando", progreso={}, grupos=[], cancelar=False,
+                              inicio=time.strftime("%H:%M:%S"))
+
+    def progreso(**k):
+        TRABAJO_DUPLICADOS["progreso"] = k
+
+    def trabajo():
+        try:
+            grupos = nucleo.buscar_duplicados(carpetas, min_kb * 1024, progreso,
+                                              lambda: TRABAJO_DUPLICADOS.get("cancelar"))
+            TRABAJO_DUPLICADOS.update(grupos=grupos[:500], total_grupos=len(grupos),
+                                      recuperable=sum(g["recuperable"] for g in grupos),
+                                      estado="cancelado" if TRABAJO_DUPLICADOS.get("cancelar") else "terminado")
+        except Exception as e:
+            TRABAJO_DUPLICADOS.update(estado="error", error=str(e))
+
+    threading.Thread(target=trabajo, daemon=True).start()
+    return {"ok": True}
+
+
 def servicios_con_estado():
     estado = nucleo.cargar_estado()
     resultado = []
@@ -206,8 +246,10 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/inicio":
             return {"servicios": servicios_con_estado(), "categorias": list(nucleo.CATEGORIAS) + ["Otros"],
                     "procedencias": nucleo.PROCEDENCIAS, "pillow": nucleo.pillow_disponible(),
+                    "pypdf": nucleo.pypdf_disponible(), "watchdog": watchdog_disponible(),
                     "carpetas_rapidas": nucleo.carpetas_rapidas(), "ajustes": nucleo.cargar_ajustes(),
-                    "programacion": nucleo.estado_programacion(), "windows": nucleo.ES_WINDOWS}
+                    "programacion": nucleo.estado_programacion(), "windows": nucleo.ES_WINDOWS,
+                    "residente": nucleo.residente_activo(), "primera_vez": primera_vez()}
         if ruta == "/api/latido":
             return {"ok": True}
         if ruta == "/api/servicios":
@@ -234,6 +276,7 @@ class Manejador(BaseHTTPRequestHandler):
             e["horario"] = servicio.get("horario")
             e["activo_antes"] = bool(servicio.get("activo"))
             nucleo.guardar_estado(estado)
+            nucleo.lanzar_residente()
             return {"ok": True, "id": servicio["id"], "servicios": servicios_con_estado()}
         if ruta == "/api/borrar":
             servicios = [s for s in nucleo.cargar_servicios() if s["id"] != datos["id"]]
@@ -282,6 +325,107 @@ class Manejador(BaseHTTPRequestHandler):
             cookie = SimpleCookie(self.headers.get("Cookie") or "")
             SESIONES.discard(cookie["gestor_sesion"].value)
             return {"ok": True}
+        if ruta == "/api/preferencias":
+            ajustes = nucleo.cargar_ajustes()
+            for clave in ("notificaciones", "icono_bandeja", "pausado"):
+                if clave in datos:
+                    ajustes[clave] = bool(datos[clave])
+            if datos.get("papelera") in ("gestor", "windows"):
+                ajustes["papelera"] = datos["papelera"]
+            if "retencion_dias" in datos:
+                ajustes["retencion_dias"] = max(1, min(365, int(datos["retencion_dias"])))
+            if "asistente_visto" in datos:
+                ajustes["asistente_visto"] = True
+            nucleo.guardar_ajustes(ajustes)
+            nucleo.lanzar_residente()
+            return {"ok": True, "ajustes": ajustes}
+        if ruta == "/api/estadisticas":
+            estado = nucleo.cargar_estado()
+            nombres = {s["id"]: s.get("nombre", "") for s in nucleo.cargar_servicios()}
+            nombres["_duplicados"] = "Buscador de duplicados"
+            filas = [{"nombre": nombres[sid], **e["totales"]} for sid, e in estado.items()
+                     if sid in nombres and isinstance(e, dict) and e.get("totales")]
+            copias = estado.get("_copias", {})
+            return {"servicios": filas, "copias": copias,
+                    "papelera": {"archivos": len(nucleo.listar_papelera()),
+                                 "bytes": sum(e.get("bytes", 0) for e in nucleo.listar_papelera())}}
+        if ruta == "/api/duplicados/iniciar":
+            return iniciar_duplicados(datos.get("carpetas", []), int(datos.get("min_kb", 100)))
+        if ruta == "/api/duplicados/estado":
+            return {k: v for k, v in TRABAJO_DUPLICADOS.items() if k != "cancelar"}
+        if ruta == "/api/duplicados/cancelar":
+            TRABAJO_DUPLICADOS["cancelar"] = True
+            return {"ok": True}
+        if ruta == "/api/duplicados/quitar":
+            quitados, bytes_liberados, fallos = 0, 0, []
+            for ruta_archivo in datos.get("rutas", []):
+                try:
+                    tam = os.path.getsize(ruta_archivo)
+                    nucleo.quitar(ruta_archivo, "duplicado")
+                    quitados, bytes_liberados = quitados + 1, bytes_liberados + tam
+                except OSError as e:
+                    fallos.append(f"{ruta_archivo}: {e}")
+            nucleo.anotar_liberado(bytes_liberados, quitados)
+            return {"ok": True, "quitados": quitados, "bytes": bytes_liberados, "fallos": fallos}
+        if ruta == "/api/papelera":
+            return {"entradas": nucleo.listar_papelera(), "ajustes": nucleo.cargar_ajustes()}
+        if ruta == "/api/papelera/restaurar":
+            hechos, fallos = [], []
+            for pid in datos.get("ids", []):
+                try:
+                    hechos.append(nucleo.restaurar(pid))
+                except OSError as e:
+                    fallos.append(str(e))
+            return {"ok": True, "restaurados": len(hechos), "fallos": fallos}
+        if ruta == "/api/papelera/vaciar":
+            return nucleo.purgar_papelera(todo=bool(datos.get("todo")), ids=datos.get("ids"))
+        if ruta == "/api/copias":
+            return {"copias": nucleo.cargar_ajustes().get("copias", []), "unidades": nucleo.unidades_conectadas(),
+                    "estado": nucleo.cargar_estado().get("_copias", {})}
+        if ruta == "/api/copias/guardar":
+            ajustes = nucleo.cargar_ajustes()
+            copias = datos.get("copias", [])
+            for c in copias:
+                c.setdefault("id", nucleo.nuevo_id())
+            ajustes["copias"] = copias
+            nucleo.guardar_ajustes(ajustes)
+            nucleo.lanzar_residente()
+            return {"ok": True, "copias": copias}
+        if ruta == "/api/copias/ejecutar":
+            copia = next(c for c in nucleo.cargar_ajustes().get("copias", []) if c["id"] == datos["id"])
+            return nucleo.ejecutar_copia(copia)
+        if ruta == "/api/asistente/analizar":
+            return nucleo.analizar_carpeta(datos.get("carpeta") or nucleo.carpeta_conocida("Descargas"))
+        if ruta == "/api/asistente/crear":
+            servicio = nucleo.crear_desde_asistente(datos["carpeta"], datos.get("reglas", []), datos.get("limpiar"))
+            return {"ok": True, "id": servicio["id"], "servicios": servicios_con_estado()}
+        if ruta == "/api/exportar":
+            ajustes = nucleo.cargar_ajustes()
+            return {"gestor": 1, "exportado": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "servicios": nucleo.cargar_servicios(),
+                    "ajustes": {k: v for k, v in ajustes.items() if k not in ("pausado",)}}
+        if ruta == "/api/importar":
+            datos_importados = datos.get("datos") or {}
+            if datos_importados.get("gestor") != 1 or not isinstance(datos_importados.get("servicios"), list):
+                return {"ok": False, "mensaje": "Ese archivo no es una configuración de GESTOR."}
+            nuevos = datos_importados["servicios"]
+            if datos.get("modo") == "reemplazar":
+                servicios = nuevos
+            else:
+                por_id = {s["id"]: s for s in nucleo.cargar_servicios()}
+                por_id.update({s["id"]: s for s in nuevos})
+                servicios = list(por_id.values())
+            for s_ in servicios:
+                s_["activo"] = bool(s_.get("activo")) and datos.get("mantener_activos", False)
+            nucleo.guardar_servicios(servicios)
+            if datos_importados.get("ajustes"):
+                ajustes = nucleo.cargar_ajustes()
+                ajustes.update({k: v for k, v in datos_importados["ajustes"].items()
+                                if k in ("revisar_cada_minutos", "notificaciones", "icono_bandeja",
+                                         "papelera", "retencion_dias", "copias")})
+                nucleo.guardar_ajustes(ajustes)
+            return {"ok": True, "mensaje": f"{len(nuevos)} servicios importados (desactivados, revísalos).",
+                    "servicios": servicios_con_estado()}
         if ruta == "/api/cerrar":
             threading.Timer(0.5, lambda: os._exit(0)).start()
             return {"ok": True}

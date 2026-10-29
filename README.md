@@ -28,20 +28,31 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
 
 - **Carpetas:** una o varias, con o sin subcarpetas. Nunca actúa en `C:\Windows`,
   `Program Files` ni `ProgramData`.
-- **Reglas** (se aplica la primera que encaja): por tipo de archivo, extensión, nombre,
-  tamaño o antigüedad. Acciones: mover, copiar, renombrar o enviar a la papelera.
-  Los destinos admiten variables: `{categoria}`, `{extension}`, `{año}`, `{mes}`,
-  `{mes_num}`, `{dia}`, `{nombre}`, `{carpeta_origen}`, `{origen}`.
-  La fecha puede ser la de modificación, la de creación o la de **captura de la foto**.
-- **Horario:** cada N minutos, horas o días; ciertas horas todos los días; ciertos días de
-  la semana o del mes; al iniciar sesión; o solo manual. Si el equipo estaba apagado,
-  se ejecuta al encenderlo.
-- **Duplicados:** si en el destino ya hay un archivo con el mismo nombre y el mismo contenido
-  (se compara el tamaño y la huella SHA-256), el nuevo va a la papelera en lugar de crear
-  `archivo (1)`. Se puede desactivar por servicio.
-- **Seguridad:** espera a que un archivo lleve unos minutos sin cambios, ignora descargas a
-  medias y accesos directos, nunca borra definitivamente, guarda un historial de cada
-  ejecución y permite **deshacerla**.
+- **Condiciones** (se aplica la primera regla que encaja): tipo de archivo, **procedencia**
+  (cámara, WhatsApp, Telegram, captura de pantalla, escáner, descarga de internet), extensión,
+  nombre, **contenido** (texto de PDF, DOCX o TXT, por palabras o expresión regular), tamaño
+  y antigüedad.
+- **Acciones:** mover, copiar, renombrar, **archivar en un ZIP mensual** o quitar (a la papelera).
+  Variables para destinos y nombres: `{categoria}`, `{procedencia}`, `{camara}`, `{sitio}`,
+  `{extension}`, `{año}`, `{mes}`, `{mes_num}`, `{dia}`, `{nombre}`, `{carpeta_origen}`, `{origen}`.
+- **Fotos por fecha de captura** (EXIF; si no hay, la fecha del nombre, como en WhatsApp).
+- **Limpiar nombres:** quita "(1)", "copia", espacios dobles y caracteres raros; opcionalmente
+  pone la fecha al inicio (AAAA-MM-DD).
+- **Duplicados:** si en el destino ya hay un archivo con el mismo contenido, el nuevo va a la
+  papelera o a una carpeta "Duplicados", y recibes una notificación.
+- **Borrar las carpetas que queden vacías.**
+- **Horario:** cada N minutos, horas o días; ciertas horas; ciertos días de la semana o del
+  mes; al iniciar sesión; **al instante** (cuando aparece un archivo); o solo manual.
+
+## Más herramientas del panel
+
+- **Asistente:** analiza una carpeta y propone reglas ("tienes 340 fotos de WhatsApp").
+- **Duplicados:** busca archivos idénticos en las carpetas o discos que elijas.
+- **Papelera de GESTOR:** guarda 30 días (configurable) lo que se quita, con restauración.
+- **Copias a USB:** al conectar una unidad concreta, copia ahí lo nuevo de las carpetas elegidas.
+- **Estadísticas:** archivos ordenados, espacio liberado y reparto por tipo.
+- **Icono junto al reloj:** notificaciones, "Ejecutar ahora", "Pausar todo" y "Abrir panel".
+- **Exportar e importar** la configuración, y **contraseña** para abrir el panel.
 
 ## Cómo funciona
 
@@ -50,7 +61,11 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
 - `GESTOR.exe --motor` es lo que lanza el Programador de tareas (tarea `GESTOR\Motor`).
   Revisa qué servicios toca ejecutar, los ejecuta y se cierra: entre revisiones no
   consume nada.
-- Tu configuración y el historial se guardan en `%APPDATA%\GESTOR`. Los errores del motor
+- `GESTOR.exe --residente` es el proceso del icono y del modo al instante. Arranca al iniciar
+  sesión y se cierra solo si no hace falta.
+- Tu configuración, el historial y la papelera se guardan en `%APPDATA%\GESTOR` (los archivos
+  quitados de otros discos se guardan en `X:\GESTOR-papelera`, oculta, para no copiar entre discos).
+- ¿Olvidaste la contraseña? Borra `%APPDATA%\GESTOR\credenciales.json` y crea otra; no se pierde nada. Los errores del motor
   quedan en `%APPDATA%\GESTOR\errores.log`.
 
 ## Desarrollo
@@ -62,8 +77,8 @@ python -m unittest discover -s tests # pruebas
 construir.bat                        # genera dist\GESTOR\GESTOR.exe
 ```
 
-Solo usa la biblioteca estándar de Python. Si `Pillow` está instalado, la fecha de captura
-funciona con más formatos además de JPEG.
+Funciona solo con la biblioteca estándar de Python. Las librerías de `requirements.txt`
+(Pillow, pillow-heif, pypdf, watchdog, pystray) son opcionales y el `.exe` ya las incluye.
 
 Cada vez que se sube un cambio a `main`, GitHub Actions construye el `.exe`. Al crear una
 etiqueta `v1.0.0` se publica como *Release*.

@@ -166,6 +166,12 @@ class PruebaProcedencia(unittest.TestCase):
         self.assertEqual(r["camara"], "samsung SM-G991B")
         self.assertEqual(self.proc("sin_nombre.jpg", subcarpeta="WhatsApp Images")["procedencia"], "WhatsApp")
 
+    def test_fecha_en_el_nombre(self):
+        self.assertEqual(nucleo.fecha_en_nombre("IMG-20231005-WA0012.jpg"), dt.datetime(2023, 10, 5))
+        self.assertEqual(nucleo.fecha_en_nombre("Screenshot_2023-10-05-10-12.png"), dt.datetime(2023, 10, 5))
+        self.assertIsNone(nucleo.fecha_en_nombre("IMG_1234.jpg"))
+        self.assertIsNone(nucleo.fecha_en_nombre("pedido 20231399.pdf"))
+
     def test_variable_y_condicion(self):
         ruta = os.path.join(self.carpeta, "IMG-20231005-WA0012.jpg")
         open(ruta, "wb").close()

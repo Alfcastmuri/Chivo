@@ -20,6 +20,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Librerías opcionales (fotos, PDF, al instante, icono)
+        run: python -m pip install -r requirements.txt
+
       - name: Pruebas
         run: python -m unittest discover -s tests -v
 
@@ -31,22 +34,45 @@ jobs:
         run: python -m pip install --no-binary pyinstaller pyinstaller==6.11.1
 
       - name: Construir el .exe
-        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --noupx --name GESTOR --version-file version_info.txt --add-data "app/panel.html;." --paths app app/gestor.py
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --noupx --name GESTOR --version-file version_info.txt --add-data "app/panel.html;." --add-data "app/login.html;." --hidden-import pystray._win32 --hidden-import watchdog.observers.read_directory_changes --collect-submodules pillow_heif --paths app app/gestor.py
 
       - name: Comprobar que el motor arranca
         shell: pwsh
         run: |
           $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-datos"
-          Start-Process -FilePath dist\GESTOR\GESTOR.exe -ArgumentList "--motor" -Wait
+          $env:GESTOR_SIN_RESIDENTE = "1"
+          $p = Start-Process -FilePath dist\GESTOR\GESTOR.exe -ArgumentList "--motor" -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "El motor no terminó" }
           if (-not (Test-Path "$env:GESTOR_DATOS\servicios.json")) { throw "El motor no creó servicios.json" }
           if (Test-Path "$env:GESTOR_DATOS\errores.log") { Get-Content "$env:GESTOR_DATOS\errores.log"; throw "El motor registró errores" }
+
+      - name: Comprobar el modo al instante
+        shell: pwsh
+        run: |
+          $datos = "$env:RUNNER_TEMP\gestor-instante"
+          $origen = "$env:RUNNER_TEMP\origen"; $destino = "$env:RUNNER_TEMP\destino"
+          New-Item -ItemType Directory -Force -Path $datos, $origen | Out-Null
+          $servicio = @{ id = "prueba"; nombre = "Prueba"; activo = $true; origenes = @($origen); subcarpetas = $false
+                         horario = @{ tipo = "instante" }; conflicto = "renombrar"; esperar_minutos = 0; ignorar = @()
+                         reglas = @(@{ si = @{}; accion = "mover"; destino = $destino }) }
+          ConvertTo-Json -Depth 6 @($servicio) | Set-Content -Encoding utf8 "$datos\servicios.json"
+          $env:GESTOR_DATOS = $datos
+          $env:GESTOR_PUERTO_RESIDENTE = "8799"
+          $p = Start-Process -FilePath dist\GESTOR\GESTOR.exe -ArgumentList "--residente", "--sin-icono" -PassThru
+          Start-Sleep -Seconds 5
+          Set-Content -Path "$origen\nuevo.txt" -Value "hola"
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) { Start-Sleep -Seconds 1; if (Test-Path "$destino\nuevo.txt") { $ok = $true; break } }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (Test-Path "$datos\errores.log") { Get-Content "$datos\errores.log" }
+          if (-not $ok) { throw "El modo al instante no movió el archivo" }
 
       - name: Comprimir
         shell: pwsh
         run: |
           Compress-Archive -Path dist\GESTOR -DestinationPath GESTOR-windows.zip
           New-Item -ItemType Directory -Path GESTOR-python | Out-Null
-          Copy-Item app\*.py, app\*.pyw, app\panel.html -Destination GESTOR-python
+          Copy-Item app\*.py, app\*.pyw, app\*.html, requirements.txt -Destination GESTOR-python
           Compress-Archive -Path GESTOR-python -DestinationPath GESTOR-python.zip
 
       - uses: actions/upload-artifact@v4

@@ -87,7 +87,22 @@ th { color: var(--suave); font-weight: 600; }
 .vacio { color: var(--suave); padding: 30px; text-align: center; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
 .modal.on { display: flex; }
-.modal .caja { padding: 20px; max-width: 520px; width: 100%; }
+.modal .caja { padding: 20px; max-width: 560px; width: 100%; max-height: 90vh; overflow: auto; }
+nav.pestanas { display: flex; gap: 4px; flex-wrap: wrap; }
+nav.pestanas button { border-color: transparent; background: transparent; }
+nav.pestanas button.on { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+.vista { display: none; }
+.vista.on { display: grid; }
+.vista.simple { grid-template-columns: 1fr; max-width: 1100px; }
+.banda { padding: 8px 20px; background: var(--aviso-suave); color: var(--aviso); display: none; align-items: center; gap: 10px; }
+.banda.on { display: flex; }
+.barra { height: 8px; background: var(--fondo); border-radius: 4px; overflow: hidden; min-width: 80px; }
+.barra > div { height: 100%; background: var(--acento); }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tarjeta { border: 1px solid var(--borde); border-radius: 8px; padding: 12px; }
+.tarjeta b { display: block; font-size: 22px; }
+.grupo-dup { border: 1px solid var(--borde); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.grupo-dup label { display: flex; font-family: Consolas, monospace; font-size: 12px; word-break: break-all; padding: 2px 0; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 16px; border-radius: 8px;
   background: var(--texto); color: var(--panel); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; }
 .toast.on { opacity: 1; }
@@ -97,13 +112,22 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <body>
 <header>
   <h1>GESTOR</h1>
-  <span class="estado" id="estadoProg"></span>
+  <nav class="pestanas" id="pestanas">
+    <button data-vista="Servicios" class="on">Servicios</button>
+    <button data-vista="Asistente">Asistente</button>
+    <button data-vista="Duplicados">Duplicados</button>
+    <button data-vista="Papelera">Papelera</button>
+    <button data-vista="Copias">Copias a USB</button>
+    <button data-vista="Estadisticas">Estadísticas</button>
+  </nav>
   <span class="espacio"></span>
+  <span class="estado" id="estadoProg"></span>
   <button id="btnAjustes">Ajustes</button>
   <button id="btnSalir">Salir</button>
   <button id="btnCerrar">Cerrar panel</button>
 </header>
-<main>
+<div class="banda" id="bandaPausa">GESTOR está en pausa: no se ordenará nada automáticamente. <button class="chico" id="btnReanudar">Reanudar</button></div>
+<main class="vista on" id="vistaServicios">
   <div class="caja lista">
     <h2>Servicios</h2>
     <div id="lista"></div>
@@ -111,6 +135,11 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   </div>
   <div class="caja editor" id="editor"><div class="vacio">Elige un servicio o crea uno nuevo.</div></div>
 </main>
+<main class="vista simple" id="vistaAsistente"><div class="caja editor" id="asistente"></div></main>
+<main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
+<main class="vista simple" id="vistaPapelera"><div class="caja editor" id="papelera"></div></main>
+<main class="vista simple" id="vistaCopias"><div class="caja editor" id="copias"></div></main>
+<main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div></main>
 
 <div class="modal" id="modalAjustes">
   <div class="caja">
@@ -122,6 +151,20 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
     <div class="fila" style="margin-top:14px">
       <button class="prim" id="ajGuardar">Activar / actualizar programación</button>
       <button class="peligro" id="ajQuitar">Quitar programación</button>
+    </div>
+    <h2 style="margin-top:22px">Funcionamiento</h2>
+    <div class="fila"><label><input type="checkbox" id="prefIcono"> Mostrar el icono junto al reloj</label></div>
+    <div class="fila"><label><input type="checkbox" id="prefNotif"> Notificaciones de Windows al ordenar</label></div>
+    <div class="fila"><label><input type="checkbox" id="prefPausa"> Pausar todo</label></div>
+    <div class="fila"><label>Lo que GESTOR quita va a
+      <select id="prefPapelera"><option value="gestor">la papelera de GESTOR</option><option value="windows">la papelera de Windows</option></select></label>
+      <label>y se guarda <input type="number" id="prefRetencion" min="1" max="365"> días</label></div>
+    <div id="prefDependencias" class="ayuda"></div>
+    <h2 style="margin-top:22px">Copia de la configuración</h2>
+    <div class="fila">
+      <button id="btnExportar">Exportar servicios y ajustes</button>
+      <label class="chip" style="cursor:pointer">Importar… <input type="file" id="archivoImportar" accept=".json" hidden></label>
+      <label><input type="checkbox" id="importarReemplazar"> Reemplazar los actuales al importar</label>
     </div>
     <h2 style="margin-top:22px">Contraseña del panel</h2>
     <div class="fila">
@@ -172,6 +215,7 @@ function resumenHorario(h) {
     case "semanal": return `${(h.dias || []).map(d => DIAS[d]).join(" ") || "ningún día"} a las ${horas}`;
     case "mensual": return `Días ${(h.dias_mes || []).join(", ") || "ninguno"} de cada mes a las ${horas}`;
     case "inicio": return "Al iniciar sesión";
+    case "instante": return "Al instante";
     default: return "Solo manual";
   }
 }
@@ -243,6 +287,11 @@ function pintarEditor() {
     </div>
     <div class="fila">
       <label><input type="checkbox" data-k="subcarpetas" ${s.subcarpetas ? "checked" : ""}> Incluir subcarpetas</label>
+      <label><input type="checkbox" data-k="borrar_carpetas_vacias" ${s.borrar_carpetas_vacias ? "checked" : ""}> Borrar las carpetas que queden vacías</label>
+    </div>
+    <div class="fila">
+      <label title="Quita (1), copia, espacios dobles y caracteres raros"><input type="checkbox" data-k="limpiar_nombres" ${s.limpiar_nombres ? "checked" : ""}> Limpiar nombres</label>
+      <label><input type="checkbox" data-k="fecha_al_inicio" ${s.fecha_al_inicio ? "checked" : ""}> Poner la fecha al inicio (AAAA-MM-DD)</label>
       <label title="${datos.pillow ? "Lee JPEG, HEIC, PNG, TIFF y WebP." : "Sin Pillow solo se lee la fecha de los JPEG."}"><input type="checkbox" data-k="fecha_captura_fotos" ${s.fecha_captura_fotos !== false ? "checked" : ""}> Ordenar fotos por fecha de captura (EXIF)</label>
       <label>Esperar <input type="number" min="0" data-k="esperar_minutos" value="${esc(s.esperar_minutos)}"> min desde la última modificación</label>
     </div>
@@ -256,10 +305,12 @@ function pintarEditor() {
     <div class="fila">
       <label>Si además es idéntico (mismo contenido):
         <select data-k="identicos">
-          ${[["papelera", "No duplicar: enviar el nuevo a la papelera"], ["conflicto", "Tratarlo como arriba"]]
+          ${[["papelera", "No duplicar: quitar el nuevo (a la papelera)"], ["carpeta", "Moverlo a una carpeta de duplicados"], ["conflicto", "Tratarlo como arriba"]]
             .map(([v, t]) => `<option value="${v}" ${(s.identicos || "papelera") === v ? "selected" : ""}>${t}</option>`).join("")}
         </select></label>
+      ${s.identicos === "carpeta" ? `<input type="text" data-k="carpeta_duplicados" value="${esc(s.carpeta_duplicados || "")}" placeholder="{origen}\\Duplicados" style="flex:1;min-width:200px">` : ""}
     </div>
+    <p class="ayuda">Siempre recibirás una notificación cuando se detecten duplicados, también los que aparecen al quitar "(1)" o "copia".</p>
     <div class="campo"><span>Ignorar archivos (patrones separados por coma, por ejemplo <code>*.ini, borrador*</code>)</span>
       <input type="text" data-k="ignorar" value="${esc((s.ignorar || []).join(", "))}"></div>
   </section>
@@ -267,7 +318,7 @@ function pintarEditor() {
     <h3>Cuándo se ejecuta</h3>
     <div class="fila">
       <select id="tipoHorario">
-        ${[["intervalo", "Cada cierto tiempo"], ["diario", "Todos los días"], ["semanal", "Algunos días de la semana"], ["mensual", "Algunos días del mes"], ["inicio", "Al iniciar sesión en Windows"], ["manual", "Solo cuando pulse Ejecutar"]]
+        ${[["intervalo", "Cada cierto tiempo"], ["diario", "Todos los días"], ["semanal", "Algunos días de la semana"], ["mensual", "Algunos días del mes"], ["instante", "Al instante, cuando aparece un archivo"], ["inicio", "Al iniciar sesión en Windows"], ["manual", "Solo cuando pulse Ejecutar"]]
           .map(([v, t]) => `<option value="${v}" ${h.tipo === v ? "selected" : ""}>${t}</option>`).join("")}
       </select>
       ${h.tipo === "intervalo" ? `
@@ -281,7 +332,9 @@ function pintarEditor() {
         <div class="chips">${(h.horas || []).map((x, i) => `<span class="chip on">${esc(x)} <span class="x" data-quitar-hora="${i}">✕</span></span>`).join("")}</div>
         <input type="time" id="horaNueva" value="09:00"><button class="chico" id="btnHora">Añadir hora</button>
       </div>` : ""}
-    <p class="ayuda">Si el equipo está apagado a la hora programada, el servicio se ejecuta en cuanto se encienda.</p>
+    ${h.tipo === "instante" ? `<p class="ayuda">Un proceso ligero vigila las carpetas y ordena cada archivo unos segundos después de que termine de copiarse o descargarse.
+      ${datos.watchdog ? "" : `<b style="color:var(--peligro)">Falta la librería watchdog: instálala con <code>pip install watchdog</code> (el .exe ya la incluye).</b>`}</p>`
+      : `<p class="ayuda">Si el equipo está apagado a la hora programada, el servicio se ejecuta en cuanto se encienda.</p>`}
   </section>
   <section>
     <h3>Reglas <span style="text-transform:none;letter-spacing:0">(se aplica la primera que encaja con cada archivo)</span></h3>
@@ -328,6 +381,11 @@ function pintarRegla(r, i) {
           <div class="campo" style="flex:1;min-width:140px"><span>&nbsp;</span><input type="text" data-c="nombre_valor" value="${esc(c.nombre_valor || "")}" placeholder="factura"></div>
         </div>
         <div class="fila">
+          <div class="campo"><span>Contenido (PDF, DOCX, TXT)</span><select data-c="contenido_modo">${[["contiene", "contiene"], ["regex", "expresión regular"]].map(([v, t]) => `<option value="${v}" ${(c.contenido_modo || "contiene") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+          <div class="campo" style="flex:1;min-width:200px"><span>&nbsp;</span><input type="text" data-c="contenido_valor" value="${esc(c.contenido_valor || "")}" placeholder="factura, rfc   (todas las palabras)"></div>
+        </div>
+        ${c.contenido_valor && !datos.pypdf ? `<div class="aviso">Para leer PDF falta la librería pypdf (<code>pip install pypdf</code>; el .exe ya la incluye).</div>` : ""}
+        <div class="fila">
           <label>Tamaño mayor de <input type="number" min="0" step="any" data-c="tamano_mayor_mb" value="${esc(c.tamano_mayor_mb ?? "")}"> MB</label>
           <label>menor de <input type="number" min="0" step="any" data-c="tamano_menor_mb" value="${esc(c.tamano_menor_mb ?? "")}"> MB</label>
         </div>
@@ -340,18 +398,19 @@ function pintarRegla(r, i) {
       <div class="et">ENTONCES</div>
       <div>
         <div class="fila">
-          <select data-r="accion">${[["mover", "Mover a"], ["copiar", "Copiar a"], ["renombrar", "Renombrar en su sitio"], ["papelera", "Enviar a la papelera"]].map(([v, t]) => `<option value="${v}" ${accion === v ? "selected" : ""}>${t}</option>`).join("")}</select>
-          ${["mover", "copiar"].includes(accion) ? `<input type="text" data-r="destino" value="${esc(r.destino || "")}" placeholder="D:\\Ordenado\\{categoria}\\{año}" style="flex:1;min-width:220px"><button class="chico" data-elegir-destino>Elegir…</button>` : ""}
+          <select data-r="accion">${[["mover", "Mover a"], ["copiar", "Copiar a"], ["renombrar", "Renombrar en su sitio"], ["archivar", "Archivar en un ZIP mensual en"], ["papelera", "Enviar a la papelera"]].map(([v, t]) => `<option value="${v}" ${accion === v ? "selected" : ""}>${t}</option>`).join("")}</select>
+          ${["mover", "copiar", "archivar"].includes(accion) ? `<input type="text" data-r="destino" value="${esc(r.destino || "")}" placeholder="${accion === "archivar" ? "{origen}\\Archivados" : "D:\\Ordenado\\{categoria}\\{año}"}" style="flex:1;min-width:220px"><button class="chico" data-elegir-destino>Elegir…</button>` : ""}
         </div>
         ${["mover", "copiar"].includes(accion) ? `<div class="fila"><span class="ayuda">Variables:</span><div class="chips">${VARIABLES.map(v => `<span class="chip" data-var="${esc(v)}">${esc(v)}</span>`).join("")}</div></div>` : ""}
-        ${accion !== "papelera" ? `
+        ${accion === "archivar" ? `<div class="ayuda">Cada archivo entra en "Archivo AAAA-MM.zip" según su fecha. Se comprueba el ZIP antes de quitar el original, que además se guarda en la papelera. Combínalo con "Modificado hace más de N días".</div>` : ""}
+        ${!["papelera", "archivar"].includes(accion) ? `
         <div class="fila">
           <label>Fecha para {año}/{mes}/{dia}:
             <select data-r="fecha">${[["modificacion", "Última modificación"], ["creacion", "Creación"]].map(([v, t]) => `<option value="${v}" ${(r.fecha === "creacion" ? "creacion" : "modificacion") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
           <span class="ayuda">${actual.fecha_captura_fotos !== false ? "Las fotos usan la fecha de captura (si no la tienen, esta)." : ""}</span>
         </div>
         <div class="campo"><span>${accion === "renombrar" ? "Nuevo nombre" : "Renombrar al mover (opcional)"}, sin extensión, por ejemplo <code>{año}-{mes_num}-{dia}_{nombre}</code></span>
-          <input type="text" data-r="nuevo_nombre" value="${esc(r.nuevo_nombre || "")}"></div>` : `<div class="ayuda">Los archivos van a la papelera de reciclaje de Windows, desde donde se pueden restaurar. GESTOR nunca borra nada de forma definitiva.</div>`}
+          <input type="text" data-r="nuevo_nombre" value="${esc(r.nuevo_nombre || "")}"></div>` : `${accion === "papelera" ? `<div class="ayuda">Los archivos van a la papelera (de GESTOR o de Windows, según Ajustes), desde donde se pueden restaurar.</div>` : ""}`}
       </div>
     </div>
   </div>`;
@@ -362,6 +421,7 @@ function resumenRegla(r) {
   const c = r.si || {}, partes = [];
   if ((c.categorias || []).length) partes.push(c.categorias.join(" o "));
   if ((c.procedencias || []).length) partes.push("de " + c.procedencias.join(" o "));
+  if (c.contenido_valor) partes.push(`con "${c.contenido_valor}" en el contenido`);
   const ext = Array.isArray(c.extensiones) ? c.extensiones : (c.extensiones ? [c.extensiones] : []);
   if (ext.length) partes.push("extensión " + ext.join(", "));
   const modos = { contiene: "contiene", empieza: "empieza por", termina: "termina en", regex: "cumple" };
@@ -372,7 +432,8 @@ function resumenRegla(r) {
   if (c.antiguedad_menor_dias) partes.push(`modificado hace menos de ${c.antiguedad_menor_dias} días`);
   const si = partes.length ? "Si es " + partes.join(", ") : "Cualquier archivo";
   const que = { mover: `mover a ${r.destino || "(falta destino)"}`, copiar: `copiar a ${r.destino || "(falta destino)"}`,
-    renombrar: `renombrar como ${r.nuevo_nombre || "(falta nombre)"}`, papelera: "enviar a la papelera" }[r.accion || "mover"];
+    renombrar: `renombrar como ${r.nuevo_nombre || "(limpiar nombre)"}`, papelera: "enviar a la papelera",
+    archivar: `archivar en ZIP mensual en ${r.destino || "{origen}\\Archivados"}` }[r.accion || "mover"];
   const fecha = r.fecha === "creacion" ? " · fecha de creación" : "";
   return `${si} → ${que}${r.accion !== "papelera" ? fecha : ""}`;
 }
@@ -388,6 +449,7 @@ $("#editor").addEventListener("input", e => {
     else if (t.type === "number") s[k] = t.value === "" ? 0 : Number(t.value);
     else s[k] = t.value;
     if (k === "activo") pintarLista();
+    if (k === "identicos") pintarEditor();
   } else if (t.dataset.h) {
     s.horario[t.dataset.h] = t.type === "number" ? Number(t.value) : t.value;
   } else if (t.id === "diasMes") {
@@ -520,7 +582,7 @@ async function guardar() {
   const s = actual;
   if (!s.nombre.trim()) { aviso("Ponle un nombre al servicio."); return; }
   if (s.activo && !s.origenes.length) { aviso("Elige al menos una carpeta antes de activarlo."); return; }
-  const malos = s.reglas.filter(r => ["mover", "copiar"].includes(r.accion) && !(r.destino || "").trim());
+  const malos = s.reglas.filter(r => ["mover", "copiar"].includes(r.accion || "mover") && !(r.destino || "").trim());
   if (malos.length) { aviso("Hay reglas de mover o copiar sin carpeta de destino."); return; }
   const res = await api("/api/guardar", { servicio: s });
   datos.servicios = res.servicios;
@@ -531,7 +593,7 @@ async function guardar() {
 function nombreCorto(ruta) { return ruta.split(/[\\/]/).pop(); }
 function pintarResultado(res, simulado) {
   const ops = res.operaciones || [], errores = res.errores || [], avisos = res.avisos || [];
-  const verbo = { mover: "Mover", copiar: "Copiar", renombrar: "Renombrar", papelera: "Papelera" };
+  const verbo = { mover: "Mover", copiar: "Copiar", renombrar: "Renombrar", papelera: "Papelera", archivar: "Archivar" };
   $("#resultado").innerHTML = `
     <section>
       <h3>${simulado ? "Simulación (no se ha tocado nada)" : "Resultado"}</h3>
@@ -539,7 +601,7 @@ function pintarResultado(res, simulado) {
       <div class="aviso ${ops.length ? "okmsg" : ""}">${simulado ? `Se procesarían ${ops.length} archivos.` : `${ops.length} archivos procesados.`}${errores.length ? ` ${errores.length} con error.` : ""}</div>
       ${ops.length || errores.length ? `<div class="resultado"><table>
         <tr><th>Acción</th><th>Archivo</th><th>Destino</th></tr>
-        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.destino || (o.identico_a ? `Papelera (idéntico a ${o.identico_a})` : "Papelera de reciclaje"))}</td></tr>`).join("")}
+        ${ops.slice(0, 500).map(o => `<tr><td>${verbo[o.accion]}</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${o.duplicado ? `<b>Duplicado</b> de ${esc(nombreCorto(o.identico_a))}${o.tras_limpiar ? " (al quitar “(1)” o “copia”)" : ""} → ` : ""}${esc(o.destino || "Papelera")}</td></tr>`).join("")}
         ${errores.map(o => `<tr><td style="color:var(--peligro)">Error</td><td title="${esc(o.origen)}">${esc(nombreCorto(o.origen))}</td><td>${esc(o.error)}</td></tr>`).join("")}
       </table>${ops.length > 500 ? `<p class="ayuda">Y ${ops.length - 500} más…</p>` : ""}</div>` : ""}
     </section>`;
@@ -599,10 +661,304 @@ $("#btnCerrar").onclick = async () => {
 window.addEventListener("beforeunload", e => { if (sinGuardar) { e.preventDefault(); e.returnValue = ""; } });
 setInterval(() => api("/api/latido").catch(() => { }), 60000);
 
+// ---------------------------------------------------------------- pestañas
+let vistaActual = "Servicios";
+$("#pestanas").addEventListener("click", e => {
+  const b = e.target.closest("[data-vista]"); if (b) mostrarVista(b.dataset.vista);
+});
+function mostrarVista(nombre) {
+  vistaActual = nombre;
+  document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === nombre));
+  document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
+  ({ Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
+     Copias: cargarCopias, Estadisticas: cargarEstadisticas }[nombre] || (() => { }))();
+}
+const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB";
+
+// ---------------------------------------------------------------- preferencias
+function pintarPreferencias() {
+  const a = datos.ajustes;
+  $("#prefIcono").checked = a.icono_bandeja !== false;
+  $("#prefNotif").checked = a.notificaciones !== false;
+  $("#prefPausa").checked = !!a.pausado;
+  $("#prefPapelera").value = a.papelera || "gestor";
+  $("#prefRetencion").value = a.retencion_dias || 30;
+  $("#bandaPausa").classList.toggle("on", !!a.pausado);
+  const faltan = [["pillow", "Pillow (fotos HEIC/PNG e icono)"], ["pypdf", "pypdf (leer PDF)"], ["watchdog", "watchdog (al instante)"]]
+    .filter(([k]) => !datos[k]).map(([, t]) => t);
+  $("#prefDependencias").textContent = faltan.length ? "Faltan librerías opcionales: " + faltan.join(", ") + ". El .exe ya las incluye." : "";
+}
+async function guardarPreferencias(cambios) {
+  try {
+    const res = await api("/api/preferencias", cambios);
+    datos.ajustes = res.ajustes; pintarPreferencias();
+  } catch (e) { aviso("Error: " + e.message); }
+}
+$("#prefIcono").onchange = e => guardarPreferencias({ icono_bandeja: e.target.checked });
+$("#prefNotif").onchange = e => guardarPreferencias({ notificaciones: e.target.checked });
+$("#prefPausa").onchange = e => guardarPreferencias({ pausado: e.target.checked });
+$("#prefPapelera").onchange = e => guardarPreferencias({ papelera: e.target.value });
+$("#prefRetencion").onchange = e => guardarPreferencias({ retencion_dias: +e.target.value || 30 });
+$("#btnReanudar").onclick = () => guardarPreferencias({ pausado: false });
+$("#btnExportar").onclick = async () => {
+  const d = await api("/api/exportar");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }));
+  a.download = `GESTOR-configuracion-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("#archivoImportar").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const contenido = JSON.parse(await f.text());
+    const reemplazar = $("#importarReemplazar").checked;
+    if (reemplazar && !confirm("Se reemplazarán todos tus servicios actuales. ¿Seguir?")) return;
+    const res = await api("/api/importar", { datos: contenido, modo: reemplazar ? "reemplazar" : "añadir" });
+    aviso(res.mensaje);
+    if (res.ok) { datos.servicios = res.servicios; actual = null; pintarLista(); pintarEditor(); }
+  } catch (x) { aviso("No se pudo leer el archivo: " + x.message); }
+  e.target.value = "";
+};
+
+// ---------------------------------------------------------------- asistente
+let asistente = { carpeta: "", analisis: null, elegidas: new Set(), limpiar: false };
+async function pintarAsistente(analizar) {
+  const cont = $("#asistente");
+  if (!asistente.carpeta) asistente.carpeta = datos.carpetas_rapidas.Descargas || "";
+  if (analizar || !asistente.analisis) {
+    cont.innerHTML = `<h2>Asistente</h2><p class="ayuda">Analizando ${esc(asistente.carpeta)}…</p>`;
+    asistente.analisis = await api("/api/asistente/analizar", { carpeta: asistente.carpeta });
+    asistente.elegidas = new Set(asistente.analisis.sugerencias.map(s => s.clave));
+    asistente.limpiar = asistente.analisis.copias > 0;
+  }
+  const a = asistente.analisis;
+  cont.innerHTML = `
+    <h2>Asistente</h2>
+    <p class="ayuda">Analiza una carpeta y te propone reglas según lo que encuentra. Después puedes revisarlas, simular y activarlas.</p>
+    <div class="fila">
+      <input type="text" id="asCarpeta" value="${esc(asistente.carpeta)}" style="flex:1">
+      <button id="asElegir">Elegir…</button>
+      ${Object.entries(datos.carpetas_rapidas).slice(0, 3).map(([n, r]) => `<button class="chico" data-as-rapida="${esc(r)}">${esc(n)}</button>`).join("")}
+      <button class="prim" id="asAnalizar">Analizar</button>
+    </div>
+    <section>
+      <h3>${a.total} archivos sueltos en la carpeta</h3>
+      ${a.sugerencias.length ? a.sugerencias.map(s => `
+        <div class="fila"><label><input type="checkbox" data-as-clave="${esc(s.clave)}" ${asistente.elegidas.has(s.clave) ? "checked" : ""}>
+          <span>Tienes <b>${esc(s.texto)}</b> (${mb(s.bytes)}). <span class="ayuda">${esc(resumenRegla(s.regla))}</span></span></label></div>`).join("")
+        : `<p class="ayuda">No hay nada que proponer: la carpeta ya está ordenada.</p>`}
+      ${a.copias ? `<div class="fila"><label><input type="checkbox" id="asLimpiar" ${asistente.limpiar ? "checked" : ""}>
+        <span><b>${a.copias} archivos</b> tienen restos como "(1)" o "copia" en el nombre: limpiar los nombres (y avisar si eran duplicados).</span></label></div>` : ""}
+    </section>
+    ${a.sugerencias.length ? `<div class="acciones"><button class="prim" id="asCrear">Crear el servicio con lo marcado</button>
+      <span class="ayuda">Se crea desactivado para que lo revises y lo simules antes.</span></div>` : ""}`;
+}
+$("#asistente").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "asAnalizar") { asistente.carpeta = $("#asCarpeta").value.trim(); await pintarAsistente(true); }
+    else if (t.dataset.asRapida) { asistente.carpeta = t.dataset.asRapida; await pintarAsistente(true); }
+    else if (t.id === "asElegir") {
+      const res = await api("/api/elegir-carpeta", { inicial: asistente.carpeta });
+      if (res.carpeta) { asistente.carpeta = res.carpeta; await pintarAsistente(true); }
+    } else if (t.dataset.asClave) {
+      t.checked ? asistente.elegidas.add(t.dataset.asClave) : asistente.elegidas.delete(t.dataset.asClave);
+    } else if (t.id === "asLimpiar") { asistente.limpiar = t.checked; }
+    else if (t.id === "asCrear") {
+      const reglas = asistente.analisis.sugerencias.filter(s => asistente.elegidas.has(s.clave)).map(s => s.regla);
+      if (!reglas.length) { aviso("Marca al menos una propuesta."); return; }
+      const res = await api("/api/asistente/crear", { carpeta: asistente.carpeta, reglas, limpiar: asistente.limpiar });
+      await api("/api/preferencias", { asistente_visto: true });
+      datos.servicios = res.servicios; mostrarVista("Servicios");
+      abrir(JSON.parse(JSON.stringify(res.servicios.find(x => x.servicio.id === res.id).servicio)));
+      aviso("Servicio creado. Pulsa Simular para ver qué haría y actívalo cuando te convenza.");
+    }
+  } catch (x) { aviso("Error: " + x.message); }
+});
+
+// ---------------------------------------------------------------- duplicados
+let dupCarpetas = null, dupSondeo = null, dupElegidos = new Set();
+async function pintarDuplicados() {
+  if (!dupCarpetas) dupCarpetas = [datos.carpetas_rapidas.Descargas, datos.carpetas_rapidas.Documentos, datos.carpetas_rapidas.Escritorio, datos.carpetas_rapidas["Imágenes"]].filter(Boolean);
+  const est = await api("/api/duplicados/estado");
+  const p = est.progreso || {};
+  const grupos = est.grupos || [];
+  if (est.estado === "terminado" && !dupElegidos.size && grupos.length) grupos.forEach(g => g.archivos.slice(1).forEach(r => dupElegidos.add(r)));
+  const marcado = grupos.reduce((t, g) => t + g.archivos.filter(r => dupElegidos.has(r)).length * g.bytes, 0);
+  $("#duplicados").innerHTML = `
+    <h2>Buscar duplicados</h2>
+    <p class="ayuda">Encuentra archivos con el mismo contenido aunque tengan distinto nombre o estén en carpetas distintas. Compara tamaño, los primeros 64 KB y la huella SHA-256 completa.</p>
+    <section><h3>Dónde buscar</h3>
+      ${dupCarpetas.map((c, i) => `<div class="carpeta"><span class="ruta">${esc(c)}</span><button class="chico peligro" data-dup-quitar="${i}">Quitar</button></div>`).join("")}
+      <div class="fila"><button id="dupAnadir">Añadir carpeta o disco…</button>
+        <label>Ignorar archivos de menos de <input type="number" id="dupMin" value="100" min="0"> KB</label>
+        ${est.estado === "buscando" ? `<button class="peligro" id="dupCancelar">Cancelar</button>` : `<button class="prim" id="dupBuscar">Buscar</button>`}</div>
+    </section>
+    ${est.estado === "buscando" ? `<div class="aviso">${esc(p.fase || "Empezando")}… ${p.revisados || 0} archivos revisados${p.total ? `, comparando ${p.comparados || 0} de ${p.total}` : ""}.</div>` : ""}
+    ${est.estado === "error" ? `<div class="aviso error">${esc(est.error)}</div>` : ""}
+    ${est.estado === "terminado" ? `
+      <section><h3>${est.total_grupos} grupos de duplicados · ${mb(est.recuperable || 0)} recuperables</h3>
+        ${grupos.length ? `<p class="ayuda">Se propone conservar el más antiguo de cada grupo (sin marcar). Lo marcado va a la papelera.</p>
+        ${grupos.map(g => `<div class="grupo-dup"><div class="ayuda">${g.archivos.length} copias de ${mb(g.bytes)}</div>
+          ${g.archivos.map(r => `<label><input type="checkbox" data-dup-ruta="${esc(r)}" ${dupElegidos.has(r) ? "checked" : ""}> ${esc(r)}</label>`).join("")}</div>`).join("")}
+        <div class="acciones"><button class="prim" id="dupQuitar">Quitar lo marcado (${mb(marcado)})</button></div>` : `<p class="ayuda">No hay duplicados.</p>`}
+      </section>` : ""}`;
+  clearTimeout(dupSondeo);
+  if (est.estado === "buscando" && vistaActual === "Duplicados") dupSondeo = setTimeout(pintarDuplicados, 1500);
+}
+$("#duplicados").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.id === "dupAnadir") {
+      const res = await api("/api/elegir-carpeta", {});
+      if (res.carpeta && !dupCarpetas.includes(res.carpeta)) dupCarpetas.push(res.carpeta);
+      pintarDuplicados();
+    } else if (t.dataset.dupQuitar !== undefined) { dupCarpetas.splice(+t.dataset.dupQuitar, 1); pintarDuplicados(); }
+    else if (t.id === "dupBuscar") {
+      dupElegidos = new Set();
+      await api("/api/duplicados/iniciar", { carpetas: dupCarpetas, min_kb: +$("#dupMin").value || 0 });
+      pintarDuplicados();
+    } else if (t.id === "dupCancelar") { await api("/api/duplicados/cancelar"); }
+    else if (t.dataset.dupRuta) { t.checked ? dupElegidos.add(t.dataset.dupRuta) : dupElegidos.delete(t.dataset.dupRuta); }
+    else if (t.id === "dupQuitar") {
+      const rutas = [...dupElegidos];
+      if (!rutas.length || !confirm(`¿Quitar ${rutas.length} archivos duplicados? Irán a la papelera.`)) return;
+      const res = await api("/api/duplicados/quitar", { rutas });
+      aviso(`${res.quitados} archivos quitados, ${mb(res.bytes)} liberados.`);
+      dupElegidos = new Set(); await api("/api/duplicados/iniciar", { carpetas: dupCarpetas, min_kb: +$("#dupMin").value || 0 });
+      pintarDuplicados();
+    }
+  } catch (x) { aviso("Error: " + x.message); }
+});
+
+// ---------------------------------------------------------------- papelera
+let papSel = new Set();
+async function cargarPapelera() {
+  const { entradas, ajustes } = await api("/api/papelera");
+  const total = entradas.reduce((t, e) => t + (e.bytes || 0), 0);
+  $("#papelera").innerHTML = `
+    <h2>Papelera de GESTOR</h2>
+    <p class="ayuda">Lo que GESTOR quita se guarda aquí ${ajustes.retencion_dias} días y después se borra. Puedes restaurarlo a su sitio original. ${ajustes.papelera === "windows" ? "<b>Ahora mismo GESTOR usa la papelera de Windows (cámbialo en Ajustes).</b>" : ""}</p>
+    <div class="fila"><b>${entradas.length} archivos · ${mb(total)}</b><span class="espacio" style="flex:1"></span>
+      <button id="papRestaurar">Restaurar lo marcado</button><button class="peligro" id="papBorrar">Borrar lo marcado ya</button></div>
+    ${entradas.length ? `<div class="resultado" style="max-height:none"><table>
+      <tr><th><input type="checkbox" id="papTodo"></th><th>Archivo</th><th>Estaba en</th><th>Motivo</th><th>Quitado</th><th>Se borra</th></tr>
+      ${entradas.map(e => `<tr><td><input type="checkbox" data-pap="${esc(e.id)}" ${papSel.has(e.id) ? "checked" : ""}></td>
+        <td>${esc(nombreCorto(e.origen))}${e.existe ? "" : " <span class='ayuda'>(no encontrado)</span>"}</td><td>${esc(e.origen)}</td>
+        <td>${esc(e.motivo || "")}</td><td>${esc(fechaBonita(e.fecha))}</td><td>${esc(fechaBonita(e.caduca))}</td></tr>`).join("")}
+    </table></div>` : `<p class="ayuda">La papelera está vacía.</p>`}`;
+}
+$("#papelera").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.dataset.pap) { t.checked ? papSel.add(t.dataset.pap) : papSel.delete(t.dataset.pap); }
+    else if (t.id === "papTodo") { document.querySelectorAll("[data-pap]").forEach(c => { c.checked = t.checked; t.checked ? papSel.add(c.dataset.pap) : papSel.delete(c.dataset.pap); }); }
+    else if (t.id === "papRestaurar" && papSel.size) {
+      const res = await api("/api/papelera/restaurar", { ids: [...papSel] });
+      aviso(`${res.restaurados} restaurados${res.fallos.length ? `, ${res.fallos.length} con error` : ""}.`); papSel = new Set(); cargarPapelera();
+    } else if (t.id === "papBorrar" && papSel.size) {
+      if (!confirm(`¿Borrar definitivamente ${papSel.size} archivos? No se podrán recuperar.`)) return;
+      const res = await api("/api/papelera/vaciar", { ids: [...papSel] });
+      aviso(`${res.borrados} borrados, ${mb(res.bytes)} liberados.`); papSel = new Set(); cargarPapelera();
+    }
+  } catch (x) { aviso("Error: " + x.message); }
+});
+
+// ---------------------------------------------------------------- copias a USB
+let copias = [];
+async function cargarCopias() {
+  const res = await api("/api/copias");
+  copias = res.copias;
+  pintarCopias(res.unidades, res.estado);
+}
+function repintarCopias() {
+  // Conserva lo editado en memoria y solo vuelve a leer las unidades conectadas.
+  api("/api/copias").then(r => pintarCopias(r.unidades, r.estado));
+}
+function pintarCopias(unidades, estado) {
+  $("#copias").innerHTML = `
+    <h2>Copias a disco externo o USB</h2>
+    <p class="ayuda">Cuando conectas la unidad (se reconoce por su nombre), GESTOR copia ahí lo nuevo o cambiado de las carpetas que elijas. Nunca borra nada en la unidad. Si la dejas conectada, repite la copia cada 12 horas.</p>
+    <p class="ayuda">Unidades conectadas ahora: ${unidades.length ? unidades.map(u => `<b>${esc(u.etiqueta)}</b> (${esc(u.letra)})`).join(", ") : "ninguna"}.</p>
+    ${copias.map((c, i) => {
+      const e = estado[c.id];
+      return `<div class="regla" data-copia="${i}">
+        <div class="cab"><b>${esc(c.etiqueta || "Nueva copia")}</b>
+          <label><input type="checkbox" data-cp="activa" ${c.activa !== false ? "checked" : ""}> Activa</label>
+          <button class="chico" data-cp-ejecutar>Copiar ahora</button><button class="chico peligro" data-cp-borrar>Quitar</button></div>
+        <div class="fila"><label>Unidad <select data-cp="etiqueta">
+          ${[...new Set([c.etiqueta, ...unidades.map(u => u.etiqueta)].filter(Boolean))].map(n => `<option ${n === c.etiqueta ? "selected" : ""}>${esc(n)}</option>`).join("")}
+          ${c.etiqueta || unidades.length ? "" : `<option value="">Conecta la unidad</option>`}</select></label>
+          <label>Carpeta en la unidad <input type="text" data-cp="subcarpeta" value="${esc(c.subcarpeta || "GESTOR-copia")}"></label></div>
+        ${(c.carpetas || []).map((r, j) => `<div class="carpeta"><span class="ruta">${esc(r)}</span><button class="chico peligro" data-cp-quitar="${j}">Quitar</button></div>`).join("")}
+        <div class="fila"><button class="chico" data-cp-carpeta>+ Carpeta a copiar…</button>
+          ${Object.entries(datos.carpetas_rapidas).map(([n, r]) => `<button class="chico" data-cp-rapida="${esc(r)}">+ ${esc(n)}</button>`).join("")}</div>
+        <div class="ayuda">${e ? `Última copia: ${esc(fechaBonita(e.ultima))}, ${e.copiados} archivos (${mb(e.bytes)})${e.errores ? `, ${e.errores} con error` : ""}.` : "Todavía no se ha copiado."}</div>
+      </div>`; }).join("")}
+    <div class="fila"><button id="cpNueva">+ Nueva copia</button><button class="prim" id="cpGuardar">Guardar</button></div>`;
+}
+$("#copias").addEventListener("change", e => {
+  const caja = e.target.closest("[data-copia]"); if (!caja || !e.target.dataset.cp) return;
+  const c = copias[+caja.dataset.copia];
+  c[e.target.dataset.cp] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+});
+$("#copias").addEventListener("click", async e => {
+  const t = e.target, caja = t.closest("[data-copia]"), c = caja ? copias[+caja.dataset.copia] : null;
+  try {
+    if (t.id === "cpNueva") { copias.push({ etiqueta: "", carpetas: [], subcarpeta: "GESTOR-copia", activa: true }); repintarCopias(); }
+    else if (t.id === "cpGuardar") { await guardarCopias(); aviso("Copias guardadas."); }
+    else if (t.dataset.cpBorrar !== undefined) { copias.splice(+caja.dataset.copia, 1); repintarCopias(); }
+    else if (t.dataset.cpQuitar !== undefined) { c.carpetas.splice(+t.dataset.cpQuitar, 1); repintarCopias(); }
+    else if (t.dataset.cpRapida) { c.carpetas = c.carpetas || []; if (!c.carpetas.includes(t.dataset.cpRapida)) c.carpetas.push(t.dataset.cpRapida); repintarCopias(); }
+    else if (t.dataset.cpCarpeta !== undefined) {
+      const res = await api("/api/elegir-carpeta", {});
+      if (res.carpeta) { c.carpetas = c.carpetas || []; c.carpetas.push(res.carpeta); repintarCopias(); }
+    } else if (t.dataset.cpEjecutar !== undefined) {
+      await guardarCopias();
+      t.disabled = true; t.textContent = "Copiando…";
+      const res = await api("/api/copias/ejecutar", { id: copias[+caja.dataset.copia].id });
+      aviso(res.ok ? `${res.copiados} archivos copiados (${mb(res.bytes)}).` : res.mensaje); cargarCopias();
+    }
+  } catch (x) { aviso("Error: " + x.message); }
+});
+async function guardarCopias() {
+  const res = await api("/api/copias/guardar", { copias });
+  copias = res.copias;
+}
+
+// ---------------------------------------------------------------- estadísticas
+async function cargarEstadisticas() {
+  const r = await api("/api/estadisticas");
+  const tot = r.servicios.reduce((t, s) => ({ archivos: t.archivos + s.archivos, ord: t.ord + s.bytes_ordenados, lib: t.lib + s.bytes_liberados }), { archivos: 0, ord: 0, lib: 0 });
+  const porCat = {};
+  r.servicios.forEach(s => Object.entries(s.por_categoria || {}).forEach(([k, v]) => porCat[k] = (porCat[k] || 0) + v));
+  const maxCat = Math.max(1, ...Object.values(porCat));
+  const copiasHechas = Object.values(r.copias || {});
+  $("#estadisticas").innerHTML = `
+    <h2>Estadísticas</h2>
+    <div class="tarjetas">
+      <div class="tarjeta"><span class="ayuda">Archivos ordenados</span><b>${tot.archivos.toLocaleString("es")}</b></div>
+      <div class="tarjeta"><span class="ayuda">Volumen ordenado</span><b>${mb(tot.ord)}</b></div>
+      <div class="tarjeta"><span class="ayuda">Espacio liberado</span><b>${mb(tot.lib)}</b></div>
+      <div class="tarjeta"><span class="ayuda">En la papelera</span><b>${mb(r.papelera.bytes)}</b><span class="ayuda">${r.papelera.archivos} archivos</span></div>
+    </div>
+    <section><h3>Por servicio</h3>
+      ${r.servicios.length ? `<table><tr><th>Servicio</th><th>Archivos</th><th>Ordenado</th><th>Liberado</th><th>Desde</th></tr>
+        ${r.servicios.sort((a, b) => b.archivos - a.archivos).map(s => `<tr><td>${esc(s.nombre)}</td><td>${s.archivos}</td><td>${mb(s.bytes_ordenados)}</td><td>${mb(s.bytes_liberados)}</td><td>${esc(s.desde || "")}</td></tr>`).join("")}</table>`
+        : `<p class="ayuda">Todavía no hay datos: aparecerán cuando los servicios empiecen a ordenar.</p>`}
+    </section>
+    ${Object.keys(porCat).length ? `<section><h3>Por tipo de archivo</h3>
+      ${Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="fila" style="margin-bottom:6px"><span style="width:140px">${esc(k)}</span>
+        <div class="barra" style="flex:1"><div style="width:${(v / maxCat * 100).toFixed(1)}%"></div></div><span style="width:60px;text-align:right">${v}</span></div>`).join("")}
+    </section>` : ""}
+    ${copiasHechas.length ? `<section><h3>Copias a USB</h3>${copiasHechas.map(c => `<div class="ayuda">Última: ${esc(fechaBonita(c.ultima))} en ${esc(c.unidad)}, ${c.copiados} archivos (${mb(c.bytes)}).</div>`).join("")}</section>` : ""}`;
+}
+
 (async () => {
   datos = await api("/api/inicio");
-  pintarLista(); pintarProgramacion();
+  pintarLista(); pintarProgramacion(); pintarPreferencias();
   if (datos.servicios.length) abrir(JSON.parse(JSON.stringify(datos.servicios[0].servicio)));
+  if (datos.primera_vez) mostrarVista("Asistente");
 })();
 </script>
 </body>

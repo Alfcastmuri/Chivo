@@ -443,9 +443,24 @@ def procedencia_de(ruta):
         return {"procedencia": "Desconocida", "camara": "Desconocida", "sitio": "Desconocido"}
 
 
+_FECHA_EN_NOMBRE = re.compile(r"(?<!\d)(20\d{2}|19\d{2})[-_.]?(0[1-9]|1[0-2])[-_.]?(0[1-9]|[12]\d|3[01])(?!\d)")
+
+
+def fecha_en_nombre(ruta):
+    """Fecha escrita en el nombre: IMG-20231005-WA0012, Screenshot_20231005-1012, PXL_20231005..."""
+    m = _FECHA_EN_NOMBRE.search(os.path.basename(ruta))
+    if not m:
+        return None
+    try:
+        return dt.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
 def fecha_archivo(ruta, st, fuente):
     if fuente == "captura":
-        fecha = fecha_captura(ruta)
+        # WhatsApp y las capturas no llevan EXIF, pero sí la fecha en el nombre.
+        fecha = fecha_captura(ruta) or fecha_en_nombre(ruta)
         if fecha:
             return fecha
     if fuente == "creacion":
@@ -1593,9 +1608,16 @@ def analizar_carpeta(carpeta, ahora=None):
     return {"total": total, "sugerencias": sugerencias, "copias": copias}
 
 
+def _nombre_amigable(carpeta):
+    for nombre, ruta in carpetas_rapidas().items():
+        if _norm(ruta) == _norm(carpeta):
+            return nombre
+    return os.path.basename(os.path.normpath(carpeta)) or carpeta
+
+
 def crear_desde_asistente(carpeta, reglas, limpiar=False):
     servicio = {
-        "id": nuevo_id(), "nombre": f"Ordenar {os.path.basename(os.path.normpath(carpeta)) or carpeta}",
+        "id": nuevo_id(), "nombre": f"Ordenar {_nombre_amigable(carpeta)}",
         "activo": False, "origenes": [carpeta], "subcarpetas": False,
         "horario": {"tipo": "intervalo", "cada": 8, "unidad": "horas"},
         "conflicto": "renombrar", "identicos": "papelera", "fecha_captura_fotos": True,
@@ -1660,7 +1682,7 @@ def necesita_residente():
 
 def lanzar_residente():
     """Arranca el proceso residente (icono y modo al instante) si hace falta y no está ya en marcha."""
-    if residente_activo() or not necesita_residente():
+    if os.environ.get("GESTOR_SIN_RESIDENTE") or residente_activo() or not necesita_residente():
         return False
     import subprocess
     if EMPAQUETADO:
