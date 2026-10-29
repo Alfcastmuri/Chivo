@@ -215,6 +215,20 @@ def resumen_movimientos(desde):
     return {"movidos": f[0] or 0, "papelera": f[1] or 0, "bytes_papelera": f[2] or 0}
 
 
+def actividad_diaria(dias=30):
+    """Para las gráficas del Inicio: archivos ordenados y enviados a la papelera, día por día (hora local)."""
+    import datetime as dt
+    hoy = dt.date.today()
+    inicio = dt.datetime.combine(hoy - dt.timedelta(days=dias - 1), dt.time()).timestamp()
+    cuenta = {(hoy - dt.timedelta(days=i)).isoformat(): [0, 0] for i in range(dias)}
+    filas = con().execute("SELECT date(t, 'unixepoch', 'localtime'), SUM(accion!='papelera'), SUM(accion='papelera') "
+                          "FROM movimientos WHERE t >= ? GROUP BY 1", (inicio,)).fetchall()
+    for dia, movidos, papelera in filas:
+        if dia in cuenta:
+            cuenta[dia] = [movidos or 0, papelera or 0]
+    return [{"d": d, "n": v[0], "p": v[1]} for d, v in sorted(cuenta.items())]
+
+
 def resumen_periodo(desde, hasta):
     """Para el informe mensual: movimientos por servicio, por extensión y por día entre dos fechas."""
     c = con()

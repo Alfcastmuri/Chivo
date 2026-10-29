@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -1955,11 +1955,29 @@ def _intervalo(horario):
         dt.timedelta(days=cada) if unidad == "dias" else dt.timedelta(hours=cada))
 
 
+def _momento_fecha(horario):
+    """El día y la hora de un horario «una fecha concreta» (o None si está incompleto)."""
+    try:
+        dia = dt.date.fromisoformat(str(horario.get("fecha") or ""))
+    except ValueError:
+        return None
+    return dt.datetime.combine(dia, (_horas(horario.get("horas")) or [dt.time(9, 0)])[0])
+
+
+def solo_una_vez(servicio):
+    """True si el servicio se ejecuta una sola vez y luego se desactiva solo (queda guardado para reusarlo)."""
+    return servicio.get("repetir") is False or (servicio.get("horario") or {}).get("tipo") == "fecha"
+
+
 def toca_ejecutar(servicio, estado_servicio, ahora):
     horario = servicio.get("horario") or {}
     tipo = horario.get("tipo", "manual")
     if tipo in ("manual", "inicio", "instante"):
         return False
+    if tipo == "fecha":
+        momento = _momento_fecha(horario)
+        ultima = estado_servicio.get("ultima")
+        return bool(momento and ahora >= momento and (not ultima or dt.datetime.fromisoformat(ultima) < momento))
     ultima = estado_servicio.get("ultima")
     referencia = dt.datetime.fromisoformat(ultima) if ultima else None
     if tipo == "intervalo":
@@ -1981,6 +1999,11 @@ def proxima_ejecucion(servicio, estado_servicio, ahora=None):
         return "al iniciar sesión"
     if tipo == "instante":
         return "al instante"
+    if tipo == "fecha":
+        momento = _momento_fecha(horario)
+        if not momento:
+            return None
+        return "en la próxima revisión" if momento <= ahora else momento.isoformat(timespec="minutes")
     if tipo == "intervalo":
         ultima = estado_servicio.get("ultima")
         if not ultima:
@@ -2136,7 +2159,11 @@ def _ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None, aprobad
                     pass
         if len(hechos) > MAX_HECHOS:
             e["hechos"] = dict(list(hechos.items())[-MAX_HECHOS:])
+        if solo_una_vez(servicio):
+            e["usado"] = e["ultima"]
         guardar_estado(estado)
+        if solo_una_vez(servicio):
+            desactivar_tras_usar(servicio["id"])
         if registro["operaciones"] or registro["errores"]:
             n = len(registro["operaciones"])
             texto = f'{n} {"archivo ordenado" if n == 1 else "archivos ordenados"}'
@@ -2150,6 +2177,18 @@ def _ejecutar_y_anotar(servicio, motivo="manual", esperar_segundos=None, aprobad
             detalle = f" ({tras} detectados al quitar \"(1)\" o \"copia\")" if tras else ""
             avisar("Duplicados detectados", f"{len(duplicados)} archivos idénticos a otros, {donde}{detalle}.")
         return registro
+
+
+def desactivar_tras_usar(servicio_id):
+    """Un servicio de un solo uso ya hizo su trabajo: se apaga, pero se queda guardado para volver a usarlo."""
+    servicios = cargar_servicios()
+    for s in servicios:
+        if s.get("id") == servicio_id and s.get("activo"):
+            s["activo"] = False
+            guardar_servicios(servicios)
+            avisar(s.get("nombre", "GESTOR"), "Era de un solo uso: ya terminó y lo dejé desactivado. Puedes volver a usarlo cuando quieras.")
+            return True
+    return False
 
 
 def proponer(servicio, motivo="horario", esperar_segundos=None):

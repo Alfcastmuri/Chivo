@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 
 import actualizar
 import aprendizaje
+import bd
 import correo
 import disco
 import informe
@@ -214,7 +215,28 @@ def dashboard():
         "pagos": [p for p in pagos.lista()["pagos"] if p["estado"] == "pendiente"][:6],
         "retenidos": len(nucleo.retenidos()),
         "actualizacion": actualizar.estado(),
+        "graficas": graficas_inicio(),
     }
+
+
+def graficas_inicio():
+    """Actividad de los últimos 30 días, por día, por tipo de archivo y por servicio."""
+    try:
+        dias = bd.actividad_diaria(30)
+        periodo = bd.resumen_periodo(time.time() - 30 * 86400, time.time() + 60)
+    except Exception:
+        return {"dias": [], "tipos": [], "servicios": []}
+    tipos = {}
+    for ext in periodo["extensiones"]:
+        cat = nucleo.categoria_de(ext) or "Otros"
+        tipos[cat] = tipos.get(cat, 0) + 1
+    nombres = {s["id"]: s.get("nombre", "") for s in nucleo.cargar_servicios()}
+    servicios = {}
+    for f in periodo["servicios"]:
+        nombre = "A mano" if f["quien"] != "gestor" else (nombres.get(f["servicio"]) or f["servicio"] or "Otro")
+        servicios[nombre] = servicios.get(nombre, 0) + f["n"]
+    return {"dias": dias, "tipos": sorted(tipos.items(), key=lambda x: -x[1])[:8],
+            "servicios": sorted(servicios.items(), key=lambda x: -x[1])[:6]}
 
 
 def limpiar_tema(t):
@@ -241,7 +263,7 @@ def qr_svg(texto):
     except ImportError:
         return ""
     salida = io.BytesIO()
-    segno.make(texto, error="m").save(salida, kind="svg", scale=6, border=2, dark="#111111", light="#ffffff",
+    segno.make(texto, error="m").save(salida, kind="svg", scale=6, border=3, dark="#111111", light="#ffffff", omitsize=True,
                                       xmldecl=False)
     return salida.getvalue().decode()
 
@@ -300,7 +322,7 @@ def servicios_con_estado():
     for s in nucleo.cargar_servicios():
         e = estado.get(s["id"], {})
         resultado.append({"servicio": s, "ultima": e.get("ultima"),
-                          "ultimo_resultado": e.get("ultimo_resultado"),
+                          "ultimo_resultado": e.get("ultimo_resultado"), "usado": e.get("usado"),
                           "proxima": nucleo.proxima_ejecucion(s, e),
                           "propuestas": e.get("propuestas") if s.get("modo_prueba") else None})
     return resultado

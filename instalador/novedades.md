@@ -1,4 +1,15 @@
-## Novedades de GESTOR 0.8.0
+## Novedades de GESTOR 0.9.0
+
+- **Panel rediseñado**: tarjetas redondeadas con sombras suaves, botones tipo píldora e interruptores en lugar de casillas. Sigue usando tus colores.
+- **Todo ordenado por grupos**: el menú de la izquierda tiene 7 secciones con icono (Inicio, Organizar, Encontrar, Espacio, Proteger, Al día, Personalizar) y cada una muestra sus partes en pestañas. Sin páginas largas.
+- **Ajustes en una ventana con pestañas**: General, Programación, Inteligencia, Celular y Datos y seguridad.
+- **Servicios en pestañas**: Carpetas, Cuándo, Reglas, Opciones e Historial.
+- **Tareas de un solo uso o repetitivas**: en «Cuándo» eliges «Repetir siempre» o «Solo una vez». Las de un solo uso se desactivan solas al terminar y quedan guardadas para reusarlas. También puedes programarlas para un día y hora concretos.
+- **Más gráficas en Inicio**: actividad de 30 días, archivos por tipo, por servicio, tendencia semanal y anillos de espacio en disco.
+- **El código QR para el celular ya se ve completo.**
+- **Icono propio de GESTOR** en el escritorio, el menú Inicio y junto al reloj.
+
+## Lo que trajo la 0.8.0
 
 - **GESTOR se abre en su propia ventana**, como cualquier programa, sin barra de direcciones ni pestañas del navegador. Usa el motor de Edge que ya trae Windows. Si prefieres el navegador, se cambia en Ajustes → Funcionamiento.
 - **El Asistente vuelve al menú de la izquierda** (Organizar → 🧭 Asistente). Sigue también en Plantillas.

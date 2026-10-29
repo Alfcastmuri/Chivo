@@ -258,6 +258,121 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
   body.cuaderno nav.lateral { background-image: none; padding-left: 10px; }
   body.cuaderno .caja.editor, body.cuaderno .panelito { padding-left: 36px; }
 }
+/* ---------------- estilo suave (0.9): tarjetas redondeadas con sombras suaves, botones tipo píldora y gráficas */
+:root {
+  --radio: 18px;
+  --sombra-osc: color-mix(in srgb, var(--fondo) 82%, #1a2030);
+  --sombra-clara: color-mix(in srgb, var(--fondo) 30%, #ffffff);
+  --sombra: 8px 8px 22px color-mix(in srgb, var(--sombra-osc) 55%, transparent), -6px -6px 18px var(--sombra-clara);
+  --sombra-chica: 3px 3px 8px color-mix(in srgb, var(--sombra-osc) 50%, transparent), -3px -3px 8px var(--sombra-clara);
+  --hundido: inset 2px 2px 5px color-mix(in srgb, var(--sombra-osc) 45%, transparent), inset -2px -2px 5px var(--sombra-clara);
+  --degradado: linear-gradient(135deg, color-mix(in oklab, var(--acento) 72%, #ffffff), var(--acento) 55%, color-mix(in oklab, var(--acento) 85%, #000000));
+}
+@media (prefers-color-scheme: dark) { :root { --sombra-clara: color-mix(in srgb, var(--fondo) 88%, #ffffff); --sombra-osc: #000000; } }
+:root[style*="color-scheme: dark"] { --sombra-clara: color-mix(in srgb, var(--fondo) 88%, #ffffff); --sombra-osc: #000000; }
+:root[style*="color-scheme: light"] { --sombra-clara: color-mix(in srgb, var(--fondo) 30%, #ffffff); --sombra-osc: color-mix(in srgb, var(--fondo) 82%, #1a2030); }
+body:not(.cuaderno) .caja, body:not(.cuaderno) .panelito { border: 0; border-radius: var(--radio); box-shadow: var(--sombra); }
+body:not(.cuaderno) .panelito { padding: 18px 20px; }
+body:not(.cuaderno) .panelito.destacado { box-shadow: var(--sombra), inset 0 0 0 2px color-mix(in srgb, var(--acento) 55%, transparent); }
+body:not(.cuaderno) header { background: var(--fondo); border-bottom: 0; }
+body:not(.cuaderno) button { border-radius: 999px; border-color: transparent; box-shadow: var(--sombra-chica); padding: 7px 16px; transition: box-shadow .15s, transform .1s; }
+body:not(.cuaderno) button:hover { border-color: transparent; color: var(--acento); }
+body:not(.cuaderno) button:active { box-shadow: var(--hundido); transform: translateY(1px); }
+body:not(.cuaderno) button.prim { background: var(--degradado); color: var(--acento-texto); box-shadow: 0 6px 16px color-mix(in srgb, var(--acento) 35%, transparent); }
+body:not(.cuaderno) button.prim:hover { color: var(--acento-texto); filter: brightness(1.05); }
+body:not(.cuaderno) button.chico { padding: 3px 11px; box-shadow: var(--sombra-chica); }
+body:not(.cuaderno) input[type=text], body:not(.cuaderno) input[type=number], body:not(.cuaderno) input[type=time],
+body:not(.cuaderno) input[type=date], body:not(.cuaderno) input[type=password], body:not(.cuaderno) select {
+  border: 0; border-radius: 12px; background: var(--fondo); box-shadow: var(--hundido); padding: 8px 12px; }
+body:not(.cuaderno) .carpeta, body:not(.cuaderno) .regla, body:not(.cuaderno) .tipo-caja, body:not(.cuaderno) .grupo-dup, body:not(.cuaderno) .tarjeta {
+  border: 0; border-radius: 14px; background: var(--fondo); box-shadow: var(--hundido); }
+body:not(.cuaderno) .regla { background: var(--panel); box-shadow: var(--sombra-chica); }
+body:not(.cuaderno) .cifras div { border-radius: 14px; box-shadow: var(--hundido); }
+body:not(.cuaderno) .chip { border: 0; box-shadow: var(--sombra-chica); padding: 4px 12px; }
+body:not(.cuaderno) .chip.on { background: var(--degradado); color: var(--acento-texto); }
+body:not(.cuaderno) .barra { height: 10px; border-radius: 999px; box-shadow: var(--hundido); }
+body:not(.cuaderno) .barra > div { background: var(--degradado); border-radius: 999px; }
+body:not(.cuaderno) .barra.llena > div { background: var(--peligro); }
+body:not(.cuaderno) .modal .caja { border-radius: 24px; }
+body:not(.cuaderno) .proc { border: 0; border-radius: 16px; }
+body:not(.cuaderno) section { border-top: 0; }
+body:not(.cuaderno) .acciones { border-top: 0; background: transparent; backdrop-filter: blur(6px); }
+/* interruptores en lugar de casillas (como el «ON» de las referencias) */
+body:not(.cuaderno) label > input[type=checkbox]:not(.normal) {
+  appearance: none; -webkit-appearance: none; width: 40px; height: 22px; border-radius: 999px; flex: none; margin: 0 2px 0 0;
+  background: var(--fondo); box-shadow: var(--hundido); position: relative; cursor: pointer; transition: background .2s; }
+body:not(.cuaderno) label > input[type=checkbox]:not(.normal)::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--panel); box-shadow: 1px 1px 3px rgba(0,0,0,.25); transition: left .2s; }
+body:not(.cuaderno) label > input[type=checkbox]:not(.normal):checked { background: var(--degradado); box-shadow: none; }
+body:not(.cuaderno) label > input[type=checkbox]:not(.normal):checked::after { left: 21px; }
+body:not(.cuaderno) label > input[type=checkbox]:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+/* menú lateral: mosaicos con icono (como Home / Calendar / Setting de las referencias) */
+.marco { grid-template-columns: 108px 1fr; }
+nav.lateral { gap: 12px; padding: 18px 8px 18px 18px; top: 66px; }
+nav.lateral button.mosaico { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 4px 9px; width: 82px;
+  border-radius: 20px; background: var(--panel); color: var(--suave); font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.15; }
+nav.lateral button.mosaico svg { width: 24px; height: 24px; }
+nav.lateral button.mosaico.on { color: var(--acento); background: var(--panel); box-shadow: var(--hundido); }
+nav.lateral button.mosaico.on svg { filter: drop-shadow(0 3px 6px color-mix(in srgb, var(--acento) 45%, transparent)); }
+nav.lateral button.mosaico .globo { position: absolute; margin: -6px 0 0 30px; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px;
+  background: var(--peligro); color: #fff; font-size: 11px; line-height: 18px; }
+.subnav { display: none; gap: 10px; flex-wrap: wrap; padding: 18px 20px 0; }
+.subnav.on { display: flex; }
+.subnav button { font-weight: 600; }
+.subnav button.on, .subnav button.on:hover { background: var(--degradado); color: var(--acento-texto); }
+body:not(.cuaderno) .pestanas-int button.on:hover, body:not(.cuaderno) .chip.on:hover, body:not(.cuaderno) .repetir button.on:hover { color: var(--acento-texto); }
+@media (max-width: 860px) {
+  .marco { grid-template-columns: 1fr; }
+  nav.lateral { flex-direction: row; padding: 10px; gap: 8px; top: 0; position: static; background: var(--fondo); border-bottom: 0; overflow-x: auto; }
+  nav.lateral button.mosaico { width: 72px; flex: none; padding: 9px 2px 7px; }
+  .subnav { padding: 10px 10px 0; flex-wrap: nowrap; overflow-x: auto; }
+  .pestanas-int { flex-wrap: nowrap; overflow-x: auto; padding: 4px 2px 8px; }
+  .pestanas-int button, .subnav button { flex: none; white-space: nowrap; }
+}
+/* ventanas emergentes con pestañas (Ajustes y servicio) */
+.pestanas-int { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.pestanas-int button.on { background: var(--degradado); color: var(--acento-texto); }
+body.cuaderno .pestanas-int button.on { background: var(--acento); color: var(--acento-texto); }
+[data-pest]:not(.on) { display: none !important; }
+#modalAjustes .caja { max-width: 760px; min-height: min(640px, 90vh); }
+#modalAjustes .cab-modal { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+#modalAjustes .cab-modal h2 { margin: 0; flex: 1; }
+.tarjeta-op { border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; background: var(--fondo); box-shadow: var(--hundido); }
+.tarjeta-op > h4 { margin: 0 0 10px; font-size: 13px; color: var(--suave); text-transform: uppercase; letter-spacing: .6px; }
+body.cuaderno .tarjeta-op { background: transparent; border: 1.5px dashed #c9bfa8; box-shadow: none; }
+.repetir { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--fondo); box-shadow: var(--hundido); gap: 4px; }
+.repetir button { box-shadow: none !important; background: transparent; }
+.repetir button.on { background: var(--degradado) !important; color: var(--acento-texto); }
+/* gráficas */
+.graf { width: 100%; display: block; overflow: visible; }
+.graf text { fill: var(--suave); font-size: 11px; }
+.graf .eje { stroke: var(--borde); stroke-width: 1; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+.kpi { padding: 14px 16px 10px !important; }
+.kpi .num { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.kpi .sub { font-size: 12px; color: var(--suave); }
+.kpi .tend { font-size: 12px; font-weight: 600; color: var(--ok); }
+.kpi .tend.baja { color: var(--suave); }
+.estado-hero { background: var(--degradado) !important; color: var(--acento-texto); }
+.estado-hero h3, .estado-hero .ayuda { color: color-mix(in srgb, var(--acento-texto) 80%, transparent) !important; }
+.estado-hero .semaforo { font-size: 20px; }
+.estado-hero .punto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento-texto) 50%, transparent); }
+.estado-hero button:not(.prim) { background: color-mix(in srgb, var(--acento-texto) 18%, transparent); color: var(--acento-texto); box-shadow: none; }
+.estado-hero button.prim { background: var(--acento-texto) !important; color: var(--acento) !important; }
+body.cuaderno { --degradado: linear-gradient(135deg, color-mix(in oklab, var(--acento) 72%, #ffffff), var(--acento) 55%, color-mix(in oklab, var(--acento) 85%, #000000)); }
+body.cuaderno .estado-hero { background-image: var(--degradado) !important; }
+.leyenda { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.leyenda span { display: flex; align-items: center; gap: 8px; }
+.leyenda i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.leyenda b { margin-left: auto; font-weight: 600; }
+.dona-caja { display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: center; }
+.anillos { display: flex; flex-wrap: wrap; gap: 14px; }
+.anillo { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; }
+.atajos { display: flex; flex-wrap: wrap; gap: 14px; }
+.atajos button { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; padding: 12px 4px 10px; border-radius: 20px; font-size: 12px; color: var(--suave); }
+.atajos button svg { width: 22px; height: 22px; color: var(--acento); }
 </style>
 </head>
 <body>
@@ -267,7 +382,6 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
   <span class="estado" id="estadoProg"></span>
   <button id="btnCuaderno" title="Modo cuaderno: el panel como una libreta de papel">📓 <span>Cuaderno</span></button>
   <button id="btnPausaTodo" title="Pausa o reanuda todos los servicios automáticos">⏸ Pausar todo</button>
-  <button id="btnAjustes">⚙ <span>Ajustes</span></button>
   <details class="mas"><summary title="Más">⋯</summary><div class="caja">
     <button id="btnSalir">Cerrar sesión</button><button id="btnCerrar">Cerrar panel</button></div></details>
 </header>
@@ -276,30 +390,9 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
   <button class="chico prim" data-actu-instalar>Actualizar ahora</button><button class="chico" id="actuNotas">Novedades</button></div>
 <div class="banda" id="bandaPausa">GESTOR está en pausa: no se ordenará nada automáticamente. <button class="chico" id="btnReanudar">Reanudar</button></div>
 <div class="marco">
-<nav class="lateral" id="pestanas">
-  <button data-vista="Inicio" class="on">🏠 Inicio</button>
-  <div class="grupo-nav">Organizar</div>
-  <button data-vista="Asistente">🧭 Asistente</button>
-  <button data-vista="Servicios">Servicios</button>
-  <button data-vista="Plantillas">Plantillas</button>
-  <button data-vista="Raiz">Sacar a la raíz</button>
-  <button data-vista="Correo">Adjuntos de correo</button>
-  <div class="grupo-nav">Encontrar</div>
-  <button data-vista="Buscar">Buscar</button>
-  <button data-vista="Duplicados">Duplicados</button>
-  <button data-vista="Linea">Línea de tiempo</button>
-  <button data-vista="Espacio">Espacio y mapa del disco</button>
-  <div class="grupo-nav">Proteger</div>
-  <button data-vista="Respaldo">Respaldo y USB</button>
-  <button data-vista="Papelera">Papelera</button>
-  <div class="grupo-nav">Al día</div>
-  <button data-vista="Vencimientos">Pagos y vencimientos</button>
-  <button data-vista="Estadisticas">Estadísticas e informes</button>
-  <div class="grupo-nav">Personalizar</div>
-  <button data-vista="Colores">🎨 Colores</button>
-  <button data-vista="Tipos">🗂 Tipos de archivo</button>
-</nav>
+<nav class="lateral" id="pestanas"></nav>
 <div class="contenido">
+<div class="subnav" id="subnav"></div>
 <main class="vista simple on" id="vistaInicio"><div id="inicio"><div class="vacio">Cargando…</div></div></main>
 <main class="vista simple" id="vistaRaiz"><div class="caja editor" id="raiz"><h2>Sacar todo a la raíz</h2><div id="aplanar"></div></div></main>
 <main class="vista" id="vistaServicios">
@@ -313,32 +406,29 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
 </main>
 <main class="vista simple" id="vistaPlantillas"><div class="caja editor" id="plantillas"></div></main>
 <main class="vista simple" id="vistaBuscar"><div class="caja editor" id="buscar"></div></main>
-<main class="vista simple" id="vistaEspacio"><div class="caja editor" id="discoMapa"></div><div class="caja editor" id="espacio"></div></main>
-<main class="vista simple" id="vistaVencimientos"><div class="caja editor" id="pagos"></div><div class="caja editor" id="vencimientos"></div></main>
+<main class="vista simple" id="vistaEspacio" style="gap:16px"><div class="pestanas-int" data-tabs="esp" style="margin:0"><button type="button" data-tab="mapa" class="on">Mapa del disco</button><button type="button" data-tab="liberar" class="">Liberar espacio</button></div><div class="caja editor on" data-pest="esp:mapa" id="discoMapa"></div><div class="caja editor" data-pest="esp:liberar" id="espacio"></div></main>
+<main class="vista simple" id="vistaVencimientos" style="gap:16px"><div class="pestanas-int" data-tabs="venc" style="margin:0"><button type="button" data-tab="pagos" class="on">💳 Pagos</button><button type="button" data-tab="venc" class="">📅 Vencimientos</button></div><div class="caja editor on" data-pest="venc:pagos" id="pagos"></div><div class="caja editor" data-pest="venc:venc" id="vencimientos"></div></main>
 <main class="vista simple" id="vistaLinea"><div class="caja editor" id="linea"></div></main>
 <main class="vista simple" id="vistaCorreo"><div class="caja editor" id="correo"></div></main>
-<main class="vista simple" id="vistaRespaldo"><div class="caja editor" id="respaldo"></div><div class="caja editor" id="copias"></div></main>
+<main class="vista simple" id="vistaRespaldo" style="gap:16px"><div class="pestanas-int" data-tabs="resp" style="margin:0"><button type="button" data-tab="versiones" class="on">Respaldo con versiones</button><button type="button" data-tab="usb" class="">Copias a USB</button></div><div class="caja editor on" data-pest="resp:versiones" id="respaldo"></div><div class="caja editor" data-pest="resp:usb" id="copias"></div></main>
 <main class="vista simple" id="vistaAsistente"><div class="caja editor" id="asistente"></div></main>
 <main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
 <main class="vista simple" id="vistaPapelera"><div class="caja editor" id="retenidos" style="display:none"></div><div class="caja editor" id="papelera"></div></main>
 <main class="vista simple" id="vistaTipos"><div class="caja editor" id="tipos"></div></main>
 <main class="vista simple" id="vistaColores"><div class="caja editor" id="colores"></div></main>
-<main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div><div class="caja editor" id="informes"></div></main>
+<main class="vista simple" id="vistaEstadisticas" style="gap:16px"><div class="pestanas-int" data-tabs="est" style="margin:0"><button type="button" data-tab="est" class="on">Estadísticas</button><button type="button" data-tab="inf" class="">Informes mensuales</button></div><div class="caja editor on" data-pest="est:est" id="estadisticas"></div><div class="caja editor" data-pest="est:inf" id="informes"></div></main>
 </div>
 </div>
 
 <div class="modal" id="modalAjustes">
   <div class="caja">
-    <h2 style="margin-top:0">Programación automática</h2>
-    <p class="ayuda">Windows lanzará el motor cada cierto tiempo. El motor mira qué servicios toca ejecutar según su horario,
-      los ejecuta y se cierra, así que entre revisiones no consume nada. Cuanto más corto el intervalo, más puntuales serán los horarios.</p>
-    <div class="fila"><label>Revisar cada <input type="number" id="ajMinutos" min="1" max="1440"> minutos</label></div>
-    <div id="ajEstado"></div>
-    <div class="fila" style="margin-top:14px">
-      <button class="prim" id="ajGuardar">Activar / actualizar programación</button>
-      <button class="peligro" id="ajQuitar">Quitar programación</button>
-    </div>
-    <h2 style="margin-top:22px">Funcionamiento</h2>
+    <div class="cab-modal"><h2>Ajustes</h2><button id="ajCerrarX" title="Cerrar">✕</button></div>
+    <div class="pestanas-int" data-tabs="ajustes">
+      <button type="button" data-tab="general" class="on">General</button><button type="button" data-tab="horario">Programación</button>
+      <button type="button" data-tab="inteligencia">Inteligencia</button><button type="button" data-tab="celular">Celular</button>
+      <button type="button" data-tab="datos">Datos y seguridad</button></div>
+    <div data-pest="ajustes:general" class="on">
+    <div class="tarjeta-op"><h4>Funcionamiento</h4>
     <div class="fila"><label><input type="checkbox" id="prefIcono"> Mostrar el icono junto al reloj</label></div>
     <div class="fila"><label><input type="checkbox" id="prefVentana"> Abrir el panel en su propia ventana (si no, en el navegador)</label></div>
     <div class="fila"><label><input type="checkbox" id="prefNotif"> Notificaciones de Windows al ordenar</label></div>
@@ -352,43 +442,73 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
     <div class="fila"><label title="Si mueves a mano archivos a una carpeta de Documentos, GESTOR te propone una regla"><input type="checkbox" id="prefAprender"> Aprender de lo que muevo a mano</label>
       <label><input type="checkbox" id="prefVence"> Avisarme de vencimientos</label>
       <label title="2026-10 CFE $1,234.50.pdf"><input type="checkbox" id="prefRenFact"> Renombrar facturas con fecha, proveedor y total</label></div>
+    </div>
+    <div class="tarjeta-op"><h4>Encendido</h4>
     <div class="fila"><button class="peligro" id="btnDetener">Detener GESTOR por completo</button>
       <span class="ayuda">Cierra el icono y deja de ordenar hasta que lo vuelvas a encender aquí.</span></div>
-    <h2 style="margin-top:22px">Desde el celular</h2>
-    <p class="ayuda">Abre el panel desde el celular u otro equipo conectado a tu misma red de casa, con tu contraseña. Desde ahí puedes revisar y aprobar el modo prueba.
-      La conexión no va cifrada: úsalo solo en tu red de casa, no en redes públicas. Windows puede preguntarte si permites el acceso: elige "Redes privadas".</p>
-    <div class="fila"><label><input type="checkbox" id="prefRed"> Permitir abrir el panel desde mi red de casa</label></div>
-    <div id="redInfo" class="ayuda"></div>
-    <h2 style="margin-top:22px">No molestar</h2>
+    </div>
+    </div>
+    <div data-pest="ajustes:horario">
+    <div class="tarjeta-op"><h4>Programación automática</h4>
+    <p class="ayuda">Windows lanzará el motor cada cierto tiempo. El motor mira qué servicios toca ejecutar según su horario,
+      los ejecuta y se cierra, así que entre revisiones no consume nada. Cuanto más corto el intervalo, más puntuales serán los horarios.</p>
+    <div class="fila"><label>Revisar cada <input type="number" id="ajMinutos" min="1" max="1440"> minutos</label></div>
+    <div id="ajEstado"></div>
+    <div class="fila" style="margin-top:14px">
+      <button class="prim" id="ajGuardar">Activar / actualizar programación</button>
+      <button class="peligro" id="ajQuitar">Quitar programación</button>
+    </div>
+    </div>
+    <div class="tarjeta-op"><h4>No molestar</h4>
     <p class="ayuda">Mientras se cumpla algo de esto, los servicios automáticos esperan; lo pendiente se ordena después. "Ejecutar ahora" funciona siempre.</p>
     <div class="fila"><label><input type="checkbox" id="nmBateria"> Con el portátil en batería</label>
       <label><input type="checkbox" id="nmPantalla"> Con un juego, vídeo o presentación a pantalla completa</label></div>
     <div class="fila"><label><input type="checkbox" id="nmHoras"> Entre las</label> <input type="time" id="nmDesde"> <label>y las</label> <input type="time" id="nmHasta"></div>
-    <h2 style="margin-top:22px">Inteligencia</h2>
+    </div>
+    </div>
+    <div data-pest="ajustes:inteligencia">
+    <div class="tarjeta-op"><h4>Lectura y avisos</h4>
     <div class="fila"><label title="Usa el lector de texto de Windows: sin internet y sin instalar nada"><input type="checkbox" id="prefOcr"> Leer el texto de fotos y PDF escaneados (OCR)</label>
       <span class="ayuda" id="ocrEstado"></span></div>
     <div class="fila"><label title="Si un servicio quiere mandar a la papelera algo que abriste hace poco o que no tiene otra copia, te pregunta antes"><input type="checkbox" id="prefPapInt"> Papelera inteligente</label>
       <label><input type="checkbox" id="prefPagos"> Recordatorios de pago</label></div>
-    <h2 style="margin-top:22px">Actualizaciones</h2>
-    <div class="fila"><label><input type="checkbox" id="prefActu"> Buscar versiones nuevas cada día</label><button class="chico" id="actuBuscar">Buscar ahora</button></div>
-    <div class="ayuda" id="actuEstado"></div>
-    <h2 style="margin-top:22px">Facturas</h2>
+    </div>
+    <div class="tarjeta-op"><h4>Facturas</h4>
     <div class="campo"><span>Tus RFC (separados por coma). Se ignoran al buscar el proveedor de una factura, para no tomar el tuyo.</span>
       <input type="text" id="prefRfc" placeholder="XAXX010101000"></div>
-    <h2 style="margin-top:22px">Base de datos</h2>
+    </div>
+    <div class="tarjeta-op"><h4>Actualizaciones</h4>
+    <div class="fila"><label><input type="checkbox" id="prefActu"> Buscar versiones nuevas cada día</label><button class="chico" id="actuBuscar">Buscar ahora</button></div>
+    <div class="ayuda" id="actuEstado"></div>
+    </div>
+    </div>
+    <div data-pest="ajustes:celular">
+    <div class="tarjeta-op"><h4>Desde el celular</h4>
+    <p class="ayuda">Abre el panel desde el celular u otro equipo conectado a tu misma red de casa, con tu contraseña. Desde ahí puedes revisar y aprobar el modo prueba.
+      La conexión no va cifrada: úsalo solo en tu red de casa, no en redes públicas. Windows puede preguntarte si permites el acceso: elige "Redes privadas".</p>
+    <div class="fila"><label><input type="checkbox" id="prefRed"> Permitir abrir el panel desde mi red de casa</label></div>
+    <div id="redInfo" class="ayuda"></div>
+    </div>
+    </div>
+    <div data-pest="ajustes:datos">
+    <div class="tarjeta-op"><h4>Base de datos</h4>
     <p class="ayuda">Todo lo que GESTOR recuerda (servicios, historial, mapa de archivos) está en una base de datos. Haz una copia cuando quieras; el instalador también hace una antes de cada actualización.</p>
     <div class="fila"><button id="btnRespBase">Respaldar la base de datos ahora</button><span class="ayuda" id="respBaseInfo"></span></div>
-    <h2 style="margin-top:22px">Copia de la configuración</h2>
+    </div>
+    <div class="tarjeta-op"><h4>Copia de la configuración</h4>
     <div class="fila">
       <button id="btnExportar">Exportar servicios y ajustes</button>
       <label class="chip" style="cursor:pointer">Importar… <input type="file" id="archivoImportar" accept=".json" hidden></label>
       <label><input type="checkbox" id="importarReemplazar"> Reemplazar los actuales al importar</label>
     </div>
-    <h2 style="margin-top:22px">Contraseña del panel</h2>
+    </div>
+    <div class="tarjeta-op"><h4>Contraseña del panel</h4>
     <div class="fila">
       <input type="password" id="clActual" placeholder="Contraseña actual" autocomplete="current-password" style="flex:1;min-width:140px">
       <input type="password" id="clNueva" placeholder="Nueva (mín. 6)" autocomplete="new-password" style="flex:1;min-width:140px">
       <button id="clCambiar">Cambiar</button>
+    </div>
+    </div>
     </div>
     <div class="fila" style="margin-top:14px;justify-content:flex-end">
       <button id="ajCerrar">Cerrar</button>
@@ -408,6 +528,36 @@ let sinGuardar = false;
 let avisosCarpeta = {};
 
 const $ = s => document.querySelector(s);
+// ---------------------------------------------------------------- menú lateral por grupos
+const ICONOS = {
+  inicio: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.8V20h13V9.8"/><path d="M10 20v-5.5h4V20"/>',
+  organizar: '<path d="M3 7.5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 12.5h8M8 16h5"/>',
+  encontrar: '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/>',
+  espacio: '<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M14.5 3.3A9 9 0 0 1 20.7 9.5H14.5z"/>',
+  proteger: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8 7.5 9.5 4.3-1.5 7.5-4.9 7.5-9.5V6z"/><path d="m8.8 12.2 2.3 2.3 4.3-4.6"/>',
+  aldia: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/>',
+  personalizar: '<circle cx="12" cy="12" r="8.5"/><circle cx="8.6" cy="10" r="1.3"/><circle cx="12" cy="7.6" r="1.3"/><circle cx="15.4" cy="10" r="1.3"/><path d="M12 20.5c-1.6 0-2-1.4-1.3-2.6.8-1.4-.2-2.9-1.8-2.9"/>',
+  ajustes: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3.1 14H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  buscar: '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/>',
+  copias: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  linea: '<path d="M4 12h16"/><circle cx="7" cy="12" r="2"/><circle cx="12.5" cy="12" r="2"/><circle cx="18" cy="12" r="2"/>',
+  plantilla: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13v7M13 16.5h7"/>',
+  raiz: '<path d="M12 20V8M7 12l5-5 5 5"/><path d="M5 4h14"/>',
+  pago: '<rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M3 10h18M7 15h4"/>'
+};
+const icono = (n, tam) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"${tam ? ` width="${tam}" height="${tam}"` : ""}>${ICONOS[n] || ""}</svg>`;
+const GRUPOS = [
+  ["Inicio", "inicio", [["Inicio", "Resumen"]]],
+  ["Organizar", "organizar", [["Asistente", "🧭 Asistente"], ["Servicios", "Servicios y tareas"], ["Plantillas", "Plantillas"], ["Raiz", "Sacar a la raíz"], ["Correo", "Adjuntos de correo"]]],
+  ["Encontrar", "encontrar", [["Buscar", "Buscar"], ["Linea", "Línea de tiempo"], ["Duplicados", "Duplicados"]]],
+  ["Espacio", "espacio", [["Espacio", "Mapa del disco"]]],
+  ["Proteger", "proteger", [["Respaldo", "Respaldo y USB"], ["Papelera", "Papelera"]]],
+  ["Al día", "aldia", [["Vencimientos", "Pagos y vencimientos"], ["Estadisticas", "Estadísticas e informes"]]],
+  ["Personalizar", "personalizar", [["Colores", "Colores"], ["Tipos", "Tipos de archivo"]]]];
+const grupoDe = vista => GRUPOS.find(g => g[2].some(([v]) => v === vista)) || GRUPOS[0];
+const ultimaDelGrupo = {};
+$("#pestanas").innerHTML = GRUPOS.map(([g, ic]) => `<button class="mosaico" data-grupo="${g}" title="${g}">${icono(ic)}<span>${g}</span></button>`).join("")
+  + `<button class="mosaico" id="btnAjustes" title="Ajustes">${icono("ajustes")}<span>Ajustes</span></button>`;
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 async function api(ruta, cuerpo = {}) {
@@ -438,6 +588,7 @@ function resumenHorario(h) {
     case "semanal": return `${(h.dias || []).map(d => DIAS[d]).join(" ") || "ningún día"} a las ${horas}`;
     case "mensual": return `Días ${(h.dias_mes || []).join(", ") || "ninguno"} de cada mes a las ${horas}`;
     case "inicio": return "Al iniciar sesión";
+    case "fecha": return `Una vez: ${h.fecha ? new Date(h.fecha + "T12:00").toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" }) : "sin fecha"} a las ${horas}`;
     case "instante": return "Al instante";
     default: return "Solo manual";
   }
@@ -460,7 +611,7 @@ function pintarLista() {
   cont.innerHTML = datos.servicios.map(({ servicio: s, ultima, proxima, ultimo_resultado: u, propuestas }) => `
     <div class="item ${actual && actual.id === s.id ? "sel" : ""}" data-id="${esc(s.id)}">
       <div class="nombre"><span class="punto ${s.activo ? "on" : ""}"></span>${esc(s.nombre || "Sin nombre")}${s.modo_prueba ? ` <span class="chip on" style="font-size:11px;padding:0 6px">prueba</span>` : ""}</div>
-      <div class="meta">${esc(resumenHorario(s.horario))}</div>
+      <div class="meta">${nucleoUnaVez(s) ? "1️⃣ Una sola vez · " : ""}${esc(resumenHorario(s.horario))}</div>
       <div class="meta">${s.activo ? (proxima ? `Próxima: <span class="cuenta" title="${esc(fechaBonita(proxima))}" data-cuenta="${esc(proxima)}">${esc(fechaBonita(proxima))}</span>` : "") : "Desactivado"}</div>
       ${propuestas && propuestas.n ? `<div class="meta" style="color:var(--acento)"><b>${propuestas.n} cambios propuestos</b>: ábrelo para aprobarlos</div>` : ""}
       ${ultima ? `<div class="meta">Última: ${esc(fechaBonita(ultima))}${u ? ` · ${u.movidos} ${u.movidos === 1 ? "archivo" : "archivos"}${u.errores ? `, ${u.errores} con error` : ""}` : ""}</div>` : ""}
@@ -494,6 +645,7 @@ function abrir(s) {
 }
 function cambiado() { sinGuardar = true; }
 
+const nucleoUnaVez = sv => sv.repetir === false || (sv.horario || {}).tipo === "fecha";
 function pintarEditor() {
   const s = actual;
   if (!s) { $("#editor").innerHTML = `<div class="vacio">Elige un servicio o crea uno nuevo.</div>`; return; }
@@ -508,8 +660,8 @@ function pintarEditor() {
     </div>
     ${s.modo_prueba ? pintarPropuestas(s) : ""}
   </section>
-  <section>
-    <h3>Carpetas donde actúa</h3>
+  ${pestanas("editor", [["carpetas", "Carpetas"], ["cuando", "Cuándo"], ["reglas", `Reglas (${s.reglas.length})`], ["opciones", "Opciones"], ["historial", "Historial"]])}
+  <div ${enPest("editor", "carpetas")}>
     ${s.origenes.map((o, i) => `
       <div class="carpeta"><span class="ruta">${esc(o)}</span><button class="chico peligro" data-quitar-origen="${i}">Quitar</button></div>
       ${avisosCarpeta[o] ? `<div class="aviso ${avisosCarpeta[o].error ? "error" : ""}">${esc(avisosCarpeta[o].texto)}</div>` : ""}`).join("") || `<p class="ayuda">Todavía no hay carpetas.</p>`}
@@ -521,10 +673,60 @@ function pintarEditor() {
       <input type="text" id="origenManual" placeholder="O escribe una ruta, por ejemplo D:\\Escaneos" style="flex:1">
       <button id="btnOrigenManual">Añadir</button>
     </div>
+  </div>
+  <div ${enPest("editor", "cuando")}>
+    <div class="tarjeta-op"><h4>¿Cuántas veces?</h4>
+      <div class="repetir">
+        <button type="button" data-repetir="si" class="${!nucleoUnaVez(s) ? "on" : ""}">🔁 Repetir siempre</button>
+        <button type="button" data-repetir="no" class="${nucleoUnaVez(s) ? "on" : ""}">1️⃣ Solo una vez</button></div>
+      <p class="ayuda" style="margin-bottom:0">${nucleoUnaVez(s) ? `Se ejecuta una vez y se desactiva sola. Queda guardada en tu lista para volver a usarla cuando quieras (actívala otra vez${h.tipo === "fecha" ? " con otra fecha" : ""}).${s.id && (datos.servicios.find(x => x.servicio.id === s.id) || {}).usado ? ` Último uso: ${esc(fechaBonita(datos.servicios.find(x => x.servicio.id === s.id).usado))}.` : ""}`
+        : "Se ejecuta cada vez que toque según el horario."}</p>
+    </div>
+    <div class="tarjeta-op"><h4>Horario</h4>
+    <div class="fila">
+      <select id="tipoHorario">
+        ${[["intervalo", "Cada cierto tiempo"], ["fecha", "Un día y hora concretos"], ["diario", "Todos los días"], ["semanal", "Algunos días de la semana"], ["mensual", "Algunos días del mes"], ["instante", "Al instante, cuando aparece un archivo"], ["inicio", "Al iniciar sesión en Windows"], ["manual", "Solo cuando pulse Ejecutar"]]
+          .map(([v, t]) => `<option value="${v}" ${h.tipo === v ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      ${h.tipo === "intervalo" ? `
+        <label>cada <input type="number" min="1" step="1" data-h="cada" value="${esc(h.cada ?? 8)}"></label>
+        <select data-h="unidad">${["minutos", "horas", "dias"].map(u => `<option value="${u}" ${h.unidad === u ? "selected" : ""}>${u === "dias" ? "días" : u}</option>`).join("")}</select>` : ""}
+    </div>
+    ${h.tipo === "fecha" ? `<div class="fila"><label>El día <input type="date" data-h="fecha" value="${esc(h.fecha || "")}"></label>
+      <label>a las <input type="time" id="horaFecha" value="${esc((h.horas || ["09:00"])[0])}"></label></div>` : ""}
+    ${h.tipo === "semanal" ? `<div class="fila"><span class="ayuda">Días:</span><div class="chips">${DIAS.map((d, i) => `<span class="chip ${(h.dias || []).includes(i) ? "on" : ""}" data-dia="${i}">${d}</span>`).join("")}</div></div>` : ""}
+    ${h.tipo === "mensual" ? `<div class="fila"><label>Días del mes <input type="text" style="width:180px" id="diasMes" value="${esc((h.dias_mes || []).join(", "))}" placeholder="1, 15, 31"></label><span class="ayuda">Si pones 31 y el mes tiene menos días, se ejecuta el último día.</span></div>` : ""}
+    ${["diario", "semanal", "mensual"].includes(h.tipo) ? `
+      <div class="fila"><span class="ayuda">Horas:</span>
+        <div class="chips">${(h.horas || []).map((x, i) => `<span class="chip on">${esc(x)} <span class="x" data-quitar-hora="${i}">✕</span></span>`).join("")}</div>
+        <input type="time" id="horaNueva" value="09:00"><button class="chico" id="btnHora">Añadir hora</button>
+      </div>` : ""}
+    ${h.tipo === "instante" ? `<p class="ayuda">Un proceso ligero vigila las carpetas y ordena cada archivo unos segundos después de que termine de copiarse o descargarse.
+      ${datos.watchdog ? "" : `<b style="color:var(--peligro)">Falta la librería watchdog: instálala con <code>pip install watchdog</code> (el .exe ya la incluye).</b>`}</p>`
+      : `<p class="ayuda">Si el equipo está apagado a la hora programada, el servicio se ejecuta en cuanto se encienda.</p>`}
+    </div>
+  </div>
+  <div ${enPest("editor", "reglas")}>
+    <p class="ayuda">Se aplica la primera regla que encaja con cada archivo.</p>
+    ${s.reglas.map((r, i) => pintarRegla(r, i)).join("")}
+    <button id="btnRegla">+ Añadir regla</button>
+  </div>
+  <div ${enPest("editor", "opciones")}>
+    <div class="tarjeta-op"><h4>Qué archivos toma</h4>
     <div class="fila">
       <label><input type="checkbox" data-k="subcarpetas" ${s.subcarpetas ? "checked" : ""}> Incluir subcarpetas</label>
       <label><input type="checkbox" data-k="borrar_carpetas_vacias" ${s.borrar_carpetas_vacias ? "checked" : ""}> Borrar las carpetas que queden vacías</label>
     </div>
+    <div class="fila">
+      <label><input type="checkbox" data-carp="activo" ${(s.carpetas || {}).activo ? "checked" : ""}> Mover también carpetas enteras</label>
+      ${(s.carpetas || {}).activo ? `<label>sin usar en <input type="number" min="0" data-carp="dias" value="${esc((s.carpetas || {}).dias ?? 14)}"> días a</label>
+        <input type="text" data-carp="destino" value="${esc((s.carpetas || {}).destino || "")}" placeholder="C:\\Users\\…\\Documentos\\Carpetas\\{año}" style="flex:1;min-width:220px">` : ""}
+    </div>
+    <div class="fila"><label>Carpeta que nunca se toca dentro del origen: <input type="text" data-k="carpeta_mantener" value="${esc(s.carpeta_mantener || "Mantener")}" style="width:140px"></label></div>
+    <div class="campo"><span>Ignorar archivos (patrones separados por coma, por ejemplo <code>*.ini, borrador*</code>)</span>
+      <input type="text" data-k="ignorar" value="${esc((s.ignorar || []).join(", "))}"></div>
+    </div>
+    <div class="tarjeta-op"><h4>Nombres y fechas</h4>
     <div class="fila">
       <label title="Quita (1), copia, espacios dobles y caracteres raros"><input type="checkbox" data-k="limpiar_nombres" ${s.limpiar_nombres ? "checked" : ""}> Limpiar nombres</label>
       <label><input type="checkbox" data-k="fecha_al_inicio" ${s.fecha_al_inicio ? "checked" : ""}> Poner la fecha al inicio (AAAA-MM-DD)</label>
@@ -535,12 +737,8 @@ function pintarEditor() {
       <label title="factura.pdf + factura.xml, foto.heic + foto.aae, video.mp4 + video.srt"><input type="checkbox" data-k="mover_hermanos" ${s.mover_hermanos !== false ? "checked" : ""}> Mover juntos los archivos con el mismo nombre y distinta extensión</label>
       <label><input type="checkbox" data-k="ordenar_accesos" ${s.ordenar_accesos ? "checked" : ""}> Incluir accesos directos (.lnk, .url)</label>
     </div>
-    <div class="fila">
-      <label><input type="checkbox" data-carp="activo" ${(s.carpetas || {}).activo ? "checked" : ""}> Mover también carpetas enteras</label>
-      ${(s.carpetas || {}).activo ? `<label>sin usar en <input type="number" min="0" data-carp="dias" value="${esc((s.carpetas || {}).dias ?? 14)}"> días a</label>
-        <input type="text" data-carp="destino" value="${esc((s.carpetas || {}).destino || "")}" placeholder="C:\\Users\\…\\Documentos\\Carpetas\\{año}" style="flex:1;min-width:220px">` : ""}
     </div>
-    <div class="fila"><label>Carpeta que nunca se toca dentro del origen: <input type="text" data-k="carpeta_mantener" value="${esc(s.carpeta_mantener || "Mantener")}" style="width:140px"></label></div>
+    <div class="tarjeta-op"><h4>Si ya existe o está repetido</h4>
     <div class="fila">
       <label>Si el archivo ya existe en el destino:
         <select data-k="conflicto">
@@ -557,40 +755,11 @@ function pintarEditor() {
       ${s.identicos === "carpeta" ? `<input type="text" data-k="carpeta_duplicados" value="${esc(s.carpeta_duplicados || "")}" placeholder="{origen}\\Duplicados" style="flex:1;min-width:200px">` : ""}
     </div>
     <p class="ayuda">Siempre recibirás una notificación cuando se detecten duplicados, también los que aparecen al quitar "(1)" o "copia".</p>
-    <div class="campo"><span>Ignorar archivos (patrones separados por coma, por ejemplo <code>*.ini, borrador*</code>)</span>
-      <input type="text" data-k="ignorar" value="${esc((s.ignorar || []).join(", "))}"></div>
-  </section>
-  <section>
-    <h3>Cuándo se ejecuta</h3>
-    <div class="fila">
-      <select id="tipoHorario">
-        ${[["intervalo", "Cada cierto tiempo"], ["diario", "Todos los días"], ["semanal", "Algunos días de la semana"], ["mensual", "Algunos días del mes"], ["instante", "Al instante, cuando aparece un archivo"], ["inicio", "Al iniciar sesión en Windows"], ["manual", "Solo cuando pulse Ejecutar"]]
-          .map(([v, t]) => `<option value="${v}" ${h.tipo === v ? "selected" : ""}>${t}</option>`).join("")}
-      </select>
-      ${h.tipo === "intervalo" ? `
-        <label>cada <input type="number" min="1" step="1" data-h="cada" value="${esc(h.cada ?? 8)}"></label>
-        <select data-h="unidad">${["minutos", "horas", "dias"].map(u => `<option value="${u}" ${h.unidad === u ? "selected" : ""}>${u === "dias" ? "días" : u}</option>`).join("")}</select>` : ""}
     </div>
-    ${h.tipo === "semanal" ? `<div class="fila"><span class="ayuda">Días:</span><div class="chips">${DIAS.map((d, i) => `<span class="chip ${(h.dias || []).includes(i) ? "on" : ""}" data-dia="${i}">${d}</span>`).join("")}</div></div>` : ""}
-    ${h.tipo === "mensual" ? `<div class="fila"><label>Días del mes <input type="text" style="width:180px" id="diasMes" value="${esc((h.dias_mes || []).join(", "))}" placeholder="1, 15, 31"></label><span class="ayuda">Si pones 31 y el mes tiene menos días, se ejecuta el último día.</span></div>` : ""}
-    ${["diario", "semanal", "mensual"].includes(h.tipo) ? `
-      <div class="fila"><span class="ayuda">Horas:</span>
-        <div class="chips">${(h.horas || []).map((x, i) => `<span class="chip on">${esc(x)} <span class="x" data-quitar-hora="${i}">✕</span></span>`).join("")}</div>
-        <input type="time" id="horaNueva" value="09:00"><button class="chico" id="btnHora">Añadir hora</button>
-      </div>` : ""}
-    ${h.tipo === "instante" ? `<p class="ayuda">Un proceso ligero vigila las carpetas y ordena cada archivo unos segundos después de que termine de copiarse o descargarse.
-      ${datos.watchdog ? "" : `<b style="color:var(--peligro)">Falta la librería watchdog: instálala con <code>pip install watchdog</code> (el .exe ya la incluye).</b>`}</p>`
-      : `<p class="ayuda">Si el equipo está apagado a la hora programada, el servicio se ejecuta en cuanto se encienda.</p>`}
-  </section>
-  <section>
-    <h3>Reglas <span style="text-transform:none;letter-spacing:0">(se aplica la primera que encaja con cada archivo)</span></h3>
-    ${s.reglas.map((r, i) => pintarRegla(r, i)).join("")}
-    <button id="btnRegla">+ Añadir regla</button>
-  </section>
-  <section>
-    <h3>Historial</h3>
+  </div>
+  <div ${enPest("editor", "historial")}>
     <div id="historial" class="ayuda">${s.id ? "Cargando…" : "Guarda el servicio para ver su historial."}</div>
-  </section>
+  </div>
   <div id="resultado"></div>
   <div class="acciones">
     <button class="prim" id="btnGuardar">Guardar</button>
@@ -723,6 +892,8 @@ $("#editor").addEventListener("input", e => {
     }
   } else if (t.dataset.h) {
     s.horario[t.dataset.h] = t.type === "number" ? Number(t.value) : t.value;
+  } else if (t.id === "horaFecha") {
+    s.horario.horas = [t.value || "09:00"];
   } else if (t.id === "diasMes") {
     s.horario.dias_mes = t.value.split(/[,\s]+/).map(Number).filter(n => n >= 1 && n <= 31);
   } else {
@@ -750,6 +921,7 @@ $("#editor").addEventListener("change", e => {
     if (["diario", "semanal", "mensual"].includes(tipo)) actual.horario.horas = h.horas && h.horas.length ? h.horas : ["09:00"];
     if (tipo === "semanal") actual.horario.dias = h.dias || [0, 1, 2, 3, 4];
     if (tipo === "mensual") actual.horario.dias_mes = h.dias_mes || [1];
+    if (tipo === "fecha") Object.assign(actual.horario, { fecha: h.fecha || new Date(Date.now() + 86400000).toISOString().slice(0, 10), horas: [(h.horas || [])[0] || "09:00"] });
     cambiado(); pintarEditor();
   }
 });
@@ -758,6 +930,7 @@ $("#editor").addEventListener("focusin", e => { if (e.target.dataset.r === "dest
 
 $("#editor").addEventListener("click", async e => {
   const t = e.target, s = actual;
+  if (t.dataset.repetir) { s.repetir = t.dataset.repetir === "si"; if (s.repetir && s.horario.tipo === "fecha") { s.horario = { tipo: "diario", horas: s.horario.horas || ["09:00"] }; } cambiado(); pintarEditor(); return; }
   const regla = t.closest("[data-regla]");
   const r = regla ? s.reglas[+regla.dataset.regla] : null;
   try {
@@ -932,7 +1105,7 @@ $("#btnAjustes").onclick = () => {
   $("#ajMinutos").value = datos.ajustes.revisar_cada_minutos; $("#modalAjustes").classList.add("on"); pintarRed(); pintarActualizacionAjustes();
   api("/api/ocr").then(o => { $("#ocrEstado").textContent = !o.windows ? "Solo en Windows." : o.error ? "No disponible: " + o.error : o.leidos ? `${o.leidos.toLocaleString("es")} archivos leídos.` : ""; }).catch(() => { });
 };
-$("#ajCerrar").onclick = () => $("#modalAjustes").classList.remove("on");
+$("#ajCerrar").onclick = $("#ajCerrarX").onclick = () => $("#modalAjustes").classList.remove("on");
 $("#ajGuardar").onclick = async () => {
   try {
     const res = await api("/api/ajustes", { revisar_cada_minutos: +$("#ajMinutos").value || 5 });
@@ -967,13 +1140,19 @@ setInterval(() => api("/api/latido").catch(() => { }), 60000);
 // ---------------------------------------------------------------- pestañas
 let vistaActual = "Inicio";
 $("#pestanas").addEventListener("click", e => {
-  const b = e.target.closest("[data-vista]"); if (b) mostrarVista(b.dataset.vista);
+  const b = e.target.closest("[data-grupo]"); if (!b) return;
+  const g = GRUPOS.find(x => x[0] === b.dataset.grupo);
+  mostrarVista(ultimaDelGrupo[g[0]] || g[2][0][0]);
 });
+$("#subnav").addEventListener("click", e => { const b = e.target.closest("[data-vista]"); if (b) mostrarVista(b.dataset.vista); });
 function mostrarVista(nombre) {
   vistaActual = nombre;
-  if (nombre === "Copias") nombre = "Respaldo";
-  const enMenu = nombre;
-  document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === enMenu));
+  if (nombre === "Copias") { nombre = "Respaldo"; setTimeout(() => cambiarPestana("resp", "usb")); }
+  const [g, , vistas] = grupoDe(nombre);
+  ultimaDelGrupo[g] = nombre;
+  document.querySelectorAll("#pestanas [data-grupo]").forEach(b => b.classList.toggle("on", b.dataset.grupo === g));
+  $("#subnav").classList.toggle("on", vistas.length > 1);
+  $("#subnav").innerHTML = vistas.length > 1 ? vistas.map(([v, t]) => `<button data-vista="${v}" class="${v === nombre ? "on" : ""}">${t}</button>`).join("") : "";
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
   ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: () => { cargarDisco(); cargarEspacio(); }, Vencimientos: () => { cargarPagos(); cargarVencimientos(); },
@@ -982,6 +1161,77 @@ function mostrarVista(nombre) {
      Copias: cargarCopias, Estadisticas: () => { cargarEstadisticas(); cargarInformes(); } }[nombre] || (() => { }))();
 }
 const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB";
+
+// ---------------------------------------------------------------- pestañas de sección (en vez de páginas largas)
+const pestActual = {};
+function pestanas(clave, lista) {
+  if (!lista.some(([v]) => v === pestActual[clave])) pestActual[clave] = lista[0][0];
+  return `<div class="pestanas-int" data-tabs="${clave}">${lista.map(([v, t]) => `<button type="button" data-tab="${v}" class="${pestActual[clave] === v ? "on" : ""}">${t}</button>`).join("")}</div>`;
+}
+const enPest = (clave, v) => `data-pest="${clave}:${v}" class="${pestActual[clave] === v ? "on" : ""}"`;
+function cambiarPestana(clave, v) {
+  pestActual[clave] = v;
+  document.querySelectorAll(`[data-tabs="${clave}"] [data-tab]`).forEach(b => b.classList.toggle("on", b.dataset.tab === v));
+  document.querySelectorAll(`[data-pest^="${clave}:"]`).forEach(x => x.classList.toggle("on", x.dataset.pest === `${clave}:${v}`));
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-tab]"); if (!b) return;
+  const c = b.closest("[data-tabs]"); if (c) { e.preventDefault(); e.stopPropagation(); cambiarPestana(c.dataset.tabs, b.dataset.tab); }
+}, true);
+
+// ---------------------------------------------------------------- gráficas (SVG, colores planos sacados del tema)
+function coloresGrafica(n) {
+  const css = getComputedStyle(document.documentElement), acento = css.getPropertyValue("--acento").trim() || "#2f6fde";
+  const oscuro = document.documentElement.style.colorScheme === "dark" || (!document.documentElement.style.colorScheme && oscuroDelSistema.matches);
+  const [h0] = hsl(acento);
+  return Array.from({ length: n }, (_, i) => i === 0 ? acento : `hsl(${((h0 + i * 137.508) % 360).toFixed(0)} ${oscuro ? 32 : 38}% ${oscuro ? 52 : 62}%)`);
+}
+let idGraf = 0;
+function graficaArea(serie, { alto = 170, etiquetas = [], titulo = x => x } = {}) {
+  const W = 600, H = alto, pad = 26, n = serie.length, max = Math.max(1, ...serie);
+  if (!n) return "";
+  const x = i => pad + (W - pad * 2) * (n === 1 ? .5 : i / (n - 1)), y = v => H - 22 - (H - 40) * v / max;
+  const pts = serie.map((v, i) => [x(i), y(v)]);
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < n; i++) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], c = (x1 - x0) / 2; d += ` C${x0 + c},${y0} ${x1 - c},${y1} ${x1},${y1}`; }
+  const id = "ga" + (++idGraf), ult = pts[n - 1];
+  return `<svg class="graf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${alto}px">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acento)" stop-opacity=".35"/><stop offset="1" stop-color="var(--acento)" stop-opacity="0"/></linearGradient></defs>
+    <line class="eje" x1="${pad}" x2="${W - pad}" y1="${H - 22}" y2="${H - 22}"/>
+    <path d="${d} L${ult[0]},${H - 22} L${pts[0][0]},${H - 22} Z" fill="url(#${id})"/>
+    <path d="${d}" fill="none" stroke="var(--acento)" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    ${pts.map(([px, py], i) => `<circle cx="${px}" cy="${py}" r="10" fill="transparent"><title>${esc(titulo(i))}</title></circle>`).join("")}
+    <circle cx="${ult[0]}" cy="${ult[1]}" r="5" fill="var(--acento)" stroke="var(--panel)" stroke-width="2.5"/>
+    ${etiquetas.map(([i, t]) => `<text x="${x(i)}" y="${H - 5}" text-anchor="middle">${esc(t)}</text>`).join("")}
+  </svg>`;
+}
+function minilinea(serie) {
+  const n = serie.length, max = Math.max(1, ...serie);
+  if (n < 2) return "";
+  const pts = serie.map((v, i) => `${(i / (n - 1) * 100).toFixed(1)},${(28 - 24 * v / max).toFixed(1)}`).join(" ");
+  return `<svg class="graf" viewBox="0 0 100 30" preserveAspectRatio="none" style="height:30px;margin-top:6px"><polyline points="${pts}" fill="none" stroke="var(--acento)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function dona(items, { tam = 150, centro = "", sub = "" } = {}) {
+  const total = items.reduce((a, x) => a + x[1], 0) || 1, colores = coloresGrafica(items.length), r = 15.9155;
+  let acum = 0;
+  const arcos = items.map(([n, v], i) => { const p = v / total * 100, a = `<circle r="${r}" cx="21" cy="21" fill="none" stroke="${colores[i]}" stroke-width="5.5"
+      stroke-dasharray="${Math.max(p - .6, .1)} ${100 - Math.max(p - .6, .1)}" stroke-dashoffset="${25 - acum}"><title>${esc(n)}: ${v}</title></circle>`; acum += p; return a; }).join("");
+  return { svg: `<svg viewBox="0 0 42 42" width="${tam}" height="${tam}"><circle r="${r}" cx="21" cy="21" fill="none" stroke="var(--fondo)" stroke-width="5.5"/>${arcos}
+      <text x="21" y="21.5" text-anchor="middle" style="font-size:7px;font-weight:700;fill:var(--texto)">${esc(centro)}</text>
+      <text x="21" y="27" text-anchor="middle" style="font-size:3.2px;fill:var(--suave)">${esc(sub)}</text></svg>`,
+    leyenda: `<div class="leyenda">${items.map(([n, v], i) => `<span><i style="background:${colores[i]}"></i>${esc(n)}<b>${v.toLocaleString("es")}</b></span>`).join("")}</div>` };
+}
+function anillo(pct, texto, sub, alerta) {
+  const r = 15.9155, p = Math.max(0, Math.min(100, pct));
+  return `<div class="anillo"><svg viewBox="0 0 42 42" width="92" height="92"><circle r="${r}" cx="21" cy="21" fill="none" stroke="var(--fondo)" stroke-width="4.5"/>
+    <circle r="${r}" cx="21" cy="21" fill="none" stroke="${alerta ? "var(--peligro)" : "var(--acento)"}" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${p} ${100 - p}" stroke-dashoffset="25"/>
+    <text x="21" y="23.5" text-anchor="middle" style="font-size:8px;font-weight:700;fill:var(--texto)">${Math.round(p)}%</text></svg><b>${esc(texto)}</b><span class="ayuda">${esc(sub)}</span></div>`;
+}
+function barras(items, { formato = v => v.toLocaleString("es") } = {}) {
+  const max = Math.max(1, ...items.map(x => x[1])), colores = coloresGrafica(items.length);
+  return items.map(([n, v], i) => `<div style="margin-bottom:9px"><div class="fila" style="justify-content:space-between;margin-bottom:4px;font-size:13px"><span>${esc(n)}</span><b>${formato(v)}</b></div>
+    <div class="barra"><div style="width:${(v / max * 100).toFixed(1)}%;background:${i ? colores[i] : "var(--degradado)"}"></div></div></div>`).join("");
+}
 
 // ---------------------------------------------------------------- inicio
 let tablero = null;
@@ -1100,12 +1350,42 @@ function pintarInicio() {
       : `<div class="ayuda">Todavía no se ha movido nada.</div>`}
   </div>`;
 
-  const atajos = [["Plantillas", "Plantillas", "Servicios listos para cada carpeta"], ["Buscar", "Buscar", "¿A dónde fue mi archivo?"],
-    ["Duplicados", "Duplicados", "Archivos repetidos en el disco"], ["Espacio", "Mapa del disco", "Qué ocupa tu espacio"],
-    ["Linea", "Línea de tiempo", "Tus archivos día a día"], ["Raiz", "Sacar a la raíz", "Vaciar subcarpetas"]];
-  const tarjetaAtajos = `<div class="panelito doble"><h3>Accesos rápidos</h3>
-    <div class="tarjetas" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin:0;gap:8px">${atajos.map(([v, t, a]) =>
-      `<button data-ir="${v}" style="text-align:left;padding:10px"><b>${esc(t)}</b><div class="ayuda">${esc(a)}</div></button>`).join("")}</div></div>`;
+  const atajos = [["Plantillas", "plantilla", "Plantillas"], ["Buscar", "buscar", "Buscar"], ["Duplicados", "copias", "Duplicados"],
+    ["Espacio", "espacio", "Mapa del disco"], ["Linea", "linea", "Línea de tiempo"], ["Raiz", "raiz", "Sacar a la raíz"], ["Vencimientos", "pago", "Pagos"]];
+  const tarjetaAtajos = `<div class="panelito ancha"><h3>Accesos rápidos</h3>
+    <div class="atajos">${atajos.map(([v, ic, t]) => `<button data-ir="${v}">${icono(ic)}<span>${esc(t)}</span></button>`).join("")}</div></div>`;
+
+  // Gráficas: actividad de 30 días, por tipo de archivo y por servicio
+  const g = d.graficas || { dias: [], tipos: [], servicios: [] };
+  const serie = g.dias.map(x => x.n), seriePap = g.dias.map(x => x.p);
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  const sem = sum(serie.slice(-7)), semAntes = sum(serie.slice(-14, -7));
+  const tend = semAntes ? Math.round((sem - semAntes) / semAntes * 100) : null;
+  const corto = iso => new Date(iso + "T12:00").toLocaleDateString("es", { day: "numeric", month: "short" });
+  const kpi = (num, txt, sub, linea, cls = "") => `<div class="panelito kpi ${cls}"><div class="sub">${txt}</div><div class="num">${num}</div>
+    <div class="sub">${sub}</div>${linea || ""}</div>`;
+  const kpis = `<div class="kpis ancha">
+    ${kpi(d.hoy.movidos.toLocaleString("es"), "Ordenados hoy", `${d.hoy.papelera} a la papelera`, minilinea(serie.slice(-14)))}
+    ${kpi(d.semana.movidos.toLocaleString("es"), "Últimos 7 días", tend === null ? "&nbsp;" : `<span class="tend ${tend < 0 ? "baja" : ""}">${tend >= 0 ? "▲" : "▼"} ${Math.abs(tend)}%</span> frente a la semana anterior`, minilinea(serie.slice(-7)))}
+    ${kpi(mb(d.semana.bytes_papelera), "Liberado esta semana", `${d.semana.papelera} archivos a la papelera`, minilinea(seriePap.slice(-14)))}
+    ${kpi(d.totales.archivos.toLocaleString("es"), "Desde que lo usas", `${mb(d.totales.bytes_liberados)} liberados`, "")}
+  </div>`;
+  const etq = g.dias.length ? [[0, corto(g.dias[0].d)], [Math.floor(g.dias.length / 2), corto(g.dias[Math.floor(g.dias.length / 2)].d)], [g.dias.length - 1, "hoy"]] : [];
+  const tarjetaArea = `<div class="panelito doble"><h3>Archivos ordenados · 30 días <button class="chico ir" data-ir="Estadisticas">Estadísticas</button></h3>
+    ${sum(serie) ? graficaArea(serie, { etiquetas: etq, titulo: i => `${corto(g.dias[i].d)}: ${g.dias[i].n} ordenados, ${g.dias[i].p} a la papelera` })
+      : `<div class="vacio">Cuando GESTOR ordene algo, aquí verás cuánto trabaja cada día.</div>`}</div>`;
+  const dt = dona(g.tipos, { centro: sum(g.tipos.map(x => x[1])).toLocaleString("es"), sub: "archivos" });
+  const tarjetaTipos = `<div class="panelito"><h3>Por tipo de archivo</h3>
+    ${g.tipos.length ? `<div class="dona-caja">${dt.svg}${dt.leyenda}</div>` : `<div class="ayuda">Sin movimientos en 30 días.</div>`}</div>`;
+  const tarjetaPorServicio = `<div class="panelito"><h3>Por servicio · 30 días <button class="chico ir" data-ir="Servicios">Servicios</button></h3>
+    ${g.servicios.length ? barras(g.servicios) : `<div class="ayuda">Sin movimientos en 30 días.</div>`}</div>`;
+  const tarjetaDiscos2 = `<div class="panelito ${discosBajos.length ? "destacado" : ""}">
+    <h3>Discos <button class="chico ir" data-ir="Espacio">Liberar espacio</button></h3>
+    <div class="anillos">${d.discos.map(x => { const usado = x.total ? 100 - x.libre / x.total * 100 : 0, bajo = x.total && x.libre / x.total * 100 < d.umbral;
+      return anillo(usado, x.letra, `${mb(x.libre)} libres`, bajo); }).join("")}</div>
+    <div class="ayuda" style="margin-top:10px">Papelera de GESTOR: ${plural(d.papelera.n, "archivo", "archivos")} (${mb(d.papelera.bytes)}). <a href="#" data-ir="Papelera">Abrir</a></div>
+  </div>`;
+  const heroEstado = tarjetaEstado.replace('class="panelito ', 'class="panelito estado-hero ');
 
   const avisos = [];
   if (discosBajos.length) avisos.push(`Queda poco espacio en ${discosBajos.map(x => x.letra).join(", ")}.`);
@@ -1114,12 +1394,20 @@ function pintarInicio() {
   $("#inicio").innerHTML = `
     <div style="margin:0 2px 14px"><div class="saludo">${saludo}${datos.ajustes.nombre ? ", " + esc(datos.ajustes.nombre) : ""}</div>
       <div class="ayuda">${avisos.length ? avisos.map(esc).join(" ") : "Todo en orden. GESTOR sigue trabajando por ti."}</div></div>
-    <div class="tablero">
-      ${tarjetaEstado}${tarjetaPend}${tarjetaActividad}
-      ${tarjetaPagos}${tarjetaVence}${tarjetaDiscos}${tarjetaServicios}
-      ${tarjetaRespaldo}${tarjetaAtajos}
-      ${tarjetaUltimos}
-    </div>`;
+    ${pestanas("inicio", [["resumen", "Resumen"], ["actividad", "Actividad y gráficas"], ["equipo", "Discos, respaldo y horarios"], ["movimientos", "Últimos movimientos"]])}
+    <div ${enPest("inicio", "resumen")}><div class="tablero">
+      ${heroEstado}${tarjetaPend}${tarjetaPagos}
+      ${kpis}
+      ${tarjetaVence}${tarjetaAtajos.replace("panelito ancha", "panelito doble")}
+    </div></div>
+    <div ${enPest("inicio", "actividad")}><div class="tablero">
+      ${tarjetaArea}${tarjetaTipos}
+      ${tarjetaPorServicio}${tarjetaActividad}
+    </div></div>
+    <div ${enPest("inicio", "equipo")}><div class="tablero">
+      ${tarjetaDiscos2}${tarjetaServicios}${tarjetaRespaldo}
+    </div></div>
+    <div ${enPest("inicio", "movimientos")}><div class="tablero">${tarjetaUltimos}</div></div>`;
 }
 $("#inicio").addEventListener("click", async e => {
   const t = e.target.closest("button, a"); if (!t) return;

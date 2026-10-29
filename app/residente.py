@@ -211,12 +211,18 @@ class Bandeja:
         from PIL import Image, ImageDraw
 
         self.pystray = pystray
-        imagen = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        d = ImageDraw.Draw(imagen)
-        d.rounded_rectangle((4, 14, 60, 56), radius=8, fill=(47, 111, 222, 255))
-        d.rounded_rectangle((4, 8, 30, 22), radius=5, fill=(47, 111, 222, 255))
-        d.rectangle((16, 30, 48, 34), fill=(255, 255, 255, 255))
-        d.rectangle((16, 40, 40, 44), fill=(255, 255, 255, 255))
+        propio = os.path.join(nucleo.BASE, "gestor.png")
+        if not os.path.exists(propio):
+            propio = os.path.join(nucleo.BASE, "..", "recursos", "gestor.png")
+        try:
+            imagen = Image.open(propio).convert("RGBA").resize((64, 64))
+        except OSError:
+            imagen = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+            d = ImageDraw.Draw(imagen)
+            d.rounded_rectangle((4, 14, 60, 56), radius=8, fill=(47, 111, 222, 255))
+            d.rounded_rectangle((4, 8, 30, 22), radius=5, fill=(47, 111, 222, 255))
+            d.rectangle((16, 30, 48, 34), fill=(255, 255, 255, 255))
+            d.rectangle((16, 40, 40, 44), fill=(255, 255, 255, 255))
         self.al_salir = al_salir
         self.icono = pystray.Icon("GESTOR", imagen, "GESTOR", menu=self._menu())
 

@@ -28,6 +28,7 @@ OutputBaseFilename=GESTOR-Instalador-{#Version}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\recursos\gestor.ico
 UninstallDisplayIcon={app}\GESTOR.exe
 UninstallDisplayName=GESTOR
 CloseApplications=force
@@ -38,7 +39,7 @@ ShowLanguageDialog=no
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Tasks]
-Name: "escritorio"; Description: "Crear un acceso directo en el escritorio"
+Name: "escritorio"; Description: "Crear un acceso directo en el escritorio"; Flags: checkedonce
 
 [InstallDelete]
 ; Reinstalar o actualizar deja el programa limpio (tus datos están en %APPDATA%\GESTOR y no se tocan).

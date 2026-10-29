@@ -856,3 +856,31 @@ class PruebaVersion07(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PruebaUnSoloUso(PruebaServicio):
+    def test_fecha_concreta(self):
+        s = {"activo": True, "horario": {"tipo": "fecha", "fecha": "2026-11-02", "horas": ["08:30"]}}
+        antes, despues = dt.datetime(2026, 11, 1, 12, 0), dt.datetime(2026, 11, 2, 9, 0)
+        self.assertFalse(nucleo.toca_ejecutar(s, {}, antes))
+        self.assertEqual(nucleo.proxima_ejecucion(s, {}, antes), "2026-11-02T08:30")
+        self.assertTrue(nucleo.toca_ejecutar(s, {}, despues))
+        self.assertFalse(nucleo.toca_ejecutar(s, {"ultima": "2026-11-02T08:31:00"}, despues))
+        self.assertTrue(nucleo.solo_una_vez(s))
+
+    def test_un_solo_uso_se_desactiva_y_queda_guardado(self):
+        self.crear("a.pdf")
+        s = self.servicio([{"si": {}, "accion": "mover", "destino": self.destino}], repetir=False)
+        nucleo.guardar_servicios([s])
+        r = nucleo.ejecutar_y_anotar(s)
+        self.assertEqual(len(r["operaciones"]), 1)
+        guardado = nucleo.cargar_servicios()[0]
+        self.assertFalse(guardado["activo"])
+        self.assertTrue(nucleo.cargar_estado()[s["id"]].get("usado"))
+
+    def test_repetitivo_sigue_activo(self):
+        self.crear("b.pdf")
+        s = self.servicio([{"si": {}, "accion": "mover", "destino": self.destino}])
+        nucleo.guardar_servicios([s])
+        nucleo.ejecutar_y_anotar(s)
+        self.assertTrue(nucleo.cargar_servicios()[0]["activo"])
