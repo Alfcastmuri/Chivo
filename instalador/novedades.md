@@ -1,4 +1,12 @@
-## Novedades de GESTOR 0.9.0
+## Novedades de GESTOR 0.9.1
+
+- **200 combinaciones de colores**: 100 nuevas en Profesionales, Salud, Naturales, Mexicanas, Retro, Elegantes, Dinámicas, Pastel e Inspiradas en marcas (estilo Coca-Cola, Amazon, Spotify, Mercado Libre, Oxxo y más).
+- **Vista previa en claro y en oscuro**: pasa el ratón por una combinación y ves cómo queda en los dos modos antes de pulsar «Aplicar».
+- **Filtros por tipo y por color**, y tus combinaciones guardadas al principio.
+- **Mi combinación**: edita los 5 colores con su código, genera una al azar (análoga, complementaria, triádica o monocromática) y guarda hasta 60.
+- **Desde una imagen o logo**: elige una imagen y GESTOR saca sus colores (sin subirla a ningún lado). Puedes pedir otra variante, ajustarla, guardarla o aplicarla.
+
+## Lo que trajo la 0.9.0
 
 - **Panel rediseñado**: tarjetas redondeadas con sombras suaves, botones tipo píldora e interruptores en lugar de casillas. Sigue usando tus colores.
 - **Todo ordenado por grupos**: el menú de la izquierda tiene 7 secciones con icono (Inicio, Organizar, Encontrar, Espacio, Proteger, Al día, Personalizar) y cada una muestra sus partes en pestañas. Sin páginas largas.

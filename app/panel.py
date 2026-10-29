@@ -244,7 +244,7 @@ def limpiar_tema(t):
     import re
     es_hex = re.compile(r"#[0-9a-fA-F]{6}").fullmatch
     propias = []
-    for p in (t.get("propias") or [])[:30]:
+    for p in (t.get("propias") or [])[-60:]:
         colores = [c for c in (p.get("colores") or []) if isinstance(c, str) and es_hex(c)][:5]
         if len(colores) == 5:
             propias.append({"nombre": str(p.get("nombre") or "Mi combinación")[:40], "colores": colores})
