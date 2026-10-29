@@ -132,6 +132,15 @@ nav.lateral .grupo-nav { font-size: 11px; text-transform: uppercase; letter-spac
 .etiqueta.ambar { background: var(--aviso-suave); color: var(--aviso); }
 .etiqueta.verde { background: var(--ok-suave); color: var(--ok); }
 .barra.llena > div { background: var(--peligro); }
+.paletas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 8px; }
+.paleta { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 6px; text-align: left; border-radius: 10px; }
+.paleta.on { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento); }
+.paleta .tiras { display: flex; height: 44px; border-radius: 6px; overflow: hidden; }
+.paleta .tiras span { flex: 1; }
+.paleta .nom { font-size: 12px; font-weight: 600; padding: 0 2px; }
+.paleta .x { position: absolute; top: 2px; right: 4px; font-size: 12px; background: var(--panel); border-radius: 50%; padding: 0 4px; }
+.tit-col { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); margin: 18px 0 8px; }
+input[type=color] { width: 44px; height: 32px; padding: 0; border: 1px solid var(--borde); border-radius: 6px; background: none; cursor: pointer; }
 .saludo { font-size: 20px; font-weight: 600; margin: 4px 0 2px; }
 .vista { display: none; }
 .vista.on { display: grid; }
@@ -182,6 +191,8 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   <div class="grupo-nav">Al día</div>
   <button data-vista="Vencimientos">Vencimientos</button>
   <button data-vista="Estadisticas">Estadísticas</button>
+  <div class="grupo-nav">Panel</div>
+  <button data-vista="Colores">🎨 Colores</button>
 </nav>
 <div class="contenido">
 <main class="vista simple on" id="vistaInicio"><div id="inicio"><div class="vacio">Cargando…</div></div></main>
@@ -204,6 +215,7 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <main class="vista simple" id="vistaDuplicados"><div class="caja editor" id="duplicados"></div></main>
 <main class="vista simple" id="vistaPapelera"><div class="caja editor" id="papelera"></div></main>
 <main class="vista simple" id="vistaCopias"><div class="caja editor" id="copias"></div></main>
+<main class="vista simple" id="vistaColores"><div class="caja editor" id="colores"></div></main>
 <main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div></main>
 </div>
 </div>
@@ -835,7 +847,7 @@ function mostrarVista(nombre) {
   document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === nombre));
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
-  ({ Inicio: cargarInicio, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: pintarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: cargarRespaldo,
+  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: pintarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: cargarRespaldo,
      Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
      Copias: cargarCopias, Estadisticas: cargarEstadisticas }[nombre] || (() => { }))();
 }
@@ -985,6 +997,214 @@ $("#inicio").addEventListener("click", async e => {
       aprendidas = (await api("/api/aprendizaje/descartar", { id: t.dataset.iniAprNo })).propuestas; pintarAprendido(); cargarInicio();
     } else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
   } catch (err) { aviso("Error: " + err.message); }
+});
+
+// ---------------------------------------------------------------- colores
+// Las 100 combinaciones de la guía de Figma, con sus nombres y tipos (los colores son una interpretación de cada nombre).
+const PALETAS = {
+  "Monocromáticas": [
+    ["Mañana tormentosa", "#EEF1F4 #C5CED8 #8C9BAD #56667A #2C3A4B"], ["Hondonada de musgo", "#EEF2E3 #C9D5A8 #8FA36A #5E7343 #34432A"],
+    ["Eclipse azul", "#E6EEFA #A9C3EC #5A87D6 #2A55A5 #142B5C"], ["Bosque frondoso", "#E5F2E9 #A8D5B4 #4FA36B #2A6E44 #143D25"],
+    ["Jugo verde", "#F1F9E4 #D3EDA8 #A3D45A #6FA82E #44701A"], ["Chile picante", "#FBE7E3 #F2AFA3 #E0573F #A9301E #5E170E"],
+    ["Trufa de chocolate", "#F3EAE4 #D6BFAF #9C7259 #6A4532 #3B241A"], ["Aguada de tinta", "#EEEFF3 #C2C5D2 #7D8299 #464B63 #1E2133"],
+    ["Topo dorado", "#F6F0E4 #E2D3B4 #BFA474 #8C7449 #574628"], ["Glicinia en flor", "#F3EEFA #D8C9F0 #A98BDD #7457B8 #43307A"],
+    ["Siena tostada", "#FBEDE4 #F0C2A6 #D9804F #A9532A #6B3115"]],
+  "Románticas": [
+    ["Romance en flor", "#FFF0F3 #F9C5D1 #E8728F #B8405F #5C1F33"], ["Atardecer en el desierto", "#FCEFE6 #F2C1A0 #D9826B #9E5A6E #4E3450"],
+    ["Campos de lavanda", "#F4F0FA #D9CCEE #A890D6 #7A6AAE #3F3A63"], ["Hortensia", "#EEF0FB #C3CAF0 #8E98DE #B07CC6 #4B4A8C"],
+    ["Flor de cactus", "#FDEFF1 #F6B4C2 #E5587F #7FA36B #3E5A3A"], ["Flores silvestres", "#FFF6E8 #F7C6D9 #C08BD1 #F2B84B #5E7D4A"],
+    ["Jardín campestre", "#F7F3E8 #E8C4C4 #C77D8B #8DA87A #4D6340"], ["Jardín de lotos", "#FDF1F4 #F4C2CF #DB7F9C #6FA89A #2E5B55"],
+    ["Jardín de lirios", "#F1EEFA #C9BEEB #7B64C4 #E5C35A #322A5E"], ["Durazno fresco", "#FFF3EC #FFD3BD #F6A27E #D9715A #7A3D33"],
+    ["Hora dorada", "#FFF6E5 #FBD99A #F2A93B #C9673A #5E3324"], ["Chai especiado", "#F7EFE6 #E6CBAE #C08A5B #8E5A3B #4A2F22"],
+    ["Flor de cerezo", "#FFF4F6 #FBD3DC #F2A1B5 #C96B86 #5A3442"], ["Rosa de la tarde", "#F8EEF0 #E2B6C0 #B86B80 #7D3B52 #3B1E2A"],
+    ["Jardín pastel", "#F6FAF4 #CFE8D5 #F6D0DC #CDBFEA #6E7AA8"], ["Atardecer toscano", "#FCF0E3 #F1C08A #DB7F3E #A44A3A #4F3B2A"]],
+  "Divertidas": [
+    ["Limón chispeante", "#FFFBE0 #FFF07A #F5D90A #9CC93B #3D5A1E"], ["Playas de California", "#FFF7E6 #FFD98E #FF9F6E #3FB8C9 #1F5F7A"],
+    ["Recién exprimido", "#FFF4E2 #FFC97A #FF8A1F #E5502A #6B2A12"], ["Sueño de pistache", "#F4F9EC #D7EBBE #A9D18E #7BAA62 #3F5E35"],
+    ["Paleta de mango", "#FFF6E0 #FFD166 #FF9F1C #F25C54 #6A2E35"], ["Guayaba", "#FFF0EE #FFB8B0 #FF6F6F #8BC34A #3F6B2A"],
+    ["Horizonte brillante", "#FFF5E8 #FFC88A #FF8E5E #E94F6A #4A2A5E"], ["Día soleado", "#FFFBEA #FFE082 #FFC107 #4FC3F7 #1E5F8C"],
+    ["Atardecer retro", "#FFF1DE #FFB86B #F26B3A #C2366B #3D1E4F"], ["Chicle pop", "#FFF0F7 #FFB3D9 #FF5EAE #7B61FF #2E1F5E"],
+    ["Cielo de algodón de azúcar", "#F6F2FF #D9C8FF #FFC1DE #9ED8F5 #5F5A9E"], ["Kiwi eléctrico", "#F5FFE6 #D4F57A #8FD61F #3E8E2A #1F3D17"],
+    ["Sandía refrescante", "#FFF1F1 #FF9AA2 #F2545B #6CC24A #23512B"]],
+  "Vibrantes": [
+    ["Reacción alquímica", "#F0FFF6 #4DEBB0 #00B37E #7C3AED #1E103F"], ["Electropop", "#FDF0FF #FF4FD8 #8B5CF6 #22D3EE #140B33"],
+    ["Revival fresco", "#EFFDFB #5EEAD4 #14B8A6 #F43F5E #0F2A33"], ["Selva neón", "#F2FFE8 #A3FF4F #39D353 #00A884 #072B1F"],
+    ["Filo cortante", "#F5F5F5 #FFE600 #FF3B30 #111111 #2B2B2B"], ["Fusión eléctrica", "#EEF4FF #3D7BFF #00E0FF #FF2E93 #0A1238"],
+    ["Fuegos artificiales", "#FFF8E6 #FFC233 #FF5C33 #B81CDB #1A0F2E"], ["Bayas espaciales", "#F7EEFF #C084FC #9333EA #DB2777 #1B0B2E"],
+    ["Arte pop", "#FFFBEB #FFD60A #FF006E #3A86FF #111111"], ["Grafiti urbano", "#F4F4F0 #C6FF3D #FF4D00 #6A00F4 #1C1C1C"],
+    ["Noir neón", "#EAF7FF #00F0FF #FF2BD6 #1A1A2E #0B0B14"], ["Ponche tropical", "#FFF4E8 #FFB000 #FF4F79 #00B8A9 #2B2D42"],
+    ["Cielo cobalto", "#EAF1FF #6FA0FF #0047AB #FFB627 #0B1F4D"], ["Sueño tecnicolor", "#FFF5FA #FF6B6B #FFD93D #6BCB77 #4D96FF"],
+    ["Joyero", "#EEF6F4 #0F9D76 #1E4FA8 #8E1E5C #2A1F3D"]],
+  "Neutras": [
+    ["Sal y pimienta", "#F7F7F7 #DADADA #9E9E9E #5C5C5C #222222"], ["Muy claro", "#FFFFFF #F2F4F5 #D5DADD #8A949B #3B4248"],
+    ["Noir gótico", "#E8E4E6 #9A8F96 #5A4652 #2B1F27 #120C10"], ["Club náutico", "#F8F6F0 #E3DCCB #2F4A6D #1B2D45 #B33A3A"],
+    ["Lujo discreto", "#F5F1EA #E0D6C6 #B8A68A #6E6252 #2E2A25"], ["Arenas nocturnas", "#EDE6DA #C9B99C #8C7A5E #3E3A44 #1E1D26"],
+    ["Bruma del puerto", "#EEF1F1 #CBD4D6 #93A3A8 #5D6E75 #2F3B40"], ["Fotografía antigua", "#F4ECDD #DCCBAA #B09A75 #7A6A52 #3F372C"],
+    ["Capuchino", "#F6EFE8 #E3CDB8 #B88E6B #7F5A40 #3E2B20"], ["Té de desayuno", "#F8F0E5 #E8CFAE #C79A64 #93653A #4F3520"],
+    ["Fogata acogedora", "#FBF2E8 #E8C9A6 #C8743B #8A3F22 #2E2320"], ["Camino de piedra", "#F1F0EC #D3D0C8 #A7A296 #6F6B62 #3A3833"],
+    ["Espejismo del desierto", "#FAF1E4 #EBD2AE #D1A673 #A4734A #5A4030"], ["Panal", "#FFF8E1 #FFE08A #F5B82E #C98A12 #5E4108"],
+    ["Loft urbano", "#F2F1EF #CFCAC4 #8F8880 #B5643B #2D2B29"], ["Moca especiado", "#F5EDE6 #D9BFA9 #A9755A #6B4535 #33231C"]],
+  "Tranquilas": [
+    ["Costa encantadora", "#F2F8FA #CFE6EE #8EC5D6 #F2D8B8 #2F6F86"], ["Azul en calma", "#EEF4FB #C7DBF2 #8DB4E2 #4F83C2 #23446E"],
+    ["Vista al mar", "#F7F3EA #EAD9BB #9FD3D6 #4FA3B0 #20566A"], ["Bajo la luz de la luna", "#E9ECF5 #B9C2DE #6E7BAA #2F3866 #141A35"],
+    ["Arrullo de lavanda", "#F6F3FB #E3DAF3 #C4B5E6 #9886C9 #4C4370"], ["Menta fresca", "#EFFAF5 #C8F0DF #8EDDBE #4CB894 #1F5E4A"],
+    ["Calma retro", "#F5F0E6 #D9E3D6 #A8C3B8 #E3A87C #4A5D63"], ["Limolita", "#F0EEEA #D6D1C7 #ADA597 #7E8A86 #44504D"],
+    ["Odisea esmeralda", "#EAF6F0 #A6DCC2 #3FA57A #146B4A #0A3324"], ["Marea oceánica", "#EAF5F8 #A9D9E5 #4BA3BF #1F6F8B #0E3747"],
+    ["Horizonte de durazno", "#FFF4EE #FBD5C4 #F3AE93 #A7B8D6 #4D5E85"], ["Niebla de montaña", "#F0F3F4 #D2DCDF #A3B5BA #6B8288 #34474D"],
+    ["Rocío matinal", "#F3FAF6 #D5EEE2 #A8D8C2 #7FB9A6 #3E6B5E"], ["Lago congelado", "#F2F8FC #D3E7F3 #A7CDE6 #6C9EC4 #2D5577"],
+    ["Olivar", "#F4F3E6 #DCDAB4 #A9A86A #6F7140 #3A3C22"], ["Mañana costera", "#F7F6F1 #E4ECEA #B5D2D0 #E9C9A5 #3E6A73"],
+    ["Bosque de eucalipto", "#F0F5F1 #CEDFD3 #9DBFA8 #6A9479 #34503F"]],
+  "De temporada": [
+    ["Primavera suave", "#FBF8EE #E6F2D3 #F9D4DC #BFDDF0 #6C8F5A"], ["Hojas de otoño", "#FBF0E2 #F0B65A #D96A2B #9C3A1E #4A2A18"],
+    ["Frío invernal", "#F2F6FA #D6E2EE #A8BDD3 #6B86A6 #2A3F5A"], ["Energía de primavera", "#F6FCE9 #C8EB7A #7CC942 #FF8FA3 #2F6B2A"],
+    ["Temporada de calabaza", "#FDF1E3 #F7C08A #E9822E #A84E1C #3E2A1E"], ["Oasis isleño", "#EFFBF8 #A6E7DC #2EC4B6 #FFBF69 #145A5A"],
+    ["Huerto otoñal", "#FBF0E6 #E8B48A #C2502E #7D8F3A #3E2F22"], ["Selva tropical", "#EAF6EC #8FD19E #2E9E5B #0F5E3A #F2B13C"],
+    ["Pradera de flores silvestres", "#FAF7EC #F4D35E #E78FB3 #8E7DBE #4E7D4A"], ["Luna de cosecha", "#FBF2DE #F2C46D #D9822B #7A4A2A #2B2433"],
+    ["Baya invernal", "#F5F1F3 #D9C5CF #A3385A #6B1F3A #2C2A3A"], ["Brisa de verano", "#F2FBFC #BDE8EE #6CCCD8 #FFD38A #2F7F8C"]],
+};
+const CLASICO = "GESTOR clásico";
+const VARIABLES_CLASICAS = {
+  claro: { "--fondo": "#f5f6f8", "--panel": "#ffffff", "--texto": "#1d2330", "--suave": "#6b7383", "--borde": "#dfe3ea",
+    "--acento": "#2f6fde", "--acento-texto": "#ffffff", "--acento-suave": "#e8f0fd" },
+  oscuro: { "--fondo": "#15181e", "--panel": "#1e222a", "--texto": "#e7eaf0", "--suave": "#9aa3b2", "--borde": "#323844",
+    "--acento": "#5b93f0", "--acento-texto": "#0d1420", "--acento-suave": "#233149" } };
+const GRUPOS_COLOR = [["Rojos", 0], ["Naranjas", 18], ["Amarillos", 42], ["Verdes", 72], ["Turquesas", 160], ["Azules", 195],
+  ["Morados", 255], ["Rosas", 300], ["Rojos", 345]];
+
+const aRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const aHex = rgb => "#" + rgb.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
+const mezcla = (a, b, t) => { const x = aRgb(a), y = aRgb(b); return aHex(x.map((v, i) => v + (y[i] - v) * t)); };
+const luz = h => { const [r, g, b] = aRgb(h).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
+const contraste = (a, b) => { const x = luz(a), y = luz(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+function hsl(h) {
+  const [r, g, b] = aRgb(h).map(v => v / 255), max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(hue * 60 + 360) % 360, s, l];
+}
+// El color "protagonista" de una combinación: el más vivo que no sea casi blanco ni casi negro.
+function acentoDe(colores) {
+  return [...colores].sort((a, b) => { const p = c => { const [, s, l] = hsl(c); return s * (1 - Math.abs(l - .5) * 1.4); }; return p(b) - p(a); })[0];
+}
+const hasta = (color, fondo, minimo, hacia) => { for (let i = 0; i < 12 && contraste(color, fondo) < minimo; i++) color = mezcla(color, hacia, .18); return color; };
+function variablesDe(colores, oscuro) {
+  const orden = [...colores].sort((a, b) => luz(a) - luz(b)), clarito = orden[4], oscurito = orden[0];
+  let acento = acentoDe(colores), v = {};
+  if (!oscuro) {
+    const base = luz(clarito) > .6 ? clarito : mezcla(acento, "#ffffff", .9);
+    v["--fondo"] = mezcla(base, "#ffffff", .25); v["--panel"] = mezcla(base, "#ffffff", .8);
+    v["--texto"] = hasta(luz(oscurito) < .2 ? oscurito : mezcla(oscurito, "#000000", .5), v["--panel"], 9, "#000000");
+    acento = hasta(acento, v["--panel"], 3.2, v["--texto"]);
+  } else {
+    const base = luz(oscurito) < .05 ? oscurito : mezcla(oscurito, "#0c0d10", .6);
+    v["--fondo"] = mezcla(base, "#0c0d10", .35); v["--panel"] = mezcla(base, "#20232a", .55);
+    v["--texto"] = hasta(mezcla(clarito, "#ffffff", .5), v["--panel"], 10, "#ffffff");
+    acento = hasta(acento, v["--panel"], 4, "#ffffff");
+  }
+  v["--acento"] = acento;
+  v["--acento-texto"] = contraste(acento, "#ffffff") >= contraste(acento, "#111111") ? "#ffffff" : "#111111";
+  v["--acento-suave"] = mezcla(acento, v["--panel"], oscuro ? .75 : .86);
+  v["--borde"] = mezcla(v["--texto"], v["--panel"], oscuro ? .8 : .85);
+  v["--suave"] = hasta(mezcla(v["--texto"], v["--panel"], .4), v["--panel"], 4.5, v["--texto"]);
+  return v;
+}
+function buscarPaleta(nombre) {
+  for (const [tipo, lista] of Object.entries(PALETAS)) { const p = lista.find(x => x[0] === nombre); if (p) return { tipo, nombre, colores: p[1].split(" ") }; }
+  const t = (datos && datos.ajustes.tema) || {};
+  const propia = (t.propias || []).find(x => "Mía: " + x.nombre === nombre);
+  return propia ? { tipo: "Mías", nombre, colores: propia.colores } : null;
+}
+const oscuroDelSistema = matchMedia("(prefers-color-scheme: dark)");
+function aplicarTema(tema) {
+  tema = tema || {};
+  const oscuro = tema.modo === "oscuro" || (tema.modo !== "claro" && oscuroDelSistema.matches);
+  const p = tema.colores ? { colores: tema.colores } : buscarPaleta(tema.paleta);
+  const v = p ? variablesDe(p.colores, oscuro) : VARIABLES_CLASICAS[oscuro ? "oscuro" : "claro"];
+  Object.entries(v).forEach(([k, x]) => document.documentElement.style.setProperty(k, x));
+  document.documentElement.style.colorScheme = oscuro ? "dark" : "light";
+  try { localStorage.setItem("gestorTema", JSON.stringify(v)); } catch (e) { }
+}
+oscuroDelSistema.addEventListener("change", () => aplicarTema(datos && datos.ajustes.tema));
+try { const v = JSON.parse(localStorage.getItem("gestorTema") || "null"); if (v) Object.entries(v).forEach(([k, x]) => document.documentElement.style.setProperty(k, x)); } catch (e) { }
+
+let col = { ver: "tipo", propia: ["#F4F1EA", "#D9CBB0", "#2F6FDE", "#C2502E", "#1D2330"], nombre: "" };
+function grupoColor(colores) {
+  const [h, s] = hsl(acentoDe(colores));
+  if (s < .2) return "Neutros";
+  return GRUPOS_COLOR.reduce((g, [n, desde]) => h >= desde ? n : g, "Rojos");
+}
+function muestra(nombre, colores, actual, quitar) {
+  return `<button class="paleta ${actual ? "on" : ""}" data-paleta="${esc(nombre)}" title="${esc(nombre)}">
+    <span class="tiras">${colores.map(c => `<span style="background:${c}"></span>`).join("")}</span>
+    <span class="nom">${esc(nombre.replace(/^Mía: /, ""))}${actual ? " ✓" : ""}</span>
+    ${quitar ? `<span class="x" data-quitar-propia="${esc(nombre)}" title="Borrar">✕</span>` : ""}</button>`;
+}
+function pintarColores() {
+  const t = datos.ajustes.tema || {}, actual = t.paleta || CLASICO;
+  const todas = Object.entries(PALETAS).flatMap(([tipo, l]) => l.map(([n, c]) => ({ tipo, nombre: n, colores: c.split(" ") })));
+  todas.forEach(p => { p.tono = hsl(acentoDe(p.colores))[0]; p.grupo = grupoColor(p.colores); });
+  const porTono = (a, b) => (a.grupo === "Neutros") - (b.grupo === "Neutros") || a.tono - b.tono;
+  let grupos;
+  if (col.ver === "tipo") grupos = Object.keys(PALETAS).map(tipo => [tipo, todas.filter(p => p.tipo === tipo).sort(porTono)]);
+  else grupos = [...new Set(["Rojos", "Naranjas", "Amarillos", "Verdes", "Turquesas", "Azules", "Morados", "Rosas", "Neutros"])]
+    .map(g => [g, todas.filter(p => p.grupo === g).sort(porTono)]).filter(([, l]) => l.length);
+  const propias = t.propias || [];
+  $("#colores").innerHTML = `
+    <h2>Colores de la interfaz</h2>
+    <p class="ayuda">Elige una de las 100 combinaciones de la guía de Figma o crea la tuya. Se aplica al momento y se guarda.</p>
+    <div class="fila">
+      <label>Modo: <select id="colModo">${[["auto", "Automático (como Windows)"], ["claro", "Claro"], ["oscuro", "Oscuro"]]
+        .map(([v, x]) => `<option value="${v}" ${(t.modo || "auto") === v ? "selected" : ""}>${x}</option>`).join("")}</select></label>
+      <label>Ordenar por: <select id="colVer"><option value="tipo" ${col.ver === "tipo" ? "selected" : ""}>Tipo</option><option value="color" ${col.ver === "color" ? "selected" : ""}>Color</option></select></label>
+      <span class="ayuda">Actual: <b>${esc(actual.replace(/^Mía: /, ""))}</b></span>
+    </div>
+    <h3 class="tit-col">Mi combinación</h3>
+    <div class="grupo-dup">
+      <div class="fila" style="margin-bottom:6px">${col.propia.map((c, i) => `<label class="ayuda" style="flex-direction:column;gap:2px;font-family:inherit">
+        <input type="color" data-propia="${i}" value="${c}">${["Fondo", "Detalle", "Principal", "Extra", "Texto"][i]}</label>`).join("")}
+        <input type="text" id="colNombre" placeholder="Nombre (por ejemplo: Mi oficina)" value="${esc(col.nombre)}" style="flex:1;min-width:160px;width:auto">
+        <button id="colProbar">Probar</button><button class="prim" id="colGuardar">Guardar mi combinación</button></div>
+      <p class="ayuda" style="margin:0">El color más vivo se usa para botones y pestañas; el más claro y el más oscuro, para fondo y texto. Si algo no se lee bien, GESTOR lo ajusta solo.</p>
+      ${propias.length ? `<div class="paletas" style="margin-top:10px">${propias.map(p => muestra("Mía: " + p.nombre, p.colores, actual === "Mía: " + p.nombre, true)).join("")}</div>` : ""}
+    </div>
+    <h3 class="tit-col">Original</h3>
+    <div class="paletas">${muestra(CLASICO, ["#f5f6f8", "#dfe3ea", "#2f6fde", "#6b7383", "#1d2330"], actual === CLASICO)}</div>
+    ${grupos.map(([g, l]) => `<h3 class="tit-col">${esc(g)} <span class="ayuda">(${l.length})</span></h3>
+      <div class="paletas">${l.map(p => muestra(p.nombre, p.colores, actual === p.nombre)).join("")}</div>`).join("")}`;
+}
+async function guardarTema(cambios) {
+  const tema = Object.assign({ paleta: CLASICO, modo: "auto", propias: [] }, datos.ajustes.tema || {}, cambios);
+  datos.ajustes.tema = tema; aplicarTema(tema);
+  await guardarPreferencias({ tema });
+  pintarColores();
+}
+$("#colores").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.dataset.quitarPropia) {
+      e.stopPropagation();
+      const n = t.dataset.quitarPropia.replace(/^Mía: /, "");
+      if (!confirm(`¿Borrar «${n}»?`)) return;
+      const tema = datos.ajustes.tema || {};
+      await guardarTema({ propias: (tema.propias || []).filter(p => p.nombre !== n), paleta: tema.paleta === t.dataset.quitarPropia ? CLASICO : tema.paleta });
+    } else if (t.closest("[data-paleta]")) await guardarTema({ paleta: t.closest("[data-paleta]").dataset.paleta });
+    else if (t.id === "colProbar") aplicarTema({ colores: col.propia, modo: (datos.ajustes.tema || {}).modo });
+    else if (t.id === "colGuardar") {
+      const nombre = ($("#colNombre").value.trim() || "Mi combinación").slice(0, 40);
+      const propias = ((datos.ajustes.tema || {}).propias || []).filter(p => p.nombre !== nombre).concat([{ nombre, colores: [...col.propia] }]);
+      col.nombre = ""; await guardarTema({ propias, paleta: "Mía: " + nombre }); aviso("Guardada y aplicada.");
+    }
+  } catch (err) { aviso("Error: " + err.message); }
+});
+$("#colores").addEventListener("change", e => {
+  const t = e.target;
+  if (t.id === "colModo") guardarTema({ modo: t.value });
+  else if (t.id === "colVer") { col.ver = t.value; pintarColores(); }
+});
+$("#colores").addEventListener("input", e => {
+  if (e.target.dataset.propia !== undefined) { col.propia[+e.target.dataset.propia] = e.target.value; col.nombre = $("#colNombre").value;
+    aplicarTema({ colores: col.propia, modo: (datos.ajustes.tema || {}).modo }); }
 });
 
 // ---------------------------------------------------------------- preferencias
@@ -1664,6 +1884,7 @@ $("#respaldo").addEventListener("click", async e => {
 
 (async () => {
   datos = await api("/api/inicio");
+  aplicarTema(datos.ajustes.tema);
   $("#version").textContent = "v" + (datos.version || "");
   if (datos.en_red) document.querySelectorAll("#btnCerrar, #ajGuardar, #ajQuitar").forEach(b => b.style.display = "none");
   pintarLista(); pintarProgramacion(); pintarPreferencias(); cargarAprendido();

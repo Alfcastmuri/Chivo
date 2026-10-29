@@ -58,6 +58,8 @@ El panel abre en **Inicio**: un resumen con el estado de GESTOR, lo que espera t
 (servicios en modo prueba y lo aprendido), la actividad de hoy y de la semana, los vencimientos
 próximos, el espacio en disco, las próximas ejecuciones, el respaldo y los últimos movimientos.
 El menú lateral agrupa las herramientas en Organizar, Encontrar, Proteger y Al día.
+En **Colores** eliges entre 100 combinaciones (por tipo o por color), en modo claro, oscuro o
+automático, o creas y guardas tus propias combinaciones.
 
 - **Plantillas** para Descargas, Documentos, Escritorio, Imágenes, capturas, Vídeos, Música,
   facturas y escaneados. Los documentos van a las subcarpetas que **ya existen** en Documentos

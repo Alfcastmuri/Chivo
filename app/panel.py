@@ -187,6 +187,20 @@ def dashboard():
     }
 
 
+def limpiar_tema(t):
+    """Colores del panel: {paleta, modo, propias: [{nombre, colores: [#hex x5]}]}."""
+    import re
+    es_hex = re.compile(r"#[0-9a-fA-F]{6}").fullmatch
+    propias = []
+    for p in (t.get("propias") or [])[:30]:
+        colores = [c for c in (p.get("colores") or []) if isinstance(c, str) and es_hex(c)][:5]
+        if len(colores) == 5:
+            propias.append({"nombre": str(p.get("nombre") or "Mi combinación")[:40], "colores": colores})
+    return {"paleta": str(t.get("paleta") or "")[:60],
+            "modo": t.get("modo") if t.get("modo") in ("auto", "claro", "oscuro") else "auto",
+            "propias": propias}
+
+
 def ip_local():
     """La IP de este equipo en la red de casa (sin enviar nada: el socket UDP solo elige la ruta)."""
     import socket
@@ -433,6 +447,8 @@ class Manejador(BaseHTTPRequestHandler):
                 ajustes["umbral_disco"] = max(0, min(50, int(datos["umbral_disco"])))
             if "aviso_semanal" in datos:
                 ajustes["aviso_semanal"] = bool(datos["aviso_semanal"])
+            if isinstance(datos.get("tema"), dict):
+                ajustes["tema"] = limpiar_tema(datos["tema"])
             if isinstance(datos.get("no_molestar"), dict):
                 nm = datos["no_molestar"]
                 ajustes["no_molestar"] = {"bateria": bool(nm.get("bateria")),
