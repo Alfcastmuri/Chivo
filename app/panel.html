@@ -328,6 +328,9 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
     <h2 style="margin-top:22px">Facturas</h2>
     <div class="campo"><span>Tus RFC (separados por coma). Se ignoran al buscar el proveedor de una factura, para no tomar el tuyo.</span>
       <input type="text" id="prefRfc" placeholder="XAXX010101000"></div>
+    <h2 style="margin-top:22px">Base de datos</h2>
+    <p class="ayuda">Todo lo que GESTOR recuerda (servicios, historial, mapa de archivos) está en una base de datos. Haz una copia cuando quieras; el instalador también hace una antes de cada actualización.</p>
+    <div class="fila"><button id="btnRespBase">Respaldar la base de datos ahora</button><span class="ayuda" id="respBaseInfo"></span></div>
     <h2 style="margin-top:22px">Copia de la configuración</h2>
     <div class="fila">
       <button id="btnExportar">Exportar servicios y ajustes</button>
@@ -1395,6 +1398,10 @@ async function pintarRed() {
       (conectado al mismo Wi-Fi) o abre <b><code>${esc(r.url)}</code></b>. Tarda unos segundos en estar listo.</div></div>` : "";
   } catch (e) { }
 }
+$("#btnRespBase").onclick = async () => {
+  try { const r = await api("/api/mantenimiento/respaldar-base"); $("#respBaseInfo").textContent = r.ok ? "Guardada en " + r.ruta : r.mensaje; }
+  catch (e) { aviso("Error: " + e.message); }
+};
 $("#prefPapelera").onchange = e => guardarPreferencias({ papelera: e.target.value });
 $("#prefRetencion").onchange = e => guardarPreferencias({ retencion_dias: +e.target.value || 30 });
 $("#btnReanudar").onclick = () => guardarPreferencias({ pausado: false });

@@ -129,7 +129,7 @@ PROCESOS_LARGOS = {"/api/simular": "Simulando", "/api/ejecutar": "Ordenando", "/
                    "/api/aplanar/ejecutar": "Sacando a la raíz", "/api/espacio": "Analizando espacio",
                    "/api/duplicados/combinar": "Combinando carpetas", "/api/prueba/aprobar": "Aplicando cambios aprobados",
                    "/api/copias/ejecutar": "Copia a USB", "/api/asistente/analizar": "Analizando carpeta",
-                   "/api/deshacer": "Deshaciendo", "/api/papelera/vaciar": "Vaciando papelera"}
+                   "/api/deshacer": "Deshaciendo", "/api/mantenimiento/respaldar-base": "Respaldando la base de datos", "/api/papelera/vaciar": "Vaciando papelera"}
 TRABAJOS = {}  # tareas largas en segundo plano: escanear vencimientos, respaldar...
 
 
@@ -555,6 +555,12 @@ class Manejador(BaseHTTPRequestHandler):
             filas = nucleo.bd.movimientos(datos.get("texto", ""), datos.get("desde"), datos.get("hasta"),
                                           limite=int(datos.get("limite") or 300), recientes_primero=True)
             return {"movimientos": filas, "total": nucleo.bd.total_movimientos()}
+        if ruta == "/api/mantenimiento/respaldar-base":
+            import mantenimiento
+            return mantenimiento.respaldar_base()
+        if ruta == "/api/mantenimiento/respaldos":
+            import mantenimiento
+            return {"respaldos": mantenimiento.respaldos()[:10], "carpeta": mantenimiento.carpeta_respaldos()}
         if ruta == "/api/qr":
             return {"svg": qr_svg(datos.get("texto", ""))}
         if ruta == "/api/duplicados/cancelar":

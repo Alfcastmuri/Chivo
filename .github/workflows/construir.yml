@@ -43,7 +43,7 @@ jobs:
           $env:GESTOR_SIN_RESIDENTE = "1"
           $p = Start-Process -FilePath dist\GESTOR\GESTOR.exe -ArgumentList "--motor" -PassThru
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "El motor no terminó" }
-          if (-not (Test-Path "$env:GESTOR_DATOS\servicios.json")) { throw "El motor no creó servicios.json" }
+          if (-not (Test-Path "$env:GESTOR_DATOS\gestor.db")) { throw "El motor no creó la base de datos" }
           if (Test-Path "$env:GESTOR_DATOS\errores.log") { Get-Content "$env:GESTOR_DATOS\errores.log"; throw "El motor registró errores" }
 
       - name: Comprobar el modo al instante
@@ -67,6 +67,41 @@ jobs:
           if (Test-Path "$datos\errores.log") { Get-Content "$datos\errores.log" }
           if (-not $ok) { throw "El modo al instante no movió el archivo" }
 
+      - name: Comprobar las órdenes de mantenimiento
+        shell: pwsh
+        run: |
+          $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-datos"
+          $env:GESTOR_SIN_RESIDENTE = "1"
+          $p = Start-Process -FilePath dist\GESTOR\GESTOR.exe -ArgumentList "--respaldar-base", "$env:RUNNER_TEMP\respaldos" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { Get-Content "$env:GESTOR_DATOS\mantenimiento.log"; throw "--respaldar-base falló" }
+          if (-not (Get-ChildItem "$env:RUNNER_TEMP\respaldos\gestor *.db")) { throw "No se creó el respaldo de la base" }
+          $p = Start-Process -FilePath dist\GESTOR\GESTOR.exe -ArgumentList "--detener" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { Get-Content "$env:GESTOR_DATOS\mantenimiento.log"; throw "--detener falló" }
+
+      - name: Crear el instalador
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path app\nucleo.py -Pattern 'VERSION = "(.+?)"').Matches[0].Groups[1].Value
+          "GESTOR_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DVersion=$version" instalador\gestor.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup falló" }
+
+      - name: Probar el instalador (instalar y desinstalar en silencio)
+        shell: pwsh
+        run: |
+          $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-instalado"
+          $p = Start-Process -FilePath "salida\GESTOR-Instalador-$env:GESTOR_VERSION.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "La instalación falló ($($p.ExitCode))" }
+          $app = "$env:LOCALAPPDATA\Programs\GESTOR"
+          if (-not (Test-Path "$app\GESTOR.exe")) { throw "No se instaló GESTOR.exe" }
+          if (-not (Test-Path "$app\instalador\GESTOR-Instalador.exe")) { throw "Falta la copia del instalador" }
+          Get-Process GESTOR -ErrorAction SilentlyContinue | Stop-Process -Force
+          $p = Start-Process -FilePath "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -PassThru -Wait
+          Start-Sleep -Seconds 3
+          if (Test-Path "$app\GESTOR.exe") { throw "La desinstalación no quitó GESTOR.exe" }
+
       - name: Comprimir
         shell: pwsh
         run: |
@@ -82,6 +117,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
+          name: GESTOR-Instalador
+          path: salida/GESTOR-Instalador-*.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
           name: GESTOR-python
           path: GESTOR-python.zip
 
@@ -90,5 +130,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            salida/GESTOR-Instalador-*.exe
             GESTOR-windows.zip
             GESTOR-python.zip

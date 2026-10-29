@@ -4,10 +4,29 @@ Organizador automático de archivos para Windows. Desde un panel en el navegador
 **servicios**: cada uno vigila las carpetas que elijas (en cualquier parte del disco) y,
 según su horario, ordena los archivos con tus reglas.
 
+## Instalador
+
+`GESTOR-Instalador-X.Y.Z.exe` (en *Releases* o en *Actions*) lleva todo dentro, así que instala
+sin internet y sin permisos de administrador (en `%LOCALAPPDATA%\Programs\GESTOR`). Al abrirlo
+pregunta qué quieres hacer:
+
+- **Instalar** o **actualizar** (antes de actualizar respalda la base de datos y cierra GESTOR).
+- **Reinstalar para reparar errores**: deja el programa limpio; servicios y datos se conservan.
+- **Preparar un paquete sin conexión**: copia el instalador y unas instrucciones a la carpeta o
+  USB que elijas, para instalarlo en otro equipo.
+- **Detener** o **reiniciar los servicios** y **respaldar la base de datos**
+  (en `Documentos\GESTOR\Respaldos de la base`).
+- **Salir**.
+
+El menú Inicio tiene "GESTOR - Herramientas" para volver a este menú en cualquier momento.
+Lo mismo se puede hacer por línea de órdenes: `GESTOR.exe --detener`, `--reiniciar`,
+`--respaldar-base [carpeta]`, `--cerrar-procesos`, `--desinstalar`.
+Desinstalar (desde Configuración de Windows) quita el programa y la tarea programada, pero no tus
+datos (`%APPDATA%\GESTOR`).
+
 ## Cómo se usa
 
-1. Descarga `GESTOR-windows.zip` desde *Releases* (o desde la pestaña *Actions*, en la última
-   ejecución correcta), descomprímelo donde quieras y abre `GESTOR.exe`.
+1. Usa el instalador, o descarga `GESTOR-windows.zip`, descomprímelo donde quieras y abre `GESTOR.exe`.
    La primera vez Windows puede mostrar "Windows protegió su PC": pulsa **Más información →
    Ejecutar de todas formas** (el programa no está firmado).
    Si el antivirus lo borra (falso positivo frecuente con PyInstaller), restáuralo desde la
