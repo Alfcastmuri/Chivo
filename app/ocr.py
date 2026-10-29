@@ -130,7 +130,7 @@ def guardado(ruta):
 
 def leer_lote(rutas, segundos=180):
     """Lee varios archivos con un solo PowerShell (arrancarlo cuesta un par de segundos)."""
-    pendientes = [r for r in dict.fromkeys(rutas) if candidato(r) and guardado(r) is None]
+    pendientes = [os.path.abspath(r) for r in dict.fromkeys(rutas) if candidato(r) and guardado(r) is None]
     if not pendientes or not activo():
         return 0
     carpeta = tempfile.mkdtemp(prefix="gestor-ocr-")
@@ -177,6 +177,7 @@ def leer_lote(rutas, segundos=180):
 
 def texto(ruta):
     """El texto de una foto o de un PDF escaneado ("" si no tiene o no se pudo leer)."""
+    ruta = os.path.abspath(ruta)
     t = guardado(ruta)
     if t is None and candidato(ruta) and activo():
         leer_lote([ruta], segundos=60)
