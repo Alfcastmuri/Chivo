@@ -343,12 +343,15 @@ class PruebaVaciarYPlantillas(PruebaServicio):
             self.viejo(ruta, dias)
             self.viejo(os.path.join(self.origen, nombre), dias)
         s = self.servicio([], carpetas={"activo": True, "dias": 14, "destino": os.path.join(self.destino, "{año}")})
+        # En Windows la llegada es la fecha de creación, que una prueba no puede cambiar.
+        original, nucleo.llegada = nucleo.llegada, lambda st: st.st_mtime
+        self.addCleanup(setattr, nucleo, "llegada", original)
         plan, _ = nucleo.planificar(s, ahora=time.time())
         self.assertEqual([os.path.basename(o["origen"]) for o in plan], ["proyecto"])
-        if not nucleo.ES_WINDOWS:  # en Linux la llegada es la modificación: se puede simular
-            registro = nucleo.ejecutar_servicio(s)
-            self.assertTrue(os.path.isfile(os.path.join(plan[0]["destino"], "a.txt")))
-            self.assertTrue(nucleo.deshacer(s["id"])["ok"] or registro)
+        nucleo.ejecutar_servicio(s)
+        self.assertTrue(os.path.isfile(os.path.join(plan[0]["destino"], "a.txt")))
+        self.assertTrue(nucleo.deshacer(s["id"])["ok"])
+        self.assertTrue(os.path.isfile(os.path.join(self.origen, "proyecto", "a.txt")))
 
     def test_sin_uso_y_zip_descomprimido(self):
         z = self.crear("fotos.zip")
