@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -1885,6 +1885,42 @@ def _leer_indice():
                     continue
     except OSError:
         return
+
+
+def ultimos_movimientos(n=10):
+    """Lo último que GESTOR movió, del más reciente al más antiguo (lee solo el final del índice)."""
+    try:
+        with open(ARCHIVO_INDICE, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            f.seek(max(0, f.tell() - 200_000))
+            lineas = f.read().decode("utf-8", "ignore").splitlines()
+    except OSError:
+        return []
+    salida = []
+    for linea in reversed(lineas):
+        try:
+            r = json.loads(linea)
+        except ValueError:
+            continue
+        salida.append({"fecha": dt.datetime.fromtimestamp(r["t"]).isoformat(timespec="minutes"),
+                       "servicio": r.get("s", ""), "accion": r["a"], "nombre": os.path.basename(r["o"]),
+                       "destino": r.get("d") or "", "existe": bool(r.get("d")) and os.path.exists(r["d"])})
+        if len(salida) >= n:
+            break
+    return salida
+
+
+def resumen_desde(desde):
+    movidos = papelera = bytes_papelera = 0
+    for r in _leer_indice():
+        if r["t"] < desde:
+            continue
+        if r["a"] == "papelera":
+            papelera += 1
+            bytes_papelera += r.get("b", 0)
+        else:
+            movidos += 1
+    return {"movidos": movidos, "papelera": papelera, "bytes_papelera": bytes_papelera}
 
 
 def buscar_movidos(texto, desde=None, hasta=None, limite=200):

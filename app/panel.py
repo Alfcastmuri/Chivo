@@ -141,6 +141,52 @@ def en_segundo_plano(nombre, funcion, *args):
     return {"ok": True}
 
 
+def dashboard():
+    """Todo lo que muestra la pestaña Inicio, en una sola llamada."""
+    import datetime as dt
+    ajustes = nucleo.cargar_ajustes()
+    ahora = time.time()
+    hoy = dt.datetime.combine(dt.date.today(), dt.time()).timestamp()
+    servicios = servicios_con_estado()
+    activos = [x for x in servicios if x["servicio"].get("activo")]
+    estado_total = nucleo.cargar_estado()
+    totales = {"archivos": 0, "bytes_liberados": 0}
+    for e in estado_total.values():
+        if isinstance(e, dict) and e.get("totales"):
+            totales["archivos"] += e["totales"].get("archivos", 0)
+            totales["bytes_liberados"] += e["totales"].get("bytes_liberados", 0)
+    papelera = nucleo.listar_papelera()
+    venc = [v for v in vencimientos.lista()["vencimientos"] if v["dias"] is not None and v["dias"] <= 60][:6]
+    respaldos = [{"nombre": r.get("nombre"), "destino": r.get("destino"),
+                  **(respaldo.estado().get(r["id"]) or {})} for r in respaldo.lista()]
+    return {
+        "version": nucleo.VERSION,
+        "estado": {"pausado": bool(ajustes.get("pausado")), "detenido": bool(ajustes.get("detenido")),
+                   "no_molestar": nucleo.motivo_no_molestar(), "programacion": nucleo.estado_programacion(),
+                   "minutos": ajustes.get("revisar_cada_minutos"), "residente": nucleo.residente_activo(),
+                   "windows": nucleo.ES_WINDOWS},
+        "hoy": nucleo.resumen_desde(hoy),
+        "semana": nucleo.resumen_desde(ahora - 7 * 86400),
+        "totales": totales,
+        "servicios": {"total": len(servicios), "activos": len(activos),
+                      "en_prueba": [{"id": x["servicio"]["id"], "nombre": x["servicio"].get("nombre"),
+                                     "n": (x.get("propuestas") or {}).get("n", 0)}
+                                    for x in servicios if x["servicio"].get("modo_prueba")],
+                      "proximas": sorted([{"id": x["servicio"]["id"], "nombre": x["servicio"].get("nombre"),
+                                           "proxima": x["proxima"]} for x in activos if x["proxima"]],
+                                         key=lambda x: x["proxima"])[:4],
+                      "con_errores": [{"id": x["servicio"]["id"], "nombre": x["servicio"].get("nombre"),
+                                       "errores": x["ultimo_resultado"]["errores"]}
+                                      for x in servicios if (x.get("ultimo_resultado") or {}).get("errores")]},
+        "aprendido": aprendizaje.propuestas()[:3],
+        "vencimientos": venc,
+        "discos": nucleo.unidades_fijas(), "umbral": ajustes.get("umbral_disco", 10),
+        "papelera": {"n": len(papelera), "bytes": sum(p.get("bytes", 0) for p in papelera)},
+        "respaldos": respaldos,
+        "ultimos": nucleo.ultimos_movimientos(8),
+    }
+
+
 def ip_local():
     """La IP de este equipo en la red de casa (sin enviar nada: el socket UDP solo elige la ruta)."""
     import socket
@@ -473,6 +519,8 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/copias/ejecutar":
             copia = next(c for c in nucleo.cargar_ajustes().get("copias", []) if c["id"] == datos["id"])
             return nucleo.ejecutar_copia(copia)
+        if ruta == "/api/dashboard":
+            return dashboard()
         if ruta == "/api/aprendizaje":
             return {"propuestas": aprendizaje.propuestas()}
         if ruta == "/api/aprendizaje/aceptar":

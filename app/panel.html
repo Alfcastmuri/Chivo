@@ -27,13 +27,11 @@ header { display: flex; align-items: center; gap: 12px; padding: 12px 20px;
 header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
 header .estado { color: var(--suave); font-size: 13px; }
 header .espacio { flex: 1; }
-main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 20px; }
 @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
 @media (max-width: 700px) {
   header { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
   header .estado, header .espacio { display: none; }
-  header nav.pestanas { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  header nav.pestanas button { white-space: nowrap; flex: none; }
   header > button { padding: 6px 10px; font-size: 13px; }
   main { padding: 10px; }
 }
@@ -96,9 +94,45 @@ th { color: var(--suave); font-weight: 600; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
 .modal.on { display: flex; }
 .modal .caja { padding: 20px; max-width: 560px; width: 100%; max-height: 90vh; overflow: auto; }
-nav.pestanas { display: flex; gap: 4px; flex-wrap: wrap; }
-nav.pestanas button { border-color: transparent; background: transparent; }
-nav.pestanas button.on { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+.marco { display: grid; grid-template-columns: 200px 1fr; max-width: 1500px; margin: 0 auto; }
+.contenido { min-width: 0; }
+.contenido main { margin: 0; }
+nav.lateral { display: flex; flex-direction: column; gap: 2px; padding: 16px 0 16px 16px; position: sticky; top: 58px; align-self: start; }
+nav.lateral button { border-color: transparent; background: transparent; text-align: left; padding: 7px 12px; }
+nav.lateral button.on { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+nav.lateral .grupo-nav { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--suave); margin: 14px 12px 4px; font-weight: 600; }
+@media (max-width: 860px) {
+  .marco { grid-template-columns: 1fr; }
+  nav.lateral { flex-direction: row; overflow-x: auto; padding: 8px 10px; gap: 4px; top: 0; position: static;
+    background: var(--panel); border-bottom: 1px solid var(--borde); -webkit-overflow-scrolling: touch; }
+  nav.lateral .grupo-nav { display: none; }
+  nav.lateral button { white-space: nowrap; flex: none; }
+}
+.tablero { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+.tablero .ancha { grid-column: 1 / -1; }
+@media (min-width: 1200px) { .tablero .doble { grid-column: span 2; } }
+.panelito { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; box-shadow: var(--sombra); padding: 14px 16px; min-width: 0; }
+.panelito > h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); margin: 0 0 10px; }
+.panelito > h3 .ir { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.panelito.destacado { border-color: var(--acento); }
+.cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cifras div { background: var(--fondo); border-radius: 8px; padding: 8px 10px; }
+.cifras b { display: block; font-size: 22px; line-height: 1.2; }
+.cifras span { font-size: 12px; color: var(--suave); }
+.renglon { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--borde); font-size: 13px; }
+.renglon:first-of-type { border-top: 0; }
+.renglon .txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.renglon .der { color: var(--suave); font-size: 12px; white-space: nowrap; }
+.semaforo { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.semaforo .punto { width: 12px; height: 12px; }
+.punto.pausa { background: var(--aviso); }
+.punto.mal { background: var(--peligro); }
+.etiqueta { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--fondo); color: var(--suave); white-space: nowrap; }
+.etiqueta.rojo { background: var(--peligro-suave); color: var(--peligro); }
+.etiqueta.ambar { background: var(--aviso-suave); color: var(--aviso); }
+.etiqueta.verde { background: var(--ok-suave); color: var(--ok); }
+.barra.llena > div { background: var(--peligro); }
+.saludo { font-size: 20px; font-weight: 600; margin: 4px 0 2px; }
 .vista { display: none; }
 .vista.on { display: grid; }
 .vista.simple { grid-template-columns: 1fr; max-width: 1100px; }
@@ -120,19 +154,6 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <body>
 <header>
   <h1>GESTOR <span class="ayuda" id="version" style="font-weight:400"></span></h1>
-  <nav class="pestanas" id="pestanas">
-    <button data-vista="Servicios" class="on">Servicios</button>
-    <button data-vista="Plantillas">Plantillas</button>
-    <button data-vista="Asistente">Asistente</button>
-    <button data-vista="Buscar">Buscar</button>
-    <button data-vista="Espacio">Espacio</button>
-    <button data-vista="Vencimientos">Vencimientos</button>
-    <button data-vista="Respaldo">Respaldo</button>
-    <button data-vista="Duplicados">Duplicados</button>
-    <button data-vista="Papelera">Papelera</button>
-    <button data-vista="Copias">Copias a USB</button>
-    <button data-vista="Estadisticas">Estadísticas</button>
-  </nav>
   <span class="espacio"></span>
   <span class="estado" id="estadoProg"></span>
   <button id="btnPausaTodo" title="Pausa o reanuda todos los servicios automáticos">⏸ Pausar todo</button>
@@ -142,7 +163,30 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 </header>
 <div class="banda" id="bandaDetenido">GESTOR está detenido: no ordena, no vigila y no muestra el icono. <button class="chico prim" id="btnEncender">Encender GESTOR</button></div>
 <div class="banda" id="bandaPausa">GESTOR está en pausa: no se ordenará nada automáticamente. <button class="chico" id="btnReanudar">Reanudar</button></div>
-<main class="vista on" id="vistaServicios">
+<div class="marco">
+<nav class="lateral" id="pestanas">
+  <button data-vista="Inicio" class="on">🏠 Inicio</button>
+  <div class="grupo-nav">Organizar</div>
+  <button data-vista="Servicios">Servicios</button>
+  <button data-vista="Plantillas">Plantillas</button>
+  <button data-vista="Asistente">Asistente</button>
+  <button data-vista="Raiz">Sacar a la raíz</button>
+  <div class="grupo-nav">Encontrar</div>
+  <button data-vista="Buscar">Buscar</button>
+  <button data-vista="Duplicados">Duplicados</button>
+  <button data-vista="Espacio">Espacio</button>
+  <div class="grupo-nav">Proteger</div>
+  <button data-vista="Respaldo">Respaldo</button>
+  <button data-vista="Copias">Copias a USB</button>
+  <button data-vista="Papelera">Papelera</button>
+  <div class="grupo-nav">Al día</div>
+  <button data-vista="Vencimientos">Vencimientos</button>
+  <button data-vista="Estadisticas">Estadísticas</button>
+</nav>
+<div class="contenido">
+<main class="vista simple on" id="vistaInicio"><div id="inicio"><div class="vacio">Cargando…</div></div></main>
+<main class="vista simple" id="vistaRaiz"><div class="caja editor" id="raiz"><h2>Sacar todo a la raíz</h2><div id="aplanar"></div></div></main>
+<main class="vista" id="vistaServicios">
   <div class="caja lista">
     <h2>Servicios</h2>
     <div id="aprendido"></div>
@@ -161,6 +205,8 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <main class="vista simple" id="vistaPapelera"><div class="caja editor" id="papelera"></div></main>
 <main class="vista simple" id="vistaCopias"><div class="caja editor" id="copias"></div></main>
 <main class="vista simple" id="vistaEstadisticas"><div class="caja editor" id="estadisticas"></div></main>
+</div>
+</div>
 
 <div class="modal" id="modalAjustes">
   <div class="caja">
@@ -780,7 +826,7 @@ window.addEventListener("beforeunload", e => { if (sinGuardar) { e.preventDefaul
 setInterval(() => api("/api/latido").catch(() => { }), 60000);
 
 // ---------------------------------------------------------------- pestañas
-let vistaActual = "Servicios";
+let vistaActual = "Inicio";
 $("#pestanas").addEventListener("click", e => {
   const b = e.target.closest("[data-vista]"); if (b) mostrarVista(b.dataset.vista);
 });
@@ -788,11 +834,158 @@ function mostrarVista(nombre) {
   vistaActual = nombre;
   document.querySelectorAll("#pestanas button").forEach(b => b.classList.toggle("on", b.dataset.vista === nombre));
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
-  ({ Plantillas: pintarPlantillas, Buscar: pintarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: cargarRespaldo,
+  window.scrollTo(0, 0);
+  ({ Inicio: cargarInicio, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: pintarBuscar, Espacio: cargarEspacio, Vencimientos: cargarVencimientos, Respaldo: cargarRespaldo,
      Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: cargarPapelera,
      Copias: cargarCopias, Estadisticas: cargarEstadisticas }[nombre] || (() => { }))();
 }
 const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB";
+
+// ---------------------------------------------------------------- inicio
+let tablero = null;
+async function cargarInicio() {
+  try { tablero = await api("/api/dashboard"); pintarInicio(); }
+  catch (e) { $("#inicio").innerHTML = `<div class="vacio">No pude cargar el resumen: ${esc(e.message)}</div>`; }
+}
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+function diasTexto(d) { return d < 0 ? `venció hace ${-d} d` : d === 0 ? "vence hoy" : d === 1 ? "vence mañana" : `en ${d} días`; }
+function pintarInicio() {
+  const d = tablero, e = d.estado, sv = d.servicios;
+  const hora = new Date().getHours();
+  const saludo = hora < 12 ? "Buenos días" : hora < 20 ? "Buenas tardes" : "Buenas noches";
+  let color = "on", titulo = "Todo funcionando", detalle = [];
+  if (e.detenido) { color = "mal"; titulo = "GESTOR está detenido"; }
+  else if (e.pausado) { color = "pausa"; titulo = "En pausa"; }
+  else if (e.no_molestar) { color = "pausa"; titulo = "Esperando: " + e.no_molestar; }
+  else if (e.windows && !e.programacion.instalada) { color = "pausa"; titulo = "Sin programación automática"; }
+  if (!e.detenido) {
+    detalle.push(e.windows ? (e.programacion.instalada ? `Revisa cada ${e.minutos} min` : "Solo con «Ejecutar ahora»") : "Programación solo en Windows");
+    detalle.push(e.residente ? "icono activo" : "sin icono");
+  }
+  detalle.push(plural(sv.activos, "servicio activo", "servicios activos") + ` de ${sv.total}`);
+  const pendientes = sv.en_prueba.filter(x => x.n).length + d.aprendido.length;
+  const discosBajos = d.discos.filter(x => x.total && x.libre / x.total * 100 < d.umbral);
+  const venceYa = d.vencimientos.filter(v => v.dias <= 30);
+
+  const tarjetaEstado = `<div class="panelito ${color === "on" ? "" : "destacado"}">
+    <h3>Estado <span class="ir ayuda">v${esc(d.version)}</span></h3>
+    <div class="semaforo"><span class="punto ${color}"></span>${esc(titulo)}</div>
+    <div class="ayuda">${detalle.map(esc).join(" · ")}</div>
+    <div class="fila" style="margin-top:12px;margin-bottom:0">
+      ${e.detenido ? `<button class="prim" data-ini="encender">Encender GESTOR</button>`
+        : e.pausado ? `<button class="prim" data-ini="reanudar">▶ Reanudar</button>` : `<button data-ini="pausar">⏸ Pausar todo</button>`}
+      <button data-ir="Servicios">Ver servicios</button>
+    </div></div>`;
+
+  const cifra = (n, t) => `<div><b>${n}</b><span>${t}</span></div>`;
+  const tarjetaActividad = `<div class="panelito">
+    <h3>Actividad <button class="chico ir" data-ir="Estadisticas">Estadísticas</button></h3>
+    <div class="ayuda" style="margin-bottom:6px">Hoy</div>
+    <div class="cifras">${cifra(d.hoy.movidos, "ordenados")}${cifra(d.hoy.papelera, "a la papelera")}${cifra(mb(d.hoy.bytes_papelera), "liberados")}</div>
+    <div class="ayuda" style="margin:10px 0 6px">Últimos 7 días</div>
+    <div class="cifras">${cifra(d.semana.movidos, "ordenados")}${cifra(d.semana.papelera, "a la papelera")}${cifra(mb(d.semana.bytes_papelera), "liberados")}</div>
+    <div class="ayuda" style="margin-top:10px">Desde que lo usas: ${d.totales.archivos.toLocaleString("es")} archivos, ${mb(d.totales.bytes_liberados)} liberados.</div>
+  </div>`;
+
+  const filasPend = [
+    ...sv.en_prueba.filter(x => x.n).map(x => `<div class="renglon"><span class="etiqueta ambar">prueba</span>
+      <span class="txt"><b>${esc(x.nombre)}</b>: ${plural(x.n, "cambio propuesto", "cambios propuestos")}</span>
+      <button class="chico prim" data-servicio="${esc(x.id)}">Revisar</button></div>`),
+    ...d.aprendido.map(p => `<div class="renglon"><span class="etiqueta verde">aprendí</span>
+      <span class="txt" title="${esc(p.ejemplos.join(", "))}">«${esc(p.palabra)}» → <b>${esc(nombreCorto(p.carpeta))}</b> (${p.n})</span>
+      <button class="chico prim" data-ini-apr-si="${esc(p.id)}">Hazlo tú</button><button class="chico" data-ini-apr-no="${esc(p.id)}">No</button></div>`)];
+  const enPruebaSinCambios = sv.en_prueba.filter(x => !x.n);
+  const tarjetaPend = `<div class="panelito ${pendientes ? "destacado" : ""}">
+    <h3>Pendiente de tu aprobación ${pendientes ? `<span class="etiqueta ambar">${pendientes}</span>` : ""}</h3>
+    ${filasPend.length ? filasPend.join("") : `<div class="ayuda">Nada pendiente. 👍</div>`}
+    ${enPruebaSinCambios.length ? `<div class="ayuda" style="margin-top:8px">En modo prueba sin cambios por ahora: ${enPruebaSinCambios.map(x => esc(x.nombre)).join(", ")}.</div>` : ""}
+  </div>`;
+
+  const tarjetaVence = `<div class="panelito ${venceYa.length ? "destacado" : ""}">
+    <h3>Vencimientos <button class="chico ir" data-ir="Vencimientos">Ver todos</button></h3>
+    ${d.vencimientos.length ? d.vencimientos.map(v => `<div class="renglon">
+      <span class="etiqueta ${v.dias <= 7 ? "rojo" : v.dias <= 30 ? "ambar" : ""}">${esc(diasTexto(v.dias))}</span>
+      <span class="txt" title="${esc(v.ruta || v.nombre)}"><b>${esc(v.tipo)}</b> · ${esc(v.nombre)}</span></div>`).join("")
+      : `<div class="ayuda">Nada vence en los próximos 60 días.</div>`}
+  </div>`;
+
+  const tarjetaDiscos = `<div class="panelito ${discosBajos.length ? "destacado" : ""}">
+    <h3>Discos <button class="chico ir" data-ir="Espacio">Liberar espacio</button></h3>
+    ${d.discos.map(x => { const usado = x.total ? 100 - x.libre / x.total * 100 : 0, bajo = x.total && x.libre / x.total * 100 < d.umbral;
+      return `<div style="margin-bottom:10px"><div class="fila" style="margin-bottom:4px;justify-content:space-between"><b>${esc(x.letra)}</b>
+        <span class="ayuda" ${bajo ? `style="color:var(--peligro)"` : ""}>${mb(x.libre)} libres de ${mb(x.total)}</span></div>
+        <div class="barra ${bajo ? "llena" : ""}"><div style="width:${usado.toFixed(0)}%"></div></div></div>`; }).join("")}
+    <div class="ayuda">Papelera de GESTOR: ${plural(d.papelera.n, "archivo", "archivos")} (${mb(d.papelera.bytes)}). <a href="#" data-ir="Papelera">Abrir</a></div>
+  </div>`;
+
+  const tarjetaServicios = `<div class="panelito">
+    <h3>Próximas ejecuciones <button class="chico ir" data-ir="Servicios">Servicios</button></h3>
+    ${sv.con_errores.map(x => `<div class="renglon"><span class="etiqueta rojo">error</span><span class="txt"><b>${esc(x.nombre)}</b>: ${plural(x.errores, "archivo con error", "archivos con error")}</span>
+      <button class="chico" data-servicio="${esc(x.id)}">Ver</button></div>`).join("")}
+    ${sv.proximas.length ? sv.proximas.map(x => `<div class="renglon"><span class="txt">${esc(x.nombre)}</span><span class="der">${esc(fechaBonita(x.proxima))}</span></div>`).join("")
+      : `<div class="ayuda">${sv.total ? "Ningún servicio activo con horario." : "Aún no tienes servicios."}</div>`}
+    ${!sv.total ? `<div class="fila" style="margin-top:10px"><button class="prim" data-ir="Plantillas">Empezar con una plantilla</button></div>` : ""}
+  </div>`;
+
+  const tarjetaRespaldo = `<div class="panelito">
+    <h3>Respaldo <button class="chico ir" data-ir="Respaldo">${d.respaldos.length ? "Abrir" : "Configurar"}</button></h3>
+    ${d.respaldos.length ? d.respaldos.map(r => {
+      const horas = r.ultima ? (Date.now() - new Date(r.ultima)) / 3600000 : null;
+      return `<div class="renglon"><span class="etiqueta ${!r.ultima ? "ambar" : r.errores ? "rojo" : horas > 72 ? "ambar" : "verde"}">${!r.ultima ? "nunca" : r.errores ? "con errores" : horas > 72 ? "atrasado" : "al día"}</span>
+        <span class="txt" title="${esc(r.destino)}"><b>${esc(r.nombre || "Respaldo")}</b> → ${esc(r.destino)}</span>
+        <span class="der">${r.ultima ? esc(fechaBonita(r.ultima)) : ""}</span></div>`; }).join("")
+      : `<div class="ayuda">Aún no respaldas Documentos. Con un respaldo con versiones, si algo se borra o se estropea, lo recuperas tal como estaba.</div>`}
+  </div>`;
+
+  const accion = { mover: "→", copiar: "copiado →", papelera: "a la papelera", renombrar: "renombrado →" };
+  const tarjetaUltimos = `<div class="panelito ancha">
+    <h3>Últimos movimientos <button class="chico ir" data-ir="Buscar">Buscar un archivo</button></h3>
+    ${d.ultimos.length ? d.ultimos.map(u => `<div class="renglon">
+      <div class="txt" style="white-space:normal"><b>${esc(u.nombre)}</b> <span class="ayuda">${esc(accion[u.accion] || u.accion)} ${u.destino && u.accion !== "papelera" ? esc(nombreCorto(u.destino.replace(/[\\/][^\\/]+$/, ""))) : ""}</span>
+        <div class="ayuda">${esc(fechaBonita(u.fecha))} · ${esc(u.servicio)}</div></div>
+      ${u.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(u.destino)}">Abrir carpeta</button>` : ""}</div>`).join("")
+      : `<div class="ayuda">Todavía no se ha movido nada.</div>`}
+  </div>`;
+
+  const atajos = [["Plantillas", "Plantillas", "Servicios listos para cada carpeta"], ["Buscar", "Buscar", "¿A dónde fue mi archivo?"],
+    ["Duplicados", "Duplicados", "Archivos repetidos en el disco"], ["Raiz", "Sacar a la raíz", "Vaciar subcarpetas"]];
+  const tarjetaAtajos = `<div class="panelito doble"><h3>Accesos rápidos</h3>
+    <div class="tarjetas" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin:0;gap:8px">${atajos.map(([v, t, a]) =>
+      `<button data-ir="${v}" style="text-align:left;padding:10px"><b>${esc(t)}</b><div class="ayuda">${esc(a)}</div></button>`).join("")}</div></div>`;
+
+  const avisos = [];
+  if (discosBajos.length) avisos.push(`Queda poco espacio en ${discosBajos.map(x => x.letra).join(", ")}.`);
+  if (venceYa.length) avisos.push(`${plural(venceYa.length, "documento vence", "documentos vencen")} en menos de un mes.`);
+  if (pendientes) avisos.push(`${plural(pendientes, "cosa espera", "cosas esperan")} tu aprobación.`);
+  $("#inicio").innerHTML = `
+    <div style="margin:0 2px 14px"><div class="saludo">${saludo}${datos.ajustes.nombre ? ", " + esc(datos.ajustes.nombre) : ""}</div>
+      <div class="ayuda">${avisos.length ? avisos.map(esc).join(" ") : "Todo en orden. GESTOR sigue trabajando por ti."}</div></div>
+    <div class="tablero">
+      ${tarjetaEstado}${tarjetaPend}${tarjetaActividad}
+      ${tarjetaVence}${tarjetaDiscos}${tarjetaServicios}
+      ${tarjetaRespaldo}${tarjetaAtajos}
+      ${tarjetaUltimos}
+    </div>`;
+}
+$("#inicio").addEventListener("click", async e => {
+  const t = e.target.closest("button, a"); if (!t) return;
+  e.preventDefault();
+  try {
+    if (t.dataset.ir) mostrarVista(t.dataset.ir);
+    else if (t.dataset.servicio) {
+      const x = datos.servicios.find(x => x.servicio.id === t.dataset.servicio);
+      mostrarVista("Servicios"); if (x) abrir(JSON.parse(JSON.stringify(x.servicio)));
+    } else if (t.dataset.ini === "pausar" || t.dataset.ini === "reanudar") { await guardarPreferencias({ pausado: t.dataset.ini === "pausar" }); cargarInicio(); }
+    else if (t.dataset.ini === "encender") { await guardarPreferencias({ detenido: false, pausado: false }); cargarInicio(); }
+    else if (t.dataset.iniAprSi) {
+      const res = await api("/api/aprendizaje/aceptar", { id: t.dataset.iniAprSi });
+      aprendidas = res.propuestas; datos.servicios = res.servicios; pintarAprendido(); pintarLista();
+      aviso("Regla añadida al servicio «Aprendido de ti» (en modo prueba)."); cargarInicio();
+    } else if (t.dataset.iniAprNo) {
+      aprendidas = (await api("/api/aprendizaje/descartar", { id: t.dataset.iniAprNo })).propuestas; pintarAprendido(); cargarInicio();
+    } else if (t.dataset.abrirRuta) await api("/api/abrir", { ruta: t.dataset.abrirRuta });
+  } catch (err) { aviso("Error: " + err.message); }
+});
 
 // ---------------------------------------------------------------- preferencias
 function pintarPreferencias() {
@@ -871,9 +1064,7 @@ async function pintarPlantillas(recargar) {
   }
   const docs = Object.values(plant.documentos || {});
   cont.innerHTML = `
-    <h2>Sacar todo a la raíz</h2>
-    <div class="grupo-dup" id="aplanar">${pintarAplanar()}</div>
-    <h2 style="margin-top:22px">Plantillas</h2>
+    <h2>Plantillas</h2>
     <p class="ayuda">Servicios listos para cada tipo de carpeta. Los documentos van a las carpetas que <b>ya tienes en Documentos</b>
       ${docs.length ? `(he encontrado: ${docs.map(d => esc(nombreCorto(d))).join(", ")})` : "(no encontré subcarpetas conocidas: lo que no encaje irá a una carpeta genérica dentro de Documentos)"}.
       Si hace falta crear una carpeta, siempre es dentro de Documentos. Cada servicio arranca <b>en modo prueba</b>: verás lo que haría y lo apruebas con un clic.</p>
@@ -938,12 +1129,14 @@ async function accionAplanar(t) {
   } else return;
   $("#aplanar").innerHTML = pintarAplanar();
 }
-$("#plantillas").addEventListener("click", async e => {
+$("#raiz").addEventListener("click", async e => {
   const t = e.target;
   if (["apElegir", "apVer", "apHacer", "apDeshacer"].includes(t.id)) {
     try { await accionAplanar(t); } catch (err) { aviso("Error: " + err.message); $("#aplanar").innerHTML = pintarAplanar(); }
-    return;
   }
+});
+$("#plantillas").addEventListener("click", async e => {
+  const t = e.target;
   try {
     if (t.id === "plRecargar") { plant.dias = +$("#plDias").value || 0; pintarPlantillas(true); }
     else if (t.dataset.plAbrir) { plant.abierta = plant.abierta === t.dataset.plAbrir ? null : t.dataset.plAbrir; pintarPlantillas(); }
@@ -1475,7 +1668,8 @@ $("#respaldo").addEventListener("click", async e => {
   if (datos.en_red) document.querySelectorAll("#btnCerrar, #ajGuardar, #ajQuitar").forEach(b => b.style.display = "none");
   pintarLista(); pintarProgramacion(); pintarPreferencias(); cargarAprendido();
   if (datos.servicios.length) abrir(JSON.parse(JSON.stringify(datos.servicios[0].servicio)));
-  if (datos.primera_vez) mostrarVista("Asistente");
+  if (datos.primera_vez) mostrarVista("Asistente"); else cargarInicio();
+  setInterval(() => { if (vistaActual === "Inicio" && !document.hidden) cargarInicio(); }, 60000);
 })();
 </script>
 </body>

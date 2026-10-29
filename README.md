@@ -54,6 +54,11 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
 
 ## Más herramientas del panel
 
+El panel abre en **Inicio**: un resumen con el estado de GESTOR, lo que espera tu aprobación
+(servicios en modo prueba y lo aprendido), la actividad de hoy y de la semana, los vencimientos
+próximos, el espacio en disco, las próximas ejecuciones, el respaldo y los últimos movimientos.
+El menú lateral agrupa las herramientas en Organizar, Encontrar, Proteger y Al día.
+
 - **Plantillas** para Descargas, Documentos, Escritorio, Imágenes, capturas, Vídeos, Música,
   facturas y escaneados. Los documentos van a las subcarpetas que **ya existen** en Documentos
   (Facturas, Contratos, Bancos…); si hay que crear alguna, siempre es dentro de Documentos.
