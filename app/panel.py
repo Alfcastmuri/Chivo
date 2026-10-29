@@ -18,10 +18,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 
+import aprendizaje
 import nucleo
 import plantillas
+import respaldo
+import vencimientos
 
 PUERTO = int(os.environ.get("GESTOR_PUERTO", "8765"))
+PUERTO_RED = int(os.environ.get("GESTOR_PUERTO_RED", "8770"))  # panel para el celular (lo sirve el residente)
+SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes"}
 TOKEN = secrets.token_urlsafe(24)
 INACTIVIDAD_SEGUNDOS = 5 * 60
 ultima_actividad = time.time()
@@ -118,6 +123,37 @@ def primera_vez():
     return not ajustes.get("asistente_visto") and not any(s.get("activo") for s in nucleo.cargar_servicios())
 
 
+TRABAJOS = {}  # tareas largas en segundo plano: escanear vencimientos, respaldar...
+
+
+def en_segundo_plano(nombre, funcion, *args):
+    if (TRABAJOS.get(nombre) or {}).get("estado") == "en marcha":
+        return {"ok": False, "mensaje": "Ya está en marcha."}
+    TRABAJOS[nombre] = {"estado": "en marcha", "inicio": time.strftime("%H:%M:%S")}
+
+    def trabajo():
+        try:
+            TRABAJOS[nombre] = {"estado": "terminado", "resultado": funcion(*args)}
+        except Exception as e:
+            TRABAJOS[nombre] = {"estado": "error", "error": str(e)}
+
+    threading.Thread(target=trabajo, daemon=True).start()
+    return {"ok": True}
+
+
+def ip_local():
+    """La IP de este equipo en la red de casa (sin enviar nada: el socket UDP solo elige la ruta)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.168.0.1", 9))
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 TRABAJO_DUPLICADOS = {"estado": "inactivo"}
 
 
@@ -158,6 +194,8 @@ def servicios_con_estado():
 
 
 class Manejador(BaseHTTPRequestHandler):
+    en_red = False
+
     def log_message(self, *args):
         pass
 
@@ -237,6 +275,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self._responder(403, {"error": "Acceso no permitido"})
         if not self._sesion_valida():
             return self._responder(401, {"error": "Sesión caducada: vuelve a entrar."})
+        if self.en_red and ruta in SOLO_EN_EL_PC:
+            return self._responder(403, {"error": "Esto solo se puede hacer desde el PC."})
         ultima_actividad = time.time()
         try:
             datos = self._leer()
@@ -251,7 +291,9 @@ class Manejador(BaseHTTPRequestHandler):
                     "pypdf": nucleo.pypdf_disponible(), "watchdog": watchdog_disponible(),
                     "carpetas_rapidas": nucleo.carpetas_rapidas(), "ajustes": nucleo.cargar_ajustes(),
                     "programacion": nucleo.estado_programacion(), "windows": nucleo.ES_WINDOWS,
-                    "residente": nucleo.residente_activo(), "primera_vez": primera_vez()}
+                    "residente": nucleo.residente_activo(), "primera_vez": primera_vez(),
+                    "version": nucleo.VERSION, "aprendido": len(aprendizaje.propuestas()),
+                    "en_red": self.en_red}
         if ruta == "/api/latido":
             return {"ok": True}
         if ruta == "/api/servicios":
@@ -349,10 +391,18 @@ class Manejador(BaseHTTPRequestHandler):
                                           "horas": bool(nm.get("horas")),
                                           "desde": str(nm.get("desde") or "22:00")[:5],
                                           "hasta": str(nm.get("hasta") or "07:00")[:5]}
+            for clave in ("acceso_red", "aprender", "vencimientos", "renombrar_facturas"):
+                if clave in datos:
+                    ajustes[clave] = bool(datos[clave])
+            if "detenido" in datos:
+                ajustes["detenido"] = bool(datos["detenido"])
             if "asistente_visto" in datos:
                 ajustes["asistente_visto"] = True
             nucleo.guardar_ajustes(ajustes)
-            nucleo.lanzar_residente()
+            if ajustes.get("detenido"):
+                nucleo.cerrar_residente()
+            else:
+                nucleo.lanzar_residente()
             return {"ok": True, "ajustes": ajustes}
         if ruta == "/api/estadisticas":
             estado = nucleo.cargar_estado()
@@ -409,6 +459,59 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/copias/ejecutar":
             copia = next(c for c in nucleo.cargar_ajustes().get("copias", []) if c["id"] == datos["id"])
             return nucleo.ejecutar_copia(copia)
+        if ruta == "/api/aprendizaje":
+            return {"propuestas": aprendizaje.propuestas()}
+        if ruta == "/api/aprendizaje/aceptar":
+            servicio = aprendizaje.aceptar(datos["id"])
+            nucleo.lanzar_residente()
+            return {"ok": True, "id": servicio["id"], "propuestas": aprendizaje.propuestas(),
+                    "servicios": servicios_con_estado()}
+        if ruta == "/api/aprendizaje/descartar":
+            aprendizaje.descartar(datos["id"])
+            return {"ok": True, "propuestas": aprendizaje.propuestas()}
+        if ruta == "/api/vencimientos":
+            return dict(vencimientos.lista(), trabajo=TRABAJOS.get("vencimientos"),
+                        carpetas=vencimientos.carpetas_a_revisar(), tipos=[t for t, _ in vencimientos.TIPOS])
+        if ruta == "/api/vencimientos/escanear":
+            return en_segundo_plano("vencimientos", vencimientos.escanear, 3600)
+        if ruta == "/api/vencimientos/cambiar":
+            vencimientos.cambiar(datos["clave"], datos.get("fecha"), datos.get("ignorar"), datos.get("borrar"))
+            return vencimientos.lista()
+        if ruta == "/api/vencimientos/agregar":
+            vencimientos.agregar(datos.get("nombre", ""), datos["fecha"], datos.get("tipo", ""))
+            return vencimientos.lista()
+        if ruta == "/api/respaldos":
+            return {"respaldos": respaldo.lista(), "estado": respaldo.estado(),
+                    "sugeridos": respaldo.destinos_sugeridos(), "documentos": nucleo.carpeta_conocida("Documentos"),
+                    "trabajos": {k[9:]: v for k, v in TRABAJOS.items() if k.startswith("respaldo-")}}
+        if ruta == "/api/respaldos/guardar":
+            lista = []
+            for r in datos.get("respaldos", []):
+                problema = respaldo.validar(r.get("origen"), r.get("destino"))
+                if problema:
+                    return {"ok": False, "mensaje": problema}
+                lista.append({"id": r.get("id") or nucleo.nuevo_id(), "nombre": str(r.get("nombre") or "Respaldo"),
+                              "origen": os.path.normpath(r["origen"]), "destino": os.path.normpath(r["destino"]),
+                              "cada_horas": max(1, int(r.get("cada_horas") or 24)),
+                              "dias_versiones": max(1, int(r.get("dias_versiones") or 90)),
+                              "activo": bool(r.get("activo", True))})
+            ajustes = nucleo.cargar_ajustes()
+            ajustes["respaldos"] = lista
+            nucleo.guardar_ajustes(ajustes)
+            avisos = [a for a in (respaldo.aviso_nube(r["origen"], r["destino"]) for r in lista) if a]
+            return {"ok": True, "respaldos": lista, "avisos": avisos}
+        if ruta == "/api/respaldos/ejecutar":
+            r = next(x for x in respaldo.lista() if x["id"] == datos["id"])
+            return en_segundo_plano("respaldo-" + r["id"], respaldo.ejecutar, r)
+        if ruta == "/api/respaldos/versiones":
+            r = next(x for x in respaldo.lista() if x["id"] == datos["id"])
+            return {"versiones": respaldo.buscar_versiones(r["destino"], datos.get("texto", ""))}
+        if ruta == "/api/respaldos/restaurar":
+            r = next(x for x in respaldo.lista() if x["id"] == datos["id"])
+            return {"ok": True, "ruta": respaldo.restaurar_version(r, datos["ruta"])}
+        if ruta == "/api/red":
+            return {"activo": bool(nucleo.cargar_ajustes().get("acceso_red")), "hay_clave": hay_clave(),
+                    "url": f"http://{ip_local()}:{PUERTO_RED}/", "residente": nucleo.residente_activo()}
         if ruta == "/api/plantillas":
             return {"plantillas": plantillas.catalogo(int(datos.get("dias") or 14)),
                     "documentos": plantillas.mapa_documentos()[0]}
@@ -491,18 +594,51 @@ class Manejador(BaseHTTPRequestHandler):
 
 def vigilar_inactividad():
     while True:
-        time.sleep(30)
-        if time.time() - ultima_actividad > INACTIVIDAD_SEGUNDOS:
+        time.sleep(2)
+        if time.time() - ultima_actividad > INACTIVIDAD_SEGUNDOS or nucleo.debo_cerrarme():
             os._exit(0)
+
+
+class ManejadorRed(Manejador):
+    """El mismo panel, desde otros equipos de la red de casa. Siempre con contraseña."""
+    en_red = True
+
+    def _host_valido(self):
+        import ipaddress
+        try:
+            cliente = ipaddress.ip_address(self.client_address[0])
+        except ValueError:
+            return False
+        return (cliente.is_private or cliente.is_loopback) and bool(self.headers.get("Host")) and hay_clave()
+
+    def _origen_valido(self):
+        return self.headers.get("Origin") == f'http://{self.headers.get("Host")}'
+
+
+def servidor_en_red():
+    return ThreadingHTTPServer(("0.0.0.0", PUERTO_RED), ManejadorRed)
 
 
 def main():
     try:
-        servidor = ThreadingHTTPServer(("127.0.0.1", PUERTO), Manejador)
-    except OSError:
-        # Ya hay un panel abierto: se reutiliza.
+        relevo = nucleo.tomar_el_relevo()  # si hay otra versión de GESTOR abierta, se cierra
+    except Exception:
+        relevo = {"cerrados": 0}
+    servidor = None
+    for _ in range(8 if relevo["cerrados"] else 1):  # el puerto tarda un momento en quedar libre
+        try:
+            servidor = ThreadingHTTPServer(("127.0.0.1", PUERTO), Manejador)
+            break
+        except OSError:
+            time.sleep(1)
+    if not servidor:
+        # Ya hay un panel de esta versión abierto: se reutiliza.
         webbrowser.open(f"http://127.0.0.1:{PUERTO}/")
         return
+    try:
+        nucleo.lanzar_residente()
+    except Exception:
+        pass
     threading.Thread(target=vigilar_inactividad, daemon=True).start()
     url = f"http://127.0.0.1:{PUERTO}/"
     print(f"Panel de GESTOR en {url}  (cierra esta ventana o usa 'Cerrar panel' para salir)")

@@ -19,6 +19,7 @@ import sys
 import time
 import uuid
 
+VERSION = "0.4.0"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -62,9 +63,11 @@ MESES = ["", "01-Enero", "02-Febrero", "03-Marzo", "04-Abril", "05-Mayo", "06-Ju
 
 AJUSTES_POR_DEFECTO = {"revisar_cada_minutos": 5, "pausado": False, "notificaciones": True,
                        "icono_bandeja": True, "papelera": "gestor", "retencion_dias": 30, "copias": [],
-                       "mis_rfc": "", "umbral_disco": 10, "aviso_semanal": True,
+                       "mis_rfc": "", "umbral_disco": 10, "aviso_semanal": True, "renombrar_facturas": True,
                        "no_molestar": {"bateria": True, "pantalla_completa": True,
                                        "horas": False, "desde": "22:00", "hasta": "07:00"}}
+ARCHIVO_DETENER = os.path.join(DATOS, "detener.json")  # pide a otros procesos de GESTOR que se cierren
+ARCHIVO_PID_RESIDENTE = os.path.join(DATOS, "residente.pid")
 ARCHIVO_SISTEMA = os.path.join(DATOS, "sistema.json")  # avisos de disco, resumen semanal
 ARCHIVO_INDICE = os.path.join(DATOS, "indice.jsonl")   # a dónde fue cada archivo, para el buscador
 MAX_INDICE = 20 * 1024 * 1024
@@ -614,13 +617,15 @@ def _cfdi_xml(ruta):
             "rfc": (emisor.get("Rfc") or emisor.get("rfc") or "") if emisor is not None else "",
             "proveedor": (emisor.get("Nombre") or emisor.get("nombre") or "") if emisor is not None else "",
             "rfc_receptor": (receptor.get("Rfc") or "") if receptor is not None else "",
-            "fecha": raiz.get("Fecha") or raiz.get("fecha") or ""}
+            "fecha": raiz.get("Fecha") or raiz.get("fecha") or "",
+            "total": raiz.get("Total") or raiz.get("total") or "",
+            "folio": ((raiz.get("Serie") or "") + (raiz.get("Folio") or "")).strip()}
 
 
 @functools.lru_cache(maxsize=1024)
 def _datos_factura(ruta, _mtime, mis_rfc):
     extension = os.path.splitext(ruta)[1].lower()
-    vacio = {"es_factura": False, "rfc": "", "proveedor": "", "rfc_receptor": "", "fecha": ""}
+    vacio = {"es_factura": False, "rfc": "", "proveedor": "", "rfc_receptor": "", "fecha": "", "total": "", "folio": ""}
     if extension == ".xml":
         return _cfdi_xml(ruta) or vacio
     if extension != ".pdf":
@@ -645,8 +650,69 @@ def _datos_factura(ruta, _mtime, mis_rfc):
             proveedor = re.split(r"\s{2,}|\bRFC\b", m.group(1).strip(), flags=re.IGNORECASE)[0].strip(" :-,")
             if proveedor:
                 break
+    totales = _TOTAL.findall(texto)
+    fecha = _FECHA_FACTURA.search(texto)
     return {"es_factura": True, "rfc": ajenos[0] if ajenos else (rfcs[0] if rfcs else ""),
-            "proveedor": proveedor, "rfc_receptor": "", "fecha": ""}
+            "proveedor": proveedor, "rfc_receptor": "",
+            "fecha": fecha.group(1) if fecha else "",
+            "total": totales[-1].replace(",", "") if totales else "", "folio": ""}
+
+
+_TOTAL = re.compile(r"\btotal\b(?!\s*(?:de\s+)?(?:impuestos|trasladados|retenidos|art))[^\d\n]{0,25}\$?\s*([\d,]+\.\d{2})",
+                    re.IGNORECASE)
+_FECHA_FACTURA = re.compile(r"(?:fecha\s*(?:y\s*hora\s*)?de\s*emisi[oó]n|fecha)\s*[:\-]?\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
+
+# Nombres cortos de emisores frecuentes, para nombres de archivo legibles.
+_PROVEEDORES_CORTOS = {
+    "comision federal de electricidad": "CFE", "telefonos de mexico": "Telmex", "radiomovil dipsa": "Telcel",
+    "servicio de administracion tributaria": "SAT", "instituto mexicano del seguro social": "IMSS",
+    "cadena comercial oxxo": "OXXO", "nueva wal mart de mexico": "Walmart", "costco de mexico": "Costco",
+    "amazon": "Amazon", "mercado libre": "Mercado Libre", "uber": "Uber", "didi": "DiDi",
+    "cablevision red": "izzi", "total play telecomunicaciones": "Totalplay", "tiendas soriana": "Soriana",
+    "tiendas chedraui": "Chedraui", "home depot mexico": "Home Depot", "liverpool": "Liverpool",
+    "naturgy": "Naturgy", "gas natural": "Naturgy", "pemex": "Pemex", "at&t": "AT&T",
+}
+_SOCIEDADES = re.compile(r"[,.]?\s*\b(s\.?\s*a\.?\s*p?\.?\s*i?\.?(\s*de\s*c\.?\s*v\.?)?|s\.?\s*de\s*r\.?\s*l\.?(\s*de\s*c\.?\s*v\.?)?|"
+                         r"s\.?\s*c\.?|a\.?\s*c\.?|s\.?\s*a\.?\s*b\.?(\s*de\s*c\.?\s*v\.?)?)\s*$", re.IGNORECASE)
+
+
+def proveedor_corto(nombre):
+    """"COMISION FEDERAL DE ELECTRICIDAD" → "CFE"; "PAPELERIA LOPEZ SA DE CV" → "Papeleria Lopez"."""
+    n = re.sub(r"\s+", " ", nombre or "").strip()
+    plano = sin_acentos(n.lower())
+    for clave, corto in _PROVEEDORES_CORTOS.items():
+        if clave in plano:
+            return corto
+    n = _SOCIEDADES.sub("", n).strip(" ,.")
+    palabras = n.split()
+    if n.isupper():
+        palabras = [p if len(p) <= 3 and p.isalpha() and p not in ("DE", "DEL", "LA", "LOS", "Y") else p.title()
+                    for p in palabras]
+    palabras = palabras[:3]
+    while len(palabras) > 1 and sin_acentos(palabras[-1].lower()) in ("de", "del", "la", "las", "los", "y", "e"):
+        palabras.pop()
+    return " ".join(palabras)
+
+
+NOMBRE_FACTURA = "{fecha_factura} {proveedor_corto} {total}"
+
+
+def nombre_factura(ruta, origen, fecha, regla=None):
+    """"2026-10 CFE $1,234.50" con los datos de la factura, o None si no hay datos suficientes."""
+    f = datos_factura(ruta)
+    if not f["es_factura"] or not (proveedor_corto(f.get("proveedor")) or f.get("rfc")) or not f.get("total"):
+        return None
+    nuevo = re.sub(r"\s+", " ", expandir(NOMBRE_FACTURA, ruta, origen, fecha, regla)).strip()
+    if f.get("folio"):
+        nuevo += f' {f["folio"]}'
+    return _limpiar_nombre(nuevo)
+
+
+def _total_legible(total):
+    try:
+        return "${:,.2f}".format(float(total))
+    except (TypeError, ValueError):
+        return ""
 
 
 def datos_factura(ruta):
@@ -778,6 +844,13 @@ def expandir(patron, ruta, origen, fecha, regla=None):
         valores["rfc"] = f["rfc"] or "Sin RFC"
         valores["proveedor"] = (f["proveedor"] or f["rfc"] or "Proveedor desconocido").title() \
             if f["proveedor"].isupper() else (f["proveedor"] or f["rfc"] or "Proveedor desconocido")
+    if re.search(r"\{(fecha_factura|total|proveedor_corto|folio)\}", patron):
+        f = datos_factura(ruta)
+        fecha_f = (f.get("fecha") or "")[:7]
+        valores["fecha_factura"] = fecha_f if re.match(r"\d{4}-\d{2}$", fecha_f) else f"{fecha:%Y-%m}"
+        valores["total"] = _total_legible(f.get("total"))
+        valores["proveedor_corto"] = proveedor_corto(f.get("proveedor")) or f.get("rfc") or ""
+        valores["folio"] = f.get("folio") or ""
     if "{tipo_acceso}" in patron:
         valores["tipo_acceso"] = tipo_acceso(ruta)
     if "{dato}" in patron:
@@ -1295,8 +1368,13 @@ def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
                 "bytes": st.st_size, "categoria": categoria}
     nombre = os.path.basename(ruta)
     extension = os.path.splitext(nombre)[1]
+    if not regla.get("nuevo_nombre") and (regla.get("si") or {}).get("factura") \
+            and cargar_ajustes().get("renombrar_facturas", True):
+        nuevo = nombre_factura(ruta, origen, fecha, regla)
+        if nuevo:
+            nombre = nuevo + extension
     if regla.get("nuevo_nombre"):
-        nombre = _limpiar_nombre(expandir(regla["nuevo_nombre"], ruta, origen, fecha, regla)) + extension
+        nombre = _limpiar_nombre(re.sub(r"\s+", " ", expandir(regla["nuevo_nombre"], ruta, origen, fecha, regla))) + extension
     limpiado = False
     if servicio.get("limpiar_nombres") or servicio.get("fecha_al_inicio"):
         base = os.path.splitext(nombre)[0]
@@ -2368,6 +2446,10 @@ def residente_activo():
 
 def necesita_residente():
     ajustes = cargar_ajustes()
+    if ajustes.get("detenido"):
+        return False
+    if ajustes.get("acceso_red"):
+        return True
     if ajustes.get("icono_bandeja", True) and ES_WINDOWS:
         return True
     return any(s.get("activo") and (s.get("horario") or {}).get("tipo") == "instante"
@@ -2390,6 +2472,122 @@ def lanzar_residente():
 
 
 # --------------------------------------------------------------------------- Programador de tareas
+
+# --------------------------------------------------------------------------- versiones y relevo
+
+def _procesos_windows():
+    """[(pid, ruta del ejecutable)] de los procesos que se pueden consultar."""
+    import ctypes
+    from ctypes import wintypes
+    psapi, kernel32 = ctypes.windll.psapi, ctypes.windll.kernel32
+    pids = (wintypes.DWORD * 4096)()
+    usados = wintypes.DWORD()
+    if not psapi.EnumProcesses(ctypes.byref(pids), ctypes.sizeof(pids), ctypes.byref(usados)):
+        return []
+    salida = []
+    for pid in pids[:usados.value // ctypes.sizeof(wintypes.DWORD)]:
+        h = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            continue
+        try:
+            buf = ctypes.create_unicode_buffer(1024)
+            largo = wintypes.DWORD(1024)
+            if kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(largo)):
+                salida.append((pid, buf.value))
+        finally:
+            kernel32.CloseHandle(h)
+    return salida
+
+
+def otras_versiones():
+    """Procesos GESTOR.exe que se ejecutan desde otra carpeta (otra versión). Solo en el .exe."""
+    if not (ES_WINDOWS and EMPAQUETADO):
+        return []
+    propio = _norm(sys.executable)
+    nombre = os.path.basename(sys.executable).lower()
+    return [(pid, ruta) for pid, ruta in _procesos_windows()
+            if pid != os.getpid() and os.path.basename(ruta).lower() == nombre and _norm(ruta) != propio]
+
+
+def pedir_cierre(pids):
+    """Pide a esos procesos que se cierren solos (los de esta versión o posteriores lo atienden)."""
+    escribir_json(ARCHIVO_DETENER, {"pids": list(pids), "t": time.time()})
+
+
+def cerrar_residente():
+    """Pide al residente (icono, al instante) que se cierre."""
+    try:
+        with open(ARCHIVO_PID_RESIDENTE) as f:
+            pedir_cierre([int(f.read().strip())])
+    except (OSError, ValueError):
+        pass
+
+
+def debo_cerrarme():
+    datos = leer_json(ARCHIVO_DETENER, {})
+    return os.getpid() in (datos.get("pids") or []) and time.time() - datos.get("t", 0) < 120
+
+
+def relevar_versiones_antiguas(espera=6):
+    """Al abrir una versión nueva: cierra la anterior (icono, panel) para que no se queden dos a la vez.
+
+    Primero se lo pide con amabilidad; si a los pocos segundos sigue abierta (las versiones viejas no
+    entienden la petición), se cierra a la fuerza. Devuelve cuántos procesos cerró.
+    """
+    otras = otras_versiones()
+    if not otras:
+        return 0
+    pedir_cierre([pid for pid, _ in otras])
+    limite = time.time() + espera
+    while time.time() < limite and otras_versiones():
+        time.sleep(0.5)
+    import ctypes
+    for pid, _ in otras_versiones():
+        h = ctypes.windll.kernel32.OpenProcess(0x0001, False, pid)  # PROCESS_TERMINATE
+        if h:
+            ctypes.windll.kernel32.TerminateProcess(h, 0)
+            ctypes.windll.kernel32.CloseHandle(h)
+    time.sleep(1)
+    try:
+        os.remove(ARCHIVO_BLOQUEO)  # por si la versión vieja lo dejó puesto
+    except OSError:
+        pass
+    return len(otras)
+
+
+def comando_programado():
+    """El comando que tiene la tarea programada ahora mismo (o "" si no hay tarea)."""
+    if not ES_WINDOWS:
+        return ""
+    import subprocess
+    r = subprocess.run(["schtasks", "/Query", "/TN", NOMBRE_TAREA, "/XML"], capture_output=True,
+                       creationflags=0x08000000)
+    if r.returncode != 0:
+        return ""
+    xml = r.stdout.decode("utf-16", "ignore") if r.stdout[:2] in (b"\xff\xfe", b"\xfe\xff") \
+        else r.stdout.decode("utf-8", "ignore")
+    m = re.search(r"<Command>(.*?)</Command>", xml, re.S)
+    return m.group(1).strip().strip('"') if m else ""
+
+
+def actualizar_programacion():
+    """Si la tarea programada apunta a otra versión del .exe, la cambia a esta. Devuelve True si cambió."""
+    if not (ES_WINDOWS and EMPAQUETADO):
+        return False
+    actual = comando_programado()
+    if not actual or _norm(actual) == _norm(sys.executable):
+        return False
+    return programar_motor(int(cargar_ajustes().get("revisar_cada_minutos") or 5)).get("ok", False)
+
+
+def tomar_el_relevo():
+    """Lo hace cada versión al abrirse: cierra la vieja, actualiza la tarea y arranca su residente."""
+    cerrados = relevar_versiones_antiguas()
+    cambiada = actualizar_programacion()
+    if cerrados or cambiada:
+        avisar("GESTOR actualizado", f"Ahora funciona la versión {VERSION}.")
+    return {"cerrados": cerrados, "programacion_actualizada": cambiada}
+
 
 NOMBRE_TAREA = "GESTOR\\Motor"
 

@@ -109,6 +109,100 @@ class Vigilante:
                     registrar_error()
 
 
+class Aprendiz:
+    """Vigila Documentos para "aprender de ti": qué archivos mueves a mano y a qué carpeta."""
+
+    ESPERA = 60          # se espera a que GESTOR anote sus propios movimientos antes de juzgar
+    PENSAR_CADA = 300
+
+    def __init__(self):
+        self.observador = None
+        self.carpeta = None
+        self.eventos = []    # (momento, destino, origen)
+        self.candado = threading.Lock()
+        self.ultimo_pensar = 0
+        self.observados = 0
+
+    def recargar(self):
+        activo = nucleo.cargar_ajustes().get("aprender", True) and not nucleo.cargar_ajustes().get("detenido")
+        carpeta = nucleo.carpeta_conocida("Documentos") if activo else None
+        if carpeta == self.carpeta:
+            return
+        self.detener()
+        self.carpeta = carpeta
+        if not carpeta or not os.path.isdir(carpeta):
+            return
+        try:
+            from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
+        except ImportError:
+            return
+        aprendiz = self
+
+        class Manejador(FileSystemEventHandler):
+            def on_created(self, evento):
+                if not evento.is_directory:
+                    aprendiz.anotar(evento.src_path, None)
+
+            def on_moved(self, evento):
+                if not evento.is_directory:
+                    aprendiz.anotar(evento.dest_path, evento.src_path)
+
+        self.observador = Observer()
+        self.observador.schedule(Manejador(), carpeta, recursive=True)
+        self.observador.start()
+
+    def anotar(self, destino, origen):
+        with self.candado:
+            if len(self.eventos) < 500:
+                self.eventos.append((time.time(), destino, origen))
+
+    def atender(self):
+        import aprendizaje
+        ahora = time.time()
+        with self.candado:
+            listos = [e for e in self.eventos if ahora - e[0] >= self.ESPERA]
+            self.eventos = [e for e in self.eventos if ahora - e[0] < self.ESPERA]
+        for _, destino, origen in listos:
+            if os.path.isfile(destino) and aprendizaje.observar(destino, origen):
+                self.observados += 1
+        if self.observados and ahora - self.ultimo_pensar >= self.PENSAR_CADA:
+            self.ultimo_pensar = ahora
+            self.observados = 0
+            aprendizaje.pensar()
+
+    def detener(self):
+        if self.observador:
+            self.observador.stop()
+            self.observador.join(timeout=5)
+            self.observador = None
+
+
+class PanelEnRed:
+    """El panel en la red de casa (para el celular). Solo si se activa en Ajustes y hay contraseña."""
+
+    def __init__(self):
+        self.servidor = None
+
+    def recargar(self):
+        import panel
+        quiere = bool(nucleo.cargar_ajustes().get("acceso_red")) and panel.hay_clave()
+        if quiere and not self.servidor:
+            try:
+                self.servidor = panel.servidor_en_red()
+                threading.Thread(target=self.servidor.serve_forever, daemon=True).start()
+            except OSError:
+                self.servidor = None
+        elif not quiere and self.servidor:
+            self.detener()
+
+    def detener(self):
+        if self.servidor:
+            self.servidor.shutdown()
+            self.servidor.server_close()
+            self.servidor = None
+
+
 class Bandeja:
     """Icono junto al reloj con menú y notificaciones. Necesita pystray y Pillow."""
 
@@ -142,7 +236,7 @@ class Bandeja:
             p.MenuItem("Notificaciones", self._notificaciones,
                        checked=lambda _: nucleo.cargar_ajustes().get("notificaciones", True)),
             p.Menu.SEPARATOR,
-            p.MenuItem("Salir de GESTOR", self._salir),
+            p.MenuItem("Cerrar GESTOR (detener todo)", self._salir),
         )
 
     def _abrir_panel(self, *_):
@@ -180,6 +274,10 @@ class Bandeja:
         nucleo.guardar_ajustes(ajustes)
 
     def _salir(self, *_):
+        # Detenido: el motor no vuelve a abrir el icono ni ordena nada hasta que lo enciendas en el panel.
+        ajustes = nucleo.cargar_ajustes()
+        ajustes["detenido"] = True
+        nucleo.guardar_ajustes(ajustes)
         self.icono.stop()
         self.al_salir()
 
@@ -197,15 +295,30 @@ class Bandeja:
 
 def main(args):
     # Un solo residente a la vez: el puerto hace de cerrojo y permite saber si está en marcha.
-    cerrojo = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        cerrojo.bind(("127.0.0.1", nucleo.PUERTO_RESIDENTE))
-        cerrojo.listen(5)
-    except OSError:
-        return
+        nucleo.tomar_el_relevo()  # si hay otra versión abierta, se cierra y esta ocupa su lugar
+    except Exception:
+        registrar_error()
+    cerrojo = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    for intento in range(10):
+        try:
+            cerrojo.bind(("127.0.0.1", nucleo.PUERTO_RESIDENTE))
+            cerrojo.listen(5)
+            break
+        except OSError:
+            if intento == 9 or not nucleo.EMPAQUETADO:
+                return
+            time.sleep(1)
     threading.Thread(target=lambda: [c.close() for c, _ in iter(cerrojo.accept, None)], daemon=True).start()
+    try:
+        with open(nucleo.ARCHIVO_PID_RESIDENTE, "w") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass
 
     vigilante = Vigilante()
+    aprendiz = Aprendiz()
+    en_red = PanelEnRed()
     salir = threading.Event()
     bandeja = None
     if "--sin-icono" not in args and nucleo.cargar_ajustes().get("icono_bandeja", True):
@@ -221,9 +334,14 @@ def main(args):
         while not salir.is_set():
             try:
                 ahora = time.time()
+                if nucleo.debo_cerrarme():
+                    salir.set()
+                    break
                 if ahora - ultima_recarga >= 10:
                     ultima_recarga = ahora
                     vigilante.recargar()
+                    aprendiz.recargar()
+                    en_red.recargar()
                     if not nucleo.necesita_residente():
                         salir.set()
                         break
@@ -238,6 +356,7 @@ def main(args):
                             ultima_firma = firma
                             bandeja.actualizar()
                 vigilante.atender()
+                aprendiz.atender()
                 avisos, posicion = nucleo.leer_avisos_desde(posicion)
                 if bandeja:
                     for a in avisos[-3:]:
@@ -246,6 +365,8 @@ def main(args):
                 registrar_error()
             salir.wait(REVISION_SEGUNDOS)
         vigilante.detener()
+        aprendiz.detener()
+        en_red.detener()
         if bandeja:
             bandeja.icono.stop()
 

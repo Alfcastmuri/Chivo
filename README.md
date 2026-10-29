@@ -64,6 +64,15 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
 - **No molestar:** con batería, con un juego o presentación a pantalla completa o en ciertas
   horas, los servicios esperan.
 - **Aviso semanal** con lo que se ordenó.
+- **Aprender de ti:** si mueves a mano archivos a una carpeta de Documentos, GESTOR ve qué tienen
+  en común y te propone una regla ("los archivos con «predial» van a Casa").
+- **Vencimientos:** lee la vigencia de pólizas, contratos, INE, pasaportes, licencias y garantías
+  y avisa un mes antes, una semana antes y el día.
+- **Facturas con nombre útil:** `2026-10 CFE $1,234.50 A77.pdf`, con los datos del XML.
+- **Respaldo con versiones** a OneDrive, Google Drive o un disco: `Actual` y `Versiones`.
+- **Desde el celular:** el panel en la red de casa (`http://IP-del-PC:8770`), con contraseña.
+- **Pausar todo / Detener GESTOR** desde el panel o el icono. Al abrir una versión nueva, la
+  anterior se cierra sola y la tarea programada pasa a usar el .exe nuevo.
 - **Asistente:** analiza una carpeta y propone reglas ("tienes 340 fotos de WhatsApp").
 - **Duplicados:** busca archivos idénticos en las carpetas o discos que elijas.
 - **Papelera de GESTOR:** guarda 30 días (configurable) lo que se quita, con restauración.

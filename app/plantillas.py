@@ -155,7 +155,7 @@ def reglas_documentos(documentos, por_año=False, crear_faltantes=False, sin_uso
         if clave == "facturas":
             destino = os.path.join(carpeta, "{proveedor}", "{año}")
             salida.append(_regla(dict(extra_si, factura=True, extensiones=".pdf,.xml"), destino,
-                                 f"Facturas (PDF/XML del SAT) → {nombre_carpeta}\\{{proveedor}}\\{{año}}{aviso}",
+                                 f"Facturas (PDF/XML del SAT) → {nombre_carpeta}\\{{proveedor}}\\{{año}}, con nombre «2026-10 CFE $1,234.50»{aviso}",
                                  marcada=not nueva))
             continue
         destino = os.path.join(carpeta, "{año}") if por_año else carpeta

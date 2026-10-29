@@ -445,6 +445,101 @@ class PruebaVaciarYPlantillas(PruebaServicio):
         self.assertFalse(nucleo.aviso_semanal(ahora + 2))  # una vez por semana
 
 
+class PruebaCincoMas(PruebaServicio):
+    def viejo(self, ruta, dias):
+        t = time.time() - dias * 86400
+        os.utime(ruta, (t, t))
+
+    def test_factura_con_nombre_util(self):
+        self.assertEqual(nucleo.proveedor_corto("COMISION FEDERAL DE ELECTRICIDAD"), "CFE")
+        self.assertEqual(nucleo.proveedor_corto("Servicios Integrales del Norte, S.A. de C.V."), "Servicios Integrales")
+        self.crear("abc123.pdf", b"%PDF-1.4")
+        self.crear("abc123.xml", b'<?xml version="1.0"?><cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" '
+                                 b'Fecha="2026-10-03T10:00:00" Total="1234.5" Serie="A" Folio="77">'
+                                 b'<cfdi:Emisor Rfc="CFE370814QI0" Nombre="COMISION FEDERAL DE ELECTRICIDAD"/>'
+                                 b'</cfdi:Comprobante>')
+        regla = {"id": "r", "si": {"factura": True}, "accion": "mover", "destino": self.destino}
+        plan, _ = nucleo.planificar(self.servicio([regla]))
+        self.assertEqual(sorted(os.path.basename(o["destino"]) for o in plan),
+                         ["2026-10 CFE $1,234.50 A77.pdf", "2026-10 CFE $1,234.50 A77.xml"])
+
+    def test_vencimientos(self):
+        import vencimientos
+        f, _ = vencimientos.fecha_vencimiento("Póliza 123. Vigencia: desde 01/03/2025 hasta el 01/03/2027")
+        self.assertEqual(f, dt.date(2027, 3, 1))
+        self.assertEqual(vencimientos.fecha_vencimiento("VIGENCIA 2020 - 2030")[0], dt.date(2030, 12, 31))
+        self.assertEqual(vencimientos.fecha_vencimiento("Fecha de vencimiento 15 de marzo de 2027")[0], dt.date(2027, 3, 15))
+        carpeta = os.path.join(self.raiz, "Docs")
+        os.makedirs(carpeta)
+        with open(os.path.join(carpeta, "poliza auto.txt"), "w", encoding="utf-8") as fh:
+            fh.write("Seguro de auto. Fin de vigencia: 2026-12-01")
+        with open(os.path.join(carpeta, "notas.txt"), "w", encoding="utf-8") as fh:
+            fh.write("La licencia del programa es libre.")
+        ajustes = nucleo.cargar_ajustes()
+        ajustes["carpetas_vencimientos"] = [carpeta]
+        nucleo.guardar_ajustes(ajustes)
+        self.assertTrue(vencimientos.escanear(segundos=30))
+        filas = [v for v in vencimientos.lista(dt.date(2026, 11, 1))["vencimientos"] if v["ruta"].startswith(carpeta)]
+        self.assertEqual([(v["nombre"], v["fecha"], v["dias"]) for v in filas], [("poliza auto.txt", "2026-12-01", 30)])
+        vencimientos.agregar("Pasaporte", "2026-11-05", "Pasaporte")
+        self.assertEqual(vencimientos.lista(dt.date(2026, 11, 1))["vencimientos"][0]["nombre"], "Pasaporte")
+
+    def test_aprender_de_ti(self):
+        import aprendizaje
+        docs = os.path.join(self.raiz, "Documentos")
+        casa = os.path.join(docs, "Casa")
+        os.makedirs(os.path.join(casa, "2026"))
+        original = nucleo.carpeta_conocida
+        nucleo.carpeta_conocida = lambda n: docs if n == "Documentos" else os.path.join(self.raiz, n)
+        self.addCleanup(setattr, nucleo, "carpeta_conocida", original)
+        for nombre in ("Predial 2025.pdf", "recibo predial marzo.pdf"):
+            ruta = os.path.join(casa, "2026", nombre)
+            open(ruta, "w").close()
+            self.assertTrue(aprendizaje.observar(ruta, os.path.join(self.origen, nombre)))
+        self.assertFalse(aprendizaje.observar(os.path.join(docs, "suelto.pdf")))  # la raíz no enseña nada
+        nuevas = aprendizaje.pensar()
+        self.assertEqual([(p["palabra"], p["carpeta"]) for p in nuevas], [("predial", casa)])
+        servicio = aprendizaje.aceptar(nuevas[0]["id"], origenes=[self.origen])
+        self.assertTrue(servicio["modo_prueba"])
+        self.crear("PREDIAL abril.pdf")
+        plan, _ = nucleo.planificar(servicio)
+        self.assertEqual(plan[0]["destino"], os.path.join(casa, "PREDIAL abril.pdf"))
+        self.assertEqual(aprendizaje.pensar(), [])  # no vuelve a proponer lo mismo
+
+    def test_respaldo_con_versiones(self):
+        import respaldo
+        origen = os.path.join(self.raiz, "Mis docs")
+        destino = os.path.join(self.raiz, "Respaldo")
+        os.makedirs(os.path.join(origen, "sub"))
+        with open(os.path.join(origen, "sub", "a.txt"), "w") as f:
+            f.write("uno")
+        with open(os.path.join(origen, "b.txt"), "w") as f:
+            f.write("b")
+        self.assertEqual(respaldo.respaldar(origen, destino)["copiados"], 2)
+        self.assertEqual(respaldo.respaldar(origen, destino)["copiados"], 0)
+        with open(os.path.join(origen, "sub", "a.txt"), "w") as f:
+            f.write("dos, más largo")
+        os.remove(os.path.join(origen, "b.txt"))
+        r = respaldo.respaldar(origen, destino)
+        self.assertEqual((r["copiados"], r["versionados"], r["borrados"]), (1, 1, 1))
+        with open(os.path.join(destino, "Actual", "sub", "a.txt")) as f:
+            self.assertEqual(f.read(), "dos, más largo")
+        versiones = respaldo.buscar_versiones(destino, "a.txt")
+        self.assertEqual(len(versiones), 1)
+        restaurado = respaldo.restaurar_version({"origen": origen, "destino": destino}, versiones[0]["ruta"])
+        with open(restaurado) as f:
+            self.assertEqual(f.read(), "uno")
+        self.assertTrue(respaldo.validar(origen, os.path.join(origen, "x")))
+
+    def test_relevo_fuera_del_exe_no_hace_nada(self):
+        self.assertEqual(nucleo.otras_versiones(), [])
+        self.assertEqual(nucleo.tomar_el_relevo()["cerrados"], 0)
+        nucleo.pedir_cierre([os.getpid()])
+        self.assertTrue(nucleo.debo_cerrarme())
+        nucleo.pedir_cierre([])
+        self.assertFalse(nucleo.debo_cerrarme())
+
+
 class PruebaAlInstante(PruebaServicio):
     def test_ordena_al_aparecer_un_archivo(self):
         import residente
