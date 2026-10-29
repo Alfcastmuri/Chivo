@@ -76,7 +76,7 @@ def escanear(cancelado=lambda: False):
     """Recorre todas las carpetas del mapa. Anota el avance para la barra de progreso del panel."""
     lista = raices()
     _cache.update(t=time.time(), raices=lista)
-    inicio = time.time()
+    inicio = bd.sello_recorrido()
     previo = bd.contar_archivos()["archivos"]
     _anotar_progreso(estado="escaneando", inicio=inicio, fin=None, hechos=0, total_estimado=previo or None,
                      carpeta="", raices=lista)
@@ -99,12 +99,12 @@ def escanear(cancelado=lambda: False):
                     continue
                 lote.append((ruta, st.st_size, st.st_mtime))
                 if len(lote) >= LOTE:
-                    bd.archivo_visto(lote)
+                    bd.archivo_visto(lote, inicio)
                     hechos += len(lote)
                     lote = []
                     _anotar_progreso(hechos=hechos, carpeta=carpeta)
         if lote:
-            bd.archivo_visto(lote)
+            bd.archivo_visto(lote, inicio)
             hechos += len(lote)
         bd.olvidar_no_vistos(raiz, inicio)
     _anotar_progreso(estado="listo", fin=time.time(), hechos=hechos, total_estimado=hechos, carpeta="")

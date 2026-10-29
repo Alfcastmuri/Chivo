@@ -214,9 +214,9 @@ def total_movimientos():
 
 # --------------------------------------------------------------------------- mapa de archivos
 
-def archivo_visto(filas):
-    """filas: [(ruta, bytes, mtime)]"""
-    ahora = time.time()
+def archivo_visto(filas, sello=None):
+    """filas: [(ruta, bytes, mtime)]. sello: la marca de «visto» de un recorrido completo."""
+    ahora = sello or time.time()
     with transaccion() as c:
         c.executemany("INSERT OR REPLACE INTO archivos VALUES (?,?,?,?,?,?,?,?)",
                       [(r, os.path.dirname(r), os.path.basename(r), sin_acentos(os.path.basename(r)),
@@ -246,6 +246,13 @@ def archivo_movido(antes, despues):
             c.execute("UPDATE OR REPLACE archivos SET ruta=?, carpeta=?, nombre=?, busqueda=?, ext=? WHERE ruta=?",
                       (nueva, os.path.dirname(nueva), os.path.basename(nueva), sin_acentos(os.path.basename(nueva)),
                        os.path.splitext(nueva)[1].lower(), r))
+
+
+def sello_recorrido():
+    """Marca para un recorrido nuevo, siempre mayor que cualquier «visto» anterior
+    (en Windows el reloj avanza a saltos y dos recorridos seguidos pueden dar la misma hora)."""
+    ultimo = con().execute("SELECT MAX(visto) FROM archivos").fetchone()[0] or 0
+    return max(time.time(), ultimo + 0.001)
 
 
 def olvidar_no_vistos(raiz, antes_de):
