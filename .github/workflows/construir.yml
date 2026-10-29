@@ -2,7 +2,7 @@ name: Construir GESTOR.exe
 
 on:
   push:
-    branches: [main]
+    branches: [main, publicar]  # empujar a «publicar» crea la versión en Releases (la actualización automática la busca ahí)
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -131,9 +131,14 @@ jobs:
           path: GESTOR-python.zip
 
       - name: Publicar versión
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/publicar'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.GESTOR_VERSION }}
+          name: GESTOR ${{ env.GESTOR_VERSION }}
+          target_commitish: ${{ github.sha }}
+          body_path: instalador/novedades.md
+          make_latest: true
           files: |
             salida/GESTOR-Instalador-*.exe
             GESTOR-windows.zip
