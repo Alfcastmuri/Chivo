@@ -10,11 +10,19 @@ según su horario, ordena los archivos con tus reglas.
    ejecución correcta), descomprímelo donde quieras y abre `GESTOR.exe`.
    La primera vez Windows puede mostrar "Windows protegió su PC": pulsa **Más información →
    Ejecutar de todas formas** (el programa no está firmado).
+   Si el antivirus lo borra (falso positivo frecuente con PyInstaller), restáuralo desde la
+   cuarentena y añade la carpeta a las exclusiones, o usa la versión sin `.exe` (abajo).
 2. Se abre el panel en el navegador. Ya hay tres servicios de ejemplo, desactivados:
    **Ordenar Descargas**, **Ordenar Documentos** y **Ordenar Escritorio**.
 3. Revisa un servicio, pulsa **Simular** para ver qué haría sin tocar nada, y cuando te
    convenza márcalo como **Activo** y **Guarda**.
 4. Pulsa **Programación → Activar** para que Windows lance el motor automáticamente.
+
+### Versión sin .exe
+
+Instala Python desde python.org (marca "Add python.exe to PATH"), descarga `GESTOR-python.zip`,
+descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecuta
+`pythonw.exe` (firmado por la Python Software Foundation) los antivirus no lo bloquean.
 
 ## Qué puede hacer un servicio
 
