@@ -65,8 +65,8 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
   sesión y se cierra solo si no hace falta.
 - Tu configuración, el historial y la papelera se guardan en `%APPDATA%\GESTOR` (los archivos
   quitados de otros discos se guardan en `X:\GESTOR-papelera`, oculta, para no copiar entre discos).
-- ¿Olvidaste la contraseña? Borra `%APPDATA%\GESTOR\credenciales.json` y crea otra; no se pierde nada. Los errores del motor
-  quedan en `%APPDATA%\GESTOR\errores.log`.
+- Los errores del motor y del residente quedan en `%APPDATA%\GESTOR\errores.log`.
+- ¿Olvidaste la contraseña? Borra `%APPDATA%\GESTOR\credenciales.json` y crea otra; no se pierde nada.
 
 ## Desarrollo
 
