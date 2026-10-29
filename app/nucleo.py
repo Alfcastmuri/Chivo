@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -835,6 +835,7 @@ def expandir(patron, ruta, origen, fecha, regla=None):
         "dia": f"{fecha.day:02d}",
         "nombre": base,
         "carpeta_origen": os.path.basename(os.path.normpath(origen)),
+        "carpeta_padre": os.path.basename(os.path.dirname(ruta)),
         "origen": os.path.normpath(origen),
     }
     if re.search(r"\{(procedencia|camara|sitio)\}", patron):
@@ -1124,7 +1125,7 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
     ya_hechos = ya_hechos or {}
     reglas = servicio.get("reglas", [])
     plan, avisos = [], []
-    destinos_previstos = set()
+    destinos_previstos = _Previstos()
 
     for origen in servicio.get("origenes", []):
         permitida, aviso = revisar_carpeta(origen)
@@ -1212,9 +1213,58 @@ def _grupos(nombres, juntos):
 
 def _primera_regla(reglas, ruta, st, ahora, origen, servicio, destinos_previstos):
     for regla in reglas:
+        if (regla.get("si") or {}).get("solo_subcarpetas") and _norm(os.path.dirname(ruta)) == _norm(origen):
+            continue  # ya está en la raíz
         if cumple(regla.get("si"), ruta, st, ahora):
             return _operacion(regla, ruta, st, origen, servicio, destinos_previstos)
     return None
+
+
+# --------------------------------------------------------------------------- sacar todo a la raíz
+
+ID_APLANAR = "_aplanar"
+
+
+def servicio_aplanar(carpeta, nombre_con_carpeta=False, borrar_vacias=True, identicos="papelera", ignorar=None):
+    """Servicio de un solo uso que saca los archivos de todas las subcarpetas a la raíz de la carpeta."""
+    return {
+        "id": ID_APLANAR, "nombre": f"Sacar a la raíz: {os.path.basename(os.path.normpath(carpeta)) or carpeta}",
+        "activo": False, "origenes": [carpeta], "subcarpetas": True, "conflicto": "renombrar",
+        "identicos": identicos if identicos in ("papelera", "carpeta", "conflicto") else "papelera",
+        "borrar_carpetas_vacias": bool(borrar_vacias), "esperar_minutos": 0, "mover_hermanos": True,
+        "fecha_captura_fotos": False, "carpeta_mantener": "Mantener", "ignorar": list(ignorar or []),
+        "reglas": [{"id": "aplanar", "si": {"solo_subcarpetas": True}, "accion": "mover", "destino": "{origen}",
+                    "fecha": "modificacion",
+                    "nuevo_nombre": "{carpeta_padre} - {nombre}" if nombre_con_carpeta else ""}],
+    }
+
+
+def problema_aplanar(carpeta):
+    """Carpetas que nunca se aplanan: raíces de disco, la carpeta de usuario y las del sistema."""
+    ok, aviso = revisar_carpeta(carpeta)
+    if not ok:
+        return aviso
+    if not os.path.isdir(carpeta):
+        return "Esa carpeta no existe."
+    normal = _norm(carpeta)
+    if normal == _norm(os.path.splitdrive(carpeta)[0] + os.sep) or normal in (_norm("/"), _norm(os.path.expanduser("~"))):
+        return "Por seguridad no se puede sacar a la raíz un disco entero ni tu carpeta de usuario."
+    return ""
+
+
+def aplanar(carpeta, simular=True, **opciones):
+    problema = problema_aplanar(carpeta)
+    if problema:
+        return {"ok": False, "mensaje": problema}
+    servicio = servicio_aplanar(carpeta, **opciones)
+    if simular:
+        r = ejecutar_servicio(servicio, simular=True)
+    else:
+        with Bloqueo():
+            r = ejecutar_servicio(servicio)
+        indexar(servicio, r["operaciones"])
+    subcarpetas = sum(1 for _ in os.scandir(carpeta) if _.is_dir()) if os.path.isdir(carpeta) else 0
+    return dict(r, ok=True, subcarpetas=subcarpetas)
 
 
 def _operacion_hermana(principal, ruta, st, servicio, destinos_previstos):
@@ -1298,6 +1348,25 @@ def _carpetas_viejas(servicio, origen, ahora, excluir, ignorar, mantener, destin
         ops.append({"accion": "mover", "origen": d.path, "destino": destino, "regla": "carpetas",
                     "bytes": total, "categoria": "Carpetas", "carpeta": True})
     return ops
+
+
+class _Previstos(set):
+    """Destinos ya planificados en esta ejecución, y qué archivo va a cada uno."""
+
+    def __init__(self):
+        super().__init__()
+        self.origen_de = {}
+
+
+def _gemelo_previsto(ruta, st, destino, previstos):
+    """Si otro archivo de esta misma ejecución va al mismo destino y es idéntico, lo devuelve."""
+    otro = getattr(previstos, "origen_de", {}).get(_norm(destino))
+    try:
+        if otro and os.path.getsize(otro) == st.st_size and _huella(otro) == _huella(ruta):
+            return otro
+    except OSError:
+        pass
+    return None
 
 
 @sin_tocar_acceso
@@ -1393,8 +1462,9 @@ def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
     if _norm(destino) == _norm(ruta):
         return None
     identicos = servicio.get("identicos", "papelera")
-    if os.path.exists(destino) and identicos != "conflicto":
-        gemelo = _copia_identica(ruta, st, destino)
+    if identicos != "conflicto" and (os.path.exists(destino) or _norm(destino) in destinos_previstos):
+        gemelo = (_copia_identica(ruta, st, destino) if os.path.exists(destino) else None) \
+            or _gemelo_previsto(ruta, st, destino, destinos_previstos)
         if gemelo and _norm(gemelo) != _norm(ruta):
             if accion == "copiar":
                 return None  # la copia ya está en el destino
@@ -1422,6 +1492,8 @@ def _operacion(regla, ruta, st, origen, servicio, destinos_previstos):
                 destino = f"{base} ({i}){ext}"
                 i += 1
     destinos_previstos.add(_norm(destino))
+    if hasattr(destinos_previstos, "origen_de"):
+        destinos_previstos.origen_de[_norm(destino)] = ruta
     return {"accion": accion, "origen": ruta, "destino": destino, "regla": regla.get("id"),
             "bytes": st.st_size, "categoria": categoria_de(os.path.splitext(ruta)[1].lower())}
 
@@ -2096,7 +2168,11 @@ def _huella_parcial(ruta, tam=64 * 1024):
     return h.digest()
 
 
-def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda: False):
+_NO_DUPLICADOS = ("appdata", "node_modules", "__pycache__", "gestor-papelera", "system volume information",
+                  "windows.old", "$recycle.bin", "msocache", "recovery")
+
+
+def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda: False, por_carpeta=None):
     """Grupos de archivos con contenido idéntico, aunque tengan distinto nombre.
 
     Se filtra en tres pasos para no leer de más: mismo tamaño, mismos primeros 64 KB y
@@ -2104,6 +2180,9 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
     """
     progreso = progreso or (lambda **k: None)
     por_tamano, vistos, revisados = {}, set(), 0
+    por_carpeta = por_carpeta if por_carpeta is not None else {}
+    # Los respaldos son copias a propósito: no se cuentan como duplicados.
+    respaldos = [r.get("destino") for r in cargar_ajustes().get("respaldos") or [] if r.get("destino")]
     for raiz in carpetas:
         if not revisar_carpeta(raiz)[0]:
             continue
@@ -2111,8 +2190,9 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
             if cancelado():
                 return []
             subcarpetas[:] = [d for d in subcarpetas if not d.startswith((".", "$"))
-                              and d.lower() not in ("appdata", "node_modules", "__pycache__")
-                              and revisar_carpeta(os.path.join(carpeta, d))[0]]
+                              and d.lower() not in _NO_DUPLICADOS
+                              and revisar_carpeta(os.path.join(carpeta, d))[0]
+                              and not any(_dentro_de(os.path.join(carpeta, d), r) for r in respaldos)]
             for nombre in archivos:
                 ruta = os.path.join(carpeta, nombre)
                 try:
@@ -2126,6 +2206,7 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
                     continue
                 vistos.add(clave)
                 por_tamano.setdefault(st.st_size, []).append(ruta)
+                por_carpeta[carpeta] = por_carpeta.get(carpeta, 0) + 1
                 revisados += 1
                 if revisados % 500 == 0:
                     progreso(fase="Recorriendo carpetas", revisados=revisados)
@@ -2162,6 +2243,30 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
     grupos.sort(key=lambda g: g["recuperable"], reverse=True)
     progreso(fase="Terminado", revisados=revisados, comparados=hechos, total=total)
     return grupos
+
+
+def carpetas_que_se_repiten(grupos, por_carpeta, minimo=3, maximo=100):
+    """Parejas de carpetas que comparten muchos archivos idénticos (una suele ser copia de la otra).
+
+    [{a, b, archivos, bytes, pct_a, pct_b}]: pct_a es qué parte de los archivos de A también está en B.
+    """
+    parejas = {}
+    for g in grupos:
+        carpetas = sorted({os.path.dirname(r) for r in g["archivos"]})
+        for i, a in enumerate(carpetas):
+            for b in carpetas[i + 1:]:
+                p = parejas.setdefault((a, b), {"archivos": 0, "bytes": 0})
+                p["archivos"] += 1
+                p["bytes"] += g["bytes"]
+    salida = []
+    for (a, b), p in parejas.items():
+        if p["archivos"] < minimo:
+            continue
+        salida.append({"a": a, "b": b, "archivos": p["archivos"], "bytes": p["bytes"],
+                       "pct_a": round(100 * p["archivos"] / max(por_carpeta.get(a, 1), 1)),
+                       "pct_b": round(100 * p["archivos"] / max(por_carpeta.get(b, 1), 1))})
+    salida.sort(key=lambda x: x["bytes"], reverse=True)
+    return salida[:maximo]
 
 
 def anotar_liberado(bytes_liberados, archivos):

@@ -510,6 +510,7 @@ function resumenRegla(r) {
   if (c.sin_uso_dias) partes.push(`sin usar en ${c.sin_uso_dias} días`);
   if (c.factura) partes.push("una factura");
   if (c.zip_descomprimido) partes.push("un ZIP ya descomprimido");
+  if (c.solo_subcarpetas) partes.push("de una subcarpeta");
   const si = partes.length ? "Si es " + partes.join(", ") : "Cualquier archivo";
   const que = { mover: `mover a ${r.destino || "(falta destino)"}`, copiar: `copiar a ${r.destino || "(falta destino)"}`,
     renombrar: `renombrar como ${r.nuevo_nombre || "(limpiar nombre)"}`, papelera: "enviar a la papelera",
@@ -870,7 +871,9 @@ async function pintarPlantillas(recargar) {
   }
   const docs = Object.values(plant.documentos || {});
   cont.innerHTML = `
-    <h2>Plantillas</h2>
+    <h2>Sacar todo a la raíz</h2>
+    <div class="grupo-dup" id="aplanar">${pintarAplanar()}</div>
+    <h2 style="margin-top:22px">Plantillas</h2>
     <p class="ayuda">Servicios listos para cada tipo de carpeta. Los documentos van a las carpetas que <b>ya tienes en Documentos</b>
       ${docs.length ? `(he encontrado: ${docs.map(d => esc(nombreCorto(d))).join(", ")})` : "(no encontré subcarpetas conocidas: lo que no encaje irá a una carpeta genérica dentro de Documentos)"}.
       Si hace falta crear una carpeta, siempre es dentro de Documentos. Cada servicio arranca <b>en modo prueba</b>: verás lo que haría y lo apruebas con un clic.</p>
@@ -890,8 +893,57 @@ async function pintarPlantillas(recargar) {
           <div class="fila" style="margin-top:8px"><button class="prim" data-pl-crear="${esc(p.clave)}">Crear servicio (en modo prueba)</button></div>` : ""}
       </div>`).join("")}`;
 }
+let apl = { carpeta: "", nombre_con_carpeta: false, borrar_vacias: true, identicos: "papelera", res: null, hecho: null };
+function pintarAplanar() {
+  const r = apl.res;
+  return `<p class="ayuda">Saca los archivos de todas las subcarpetas (a cualquier profundidad) y los deja sueltos en la carpeta elegida.
+      Primero ves la lista; después se puede deshacer. La subcarpeta <code>Mantener</code> no se toca.</p>
+    <div class="fila"><input type="text" id="apCarpeta" value="${esc(apl.carpeta)}" placeholder="Carpeta, por ejemplo D:\\Fotos del viaje" style="flex:1;min-width:200px">
+      <button class="chico" id="apElegir">Elegir…</button></div>
+    <div class="fila">
+      <label title="Vacaciones\\foto1.jpg → «Vacaciones - foto1.jpg»"><input type="checkbox" id="apNombre" ${apl.nombre_con_carpeta ? "checked" : ""}> Poner el nombre de la subcarpeta delante</label>
+      <label><input type="checkbox" id="apVacias" ${apl.borrar_vacias ? "checked" : ""}> Borrar las subcarpetas que queden vacías</label>
+      <label>Archivos idénticos: <select id="apIdenticos">${[["papelera", "dejar solo uno (el resto a la papelera)"], ["carpeta", "moverlos a Duplicados"], ["conflicto", "conservar todos (archivo (1))"]]
+        .map(([v, t]) => `<option value="${v}" ${apl.identicos === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+    </div>
+    <p class="ayuda">Si dos archivos distintos se llaman igual, el segundo queda como «archivo (1)».</p>
+    <div class="fila"><button id="apVer">Ver qué haría</button>
+      ${r && r.ok && r.operaciones.length ? `<button class="prim" id="apHacer">Sacar ${r.operaciones.length} archivos a la raíz</button>` : ""}
+      ${apl.hecho ? `<button id="apDeshacer">Deshacer</button>` : ""}</div>
+    ${r ? (!r.ok ? `<div class="aviso error">${esc(r.mensaje)}</div>` : `<div class="aviso ${r.operaciones.length ? "okmsg" : ""}">${r.simulado ? `Movería ${r.operaciones.length} archivos de las subcarpetas a la raíz.` : `Hecho: ${r.operaciones.length} archivos en la raíz${(r.carpetas_borradas || []).length ? `, ${r.carpetas_borradas.length} carpetas vacías borradas` : ""}${r.errores.length ? `, ${r.errores.length} con error` : ""}.`}</div>
+      ${r.operaciones.length ? `<div class="resultado" style="max-height:280px"><table><tr><th>Archivo</th><th>Queda como</th></tr>${r.operaciones.slice(0, 300).map(o => `<tr><td title="${esc(o.origen)}">${esc(o.origen.slice(apl.carpeta.length).replace(/^[\\/]/, ""))}</td><td>${o.accion === "papelera" ? `<b>Duplicado</b> → papelera` : esc(nombreCorto(o.destino))}</td></tr>`).join("")}</table>${r.operaciones.length > 300 ? `<p class="ayuda">Y ${r.operaciones.length - 300} más…</p>` : ""}</div>` : ""}`) : ""}`;
+}
+function leerAplanar() {
+  apl.carpeta = $("#apCarpeta").value.trim(); apl.nombre_con_carpeta = $("#apNombre").checked;
+  apl.borrar_vacias = $("#apVacias").checked; apl.identicos = $("#apIdenticos").value;
+}
+async function accionAplanar(t) {
+  if (t.id === "apElegir") {
+    const res = await api("/api/elegir-carpeta", { inicial: apl.carpeta });
+    if (res.carpeta) { apl.carpeta = res.carpeta; apl.res = null; }
+  } else if (t.id === "apVer") {
+    leerAplanar(); if (!apl.carpeta) { aviso("Elige una carpeta."); return; }
+    t.disabled = true; t.textContent = "Mirando…";
+    apl.res = await api("/api/aplanar/simular", apl);
+  } else if (t.id === "apHacer") {
+    leerAplanar();
+    if (!confirm(`¿Sacar ${apl.res.operaciones.length} archivos a la raíz de ${apl.carpeta}? Se puede deshacer.`)) return;
+    t.disabled = true; t.textContent = "Moviendo…";
+    apl.res = await api("/api/aplanar/ejecutar", apl); apl.hecho = apl.res.ok && apl.res.operaciones.length > 0;
+  } else if (t.id === "apDeshacer") {
+    if (!confirm("¿Devolver los archivos a sus subcarpetas?")) return;
+    const res = await api("/api/aplanar/deshacer");
+    aviso(res.ok ? `${res.devueltos} archivos devueltos a sus carpetas.` : res.mensaje);
+    apl.hecho = null; apl.res = null;
+  } else return;
+  $("#aplanar").innerHTML = pintarAplanar();
+}
 $("#plantillas").addEventListener("click", async e => {
   const t = e.target;
+  if (["apElegir", "apVer", "apHacer", "apDeshacer"].includes(t.id)) {
+    try { await accionAplanar(t); } catch (err) { aviso("Error: " + err.message); $("#aplanar").innerHTML = pintarAplanar(); }
+    return;
+  }
   try {
     if (t.id === "plRecargar") { plant.dias = +$("#plDias").value || 0; pintarPlantillas(true); }
     else if (t.dataset.plAbrir) { plant.abierta = plant.abierta === t.dataset.plAbrir ? null : t.dataset.plAbrir; pintarPlantillas(); }
@@ -1095,12 +1147,24 @@ async function pintarDuplicados() {
     <section><h3>Dónde buscar</h3>
       ${dupCarpetas.map((c, i) => `<div class="carpeta"><span class="ruta">${esc(c)}</span><button class="chico peligro" data-dup-quitar="${i}">Quitar</button></div>`).join("")}
       <div class="fila"><button id="dupAnadir">Añadir carpeta o disco…</button>
+        ${(datos.discos || []).map(d => `<button class="chico" data-dup-disco="${esc(d.letra === "/" ? "/" : d.letra + "\\")}">Todo el disco ${esc(d.letra)}</button>`).join("")}
+      </div>
+      <p class="ayuda">En un disco entero se saltan las carpetas de Windows y de programas, la papelera y tus respaldos de GESTOR (son copias a propósito). Puede tardar bastante.</p>
+      <div class="fila">
         <label>Ignorar archivos de menos de <input type="number" id="dupMin" value="100" min="0"> KB</label>
         ${est.estado === "buscando" ? `<button class="peligro" id="dupCancelar">Cancelar</button>` : `<button class="prim" id="dupBuscar">Buscar</button>`}</div>
     </section>
     ${est.estado === "buscando" ? `<div class="aviso">${esc(p.fase || "Empezando")}… ${p.revisados || 0} archivos revisados${p.total ? `, comparando ${p.comparados || 0} de ${p.total}` : ""}.</div>` : ""}
     ${est.estado === "error" ? `<div class="aviso error">${esc(est.error)}</div>` : ""}
     ${est.estado === "terminado" ? `
+      ${(est.carpetas || []).length ? `<section><h3>Carpetas que se repiten</h3>
+        <p class="ayuda">Parejas de carpetas con muchos archivos idénticos: muchas veces una es copia de la otra. Elige cuál conservar y se marcan para quitar las copias de la otra (nunca la última copia de nada).</p>
+        <div class="resultado" style="max-height:340px"><table><tr><th>Carpeta A</th><th>Carpeta B</th><th style="white-space:nowrap">En común</th><th></th></tr>
+        ${est.carpetas.map((c, i) => `<tr><td title="${esc(c.a)}">${esc(c.a)}<div class="ayuda">${c.pct_a} % de sus archivos está en B</div></td>
+          <td title="${esc(c.b)}">${esc(c.b)}<div class="ayuda">${c.pct_b} % de sus archivos está en A</div></td>
+          <td style="white-space:nowrap">${c.archivos} archivos<div class="ayuda">${mb(c.bytes)}</div></td>
+          <td><button class="chico" data-dup-par="${i}" data-conservar="a">Conservar A</button> <button class="chico" data-dup-par="${i}" data-conservar="b">Conservar B</button></td></tr>`).join("")}
+        </table></div></section>` : ""}
       <section><h3>${est.total_grupos} grupos de duplicados · ${mb(est.recuperable || 0)} recuperables</h3>
         ${grupos.length ? `<p class="ayuda">Se propone conservar el más antiguo de cada grupo (sin marcar). Lo marcado va a la papelera.</p>
         ${grupos.map(g => `<div class="grupo-dup"><div class="ayuda">${g.archivos.length} copias de ${mb(g.bytes)}</div>
@@ -1118,6 +1182,20 @@ $("#duplicados").addEventListener("click", async e => {
       if (res.carpeta && !dupCarpetas.includes(res.carpeta)) dupCarpetas.push(res.carpeta);
       pintarDuplicados();
     } else if (t.dataset.dupQuitar !== undefined) { dupCarpetas.splice(+t.dataset.dupQuitar, 1); pintarDuplicados(); }
+    else if (t.dataset.dupDisco) {
+      if (!dupCarpetas.includes(t.dataset.dupDisco)) dupCarpetas.push(t.dataset.dupDisco);
+      pintarDuplicados();
+    } else if (t.dataset.dupPar !== undefined) {
+      const est = await api("/api/duplicados/estado"), c = est.carpetas[+t.dataset.dupPar];
+      const [conservar, quitar] = t.dataset.conservar === "a" ? [c.a, c.b] : [c.b, c.a];
+      const res = await api("/api/duplicados/de-carpeta", { conservar, quitar });
+      if (!res.rutas.length) { aviso("No hay copias que quitar."); return; }
+      if (!confirm(`Se conservará ${conservar}\ny se quitarán ${res.rutas.length} copias (${mb(res.bytes)}) de ${quitar}.\n\nIrán a la papelera de GESTOR. ¿Seguir?`)) return;
+      const r = await api("/api/duplicados/quitar", { rutas: res.rutas });
+      aviso(`${r.quitados} copias quitadas, ${mb(r.bytes)} liberados al vaciar la papelera.`);
+      dupElegidos = new Set(); await api("/api/duplicados/iniciar", { carpetas: dupCarpetas, min_kb: +$("#dupMin").value || 0 });
+      pintarDuplicados();
+    }
     else if (t.id === "dupBuscar") {
       dupElegidos = new Set();
       await api("/api/duplicados/iniciar", { carpetas: dupCarpetas, min_kb: +$("#dupMin").value || 0 });

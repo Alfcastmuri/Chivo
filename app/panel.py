@@ -169,8 +169,11 @@ def iniciar_duplicados(carpetas, min_kb):
 
     def trabajo():
         try:
+            por_carpeta = {}
             grupos = nucleo.buscar_duplicados(carpetas, min_kb * 1024, progreso,
-                                              lambda: TRABAJO_DUPLICADOS.get("cancelar"))
+                                              lambda: TRABAJO_DUPLICADOS.get("cancelar"), por_carpeta)
+            TRABAJO_DUPLICADOS["carpetas"] = nucleo.carpetas_que_se_repiten(grupos, por_carpeta)
+            TRABAJO_DUPLICADOS["_todos"] = grupos
             TRABAJO_DUPLICADOS.update(grupos=grupos[:500], total_grupos=len(grupos),
                                       recuperable=sum(g["recuperable"] for g in grupos),
                                       estado="cancelado" if TRABAJO_DUPLICADOS.get("cancelar") else "terminado")
@@ -292,7 +295,7 @@ class Manejador(BaseHTTPRequestHandler):
                     "carpetas_rapidas": nucleo.carpetas_rapidas(), "ajustes": nucleo.cargar_ajustes(),
                     "programacion": nucleo.estado_programacion(), "windows": nucleo.ES_WINDOWS,
                     "residente": nucleo.residente_activo(), "primera_vez": primera_vez(),
-                    "version": nucleo.VERSION, "aprendido": len(aprendizaje.propuestas()),
+                    "version": nucleo.VERSION, "discos": nucleo.unidades_fijas(), "aprendido": len(aprendizaje.propuestas()),
                     "en_red": self.en_red}
         if ruta == "/api/latido":
             return {"ok": True}
@@ -417,7 +420,18 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/duplicados/iniciar":
             return iniciar_duplicados(datos.get("carpetas", []), int(datos.get("min_kb", 100)))
         if ruta == "/api/duplicados/estado":
-            return {k: v for k, v in TRABAJO_DUPLICADOS.items() if k != "cancelar"}
+            return {k: v for k, v in TRABAJO_DUPLICADOS.items() if k not in ("cancelar", "_todos")}
+        if ruta == "/api/duplicados/de-carpeta":
+            # Las copias que hay en "quitar" de archivos que también están en "conservar" (nunca la última copia).
+            conservar, quitar_de = datos["conservar"], datos["quitar"]
+            rutas, total = [], 0
+            for g in TRABAJO_DUPLICADOS.get("_todos", []):
+                en_conservar = [r for r in g["archivos"] if os.path.dirname(r) == conservar]
+                en_quitar = [r for r in g["archivos"] if os.path.dirname(r) == quitar_de]
+                if en_conservar and en_quitar:
+                    rutas += en_quitar
+                    total += g["bytes"] * len(en_quitar)
+            return {"rutas": rutas, "bytes": total}
         if ruta == "/api/duplicados/cancelar":
             TRABAJO_DUPLICADOS["cancelar"] = True
             return {"ok": True}
@@ -512,6 +526,12 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/red":
             return {"activo": bool(nucleo.cargar_ajustes().get("acceso_red")), "hay_clave": hay_clave(),
                     "url": f"http://{ip_local()}:{PUERTO_RED}/", "residente": nucleo.residente_activo()}
+        if ruta in ("/api/aplanar/simular", "/api/aplanar/ejecutar"):
+            opciones = {k: datos[k] for k in ("nombre_con_carpeta", "borrar_vacias", "identicos") if k in datos}
+            return nucleo.aplanar(datos.get("carpeta", ""), simular=ruta.endswith("simular"), **opciones)
+        if ruta == "/api/aplanar/deshacer":
+            with nucleo.Bloqueo():
+                return nucleo.deshacer(nucleo.ID_APLANAR)
         if ruta == "/api/plantillas":
             return {"plantillas": plantillas.catalogo(int(datos.get("dias") or 14)),
                     "documentos": plantillas.mapa_documentos()[0]}

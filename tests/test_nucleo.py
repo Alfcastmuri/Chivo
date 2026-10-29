@@ -531,6 +531,42 @@ class PruebaCincoMas(PruebaServicio):
             self.assertEqual(f.read(), "uno")
         self.assertTrue(respaldo.validar(origen, os.path.join(origen, "x")))
 
+    def test_sacar_todo_a_la_raiz(self):
+        for rel, contenido in (("viaje/a.jpg", b"1"), ("viaje/dia 2/b.jpg", b"2"), ("otra/a.jpg", b"3"),
+                               ("copia/b.jpg", b"2"), ("Mantener/c.txt", b"4"), ("raiz.txt", b"5")):
+            ruta = os.path.join(self.origen, *rel.split("/"))
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            with open(ruta, "wb") as f:
+                f.write(contenido)
+        r = nucleo.aplanar(self.origen, simular=True)
+        self.assertEqual(len(r["operaciones"]), 4)
+        r = nucleo.aplanar(self.origen, simular=False)
+        self.assertEqual(len(r["errores"]), 0)
+        self.assertEqual(sorted(n for n in os.listdir(self.origen) if os.path.isfile(os.path.join(self.origen, n))),
+                         ["a (1).jpg", "a.jpg", "b.jpg", "raiz.txt"])  # b.jpg repetido e idéntico: a la papelera
+        self.assertEqual(sorted(d for d in os.listdir(self.origen) if os.path.isdir(os.path.join(self.origen, d))),
+                         ["Mantener"])
+        self.assertTrue(nucleo.deshacer(nucleo.ID_APLANAR)["ok"])
+        self.assertTrue(os.path.isfile(os.path.join(self.origen, "viaje", "dia 2", "b.jpg")))
+        self.assertTrue(os.path.isfile(os.path.join(self.origen, "copia", "b.jpg")))
+        r = nucleo.aplanar(self.origen, simular=True, nombre_con_carpeta=True)
+        self.assertIn("viaje - a.jpg", [os.path.basename(o["destino"]) for o in r["operaciones"]])
+        self.assertFalse(nucleo.aplanar(os.path.expanduser("~"))["ok"])
+
+    def test_carpetas_que_se_repiten(self):
+        a, b = os.path.join(self.raiz, "Fotos"), os.path.join(self.raiz, "Respaldo", "Fotos")
+        for c in (a, b):
+            os.makedirs(c)
+            for i in range(4):
+                with open(os.path.join(c, f"f{i}.jpg"), "wb") as f:
+                    f.write(bytes([i]) * 2000)
+        with open(os.path.join(a, "solo.jpg"), "wb") as f:
+            f.write(b"z" * 2000)
+        por_carpeta = {}
+        grupos = nucleo.buscar_duplicados([self.raiz], min_bytes=1, por_carpeta=por_carpeta)
+        pares = nucleo.carpetas_que_se_repiten(grupos, por_carpeta)
+        self.assertEqual([(p["a"], p["b"], p["archivos"], p["pct_a"], p["pct_b"]) for p in pares], [(a, b, 4, 80, 100)])
+
     def test_relevo_fuera_del_exe_no_hace_nada(self):
         self.assertEqual(nucleo.otras_versiones(), [])
         self.assertEqual(nucleo.tomar_el_relevo()["cerrados"], 0)

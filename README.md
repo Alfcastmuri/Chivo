@@ -74,7 +74,10 @@ descomprímelo y haz doble clic en `GESTOR.pyw`. Funciona igual, y como lo ejecu
 - **Pausar todo / Detener GESTOR** desde el panel o el icono. Al abrir una versión nueva, la
   anterior se cierra sola y la tarea programada pasa a usar el .exe nuevo.
 - **Asistente:** analiza una carpeta y propone reglas ("tienes 340 fotos de WhatsApp").
-- **Duplicados:** busca archivos idénticos en las carpetas o discos que elijas.
+- **Duplicados:** busca archivos idénticos en las carpetas o en discos enteros, y muestra las
+  **carpetas que se repiten** (una copia de otra) para quitar las copias de un lado.
+- **Sacar todo a la raíz:** saca los archivos de todas las subcarpetas a la carpeta principal, con
+  vista previa y deshacer (también como plantilla automática).
 - **Papelera de GESTOR:** guarda 30 días (configurable) lo que se quita, con restauración.
 - **Copias a USB:** al conectar una unidad concreta, copia ahí lo nuevo de las carpetas elegidas.
 - **Estadísticas:** archivos ordenados, espacio liberado y reparto por tipo.

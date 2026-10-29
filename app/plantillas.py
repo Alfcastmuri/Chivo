@@ -304,6 +304,12 @@ def catalogo(dias=14):
                  "facturas", os.path.join(r["Documentos"], "Facturas")), "{proveedor}", "{año}"),
                  "Facturas → Facturas\\{proveedor}\\{año}"),
          ], esperar_minutos=5)),
+        ("aplanar", "Sacar todo a la raíz (automático)",
+         "Cada vez que aparezcan subcarpetas, saca sus archivos a la raíz de la carpeta y borra las que queden "
+         "vacías. Elige la carpeta con «Cambiar…». La subcarpeta Mantener no se toca.",
+         _servicio("Sacar a la raíz", [r["Descargas"]], [
+             _regla({"solo_subcarpetas": True}, "{origen}", "Archivos de las subcarpetas → la raíz de la carpeta"),
+         ], subcarpetas=True, borrar_carpetas_vacias=True, carpeta_mantener="Mantener", esperar_minutos=10)),
         ("escaneados", "Documentos escaneados",
          "Lo que sale del escáner se manda a la carpeta de Documentos que le toca según su contenido.",
          _servicio("Ordenar escaneados", [buscar_subcarpeta(r["Documentos"], ["scanned documents",
