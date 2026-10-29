@@ -2,6 +2,7 @@
 
   gestor.py                abre el panel
   gestor.py --motor [...]  ejecuta el motor (lo usa el Programador de tareas)
+  gestor.py --residente    icono junto al reloj, notificaciones y modo al instante
 """
 
 import sys
@@ -12,6 +13,9 @@ def main():
     if args and args[0] == "--motor":
         import motor
         motor.main_seguro(args[1:])
+    elif args and args[0] == "--residente":
+        import residente
+        residente.main_seguro(args[1:])
     elif args and args[0] == "--elegir-carpeta":
         import panel
         panel.dialogo_carpeta(args[1], args[2] if len(args) > 2 else "")

@@ -24,6 +24,9 @@ def buscar(servicio_id):
 
 def revisar(al_iniciar=False):
     ahora = dt.datetime.now()
+    tareas_de_mantenimiento()
+    if nucleo.cargar_ajustes().get("pausado"):
+        return
     estado = nucleo.cargar_estado()
     cambiado = False
     pendientes = []
@@ -41,6 +44,30 @@ def revisar(al_iniciar=False):
         nucleo.guardar_estado(estado)
     for s in pendientes:
         nucleo.ejecutar_y_anotar(s, motivo="inicio" if al_iniciar else "horario")
+
+
+def tareas_de_mantenimiento():
+    """Cosas baratas que conviene hacer en cada revisión, haya o no servicios que ejecutar."""
+    for tarea in (nucleo.lanzar_residente, nucleo.purgar_papelera, copias_si_toca):
+        try:
+            tarea()
+        except Exception:
+            registrar_error("mantenimiento")
+
+
+def copias_si_toca():
+    if nucleo.cargar_ajustes().get("pausado"):
+        return
+    pendientes, _ = nucleo.copias_pendientes()
+    for copia in pendientes:
+        nucleo.ejecutar_copia(copia)
+
+
+def registrar_error(contexto):
+    import traceback
+    with open(nucleo.ARCHIVO_ERRORES, "a", encoding="utf-8") as f:
+        f.write(f"--- {dt.datetime.now().isoformat(timespec='seconds')} {contexto}\n")
+        f.write(traceback.format_exc())
 
 
 def main(args):
@@ -65,10 +92,7 @@ def main_seguro(args):
     except SystemExit:
         raise
     except Exception:
-        import traceback
-        with open(nucleo.ARCHIVO_ERRORES, "a", encoding="utf-8") as f:
-            f.write(f"--- {dt.datetime.now().isoformat(timespec='seconds')} {args}\n")
-            f.write(traceback.format_exc())
+        registrar_error(args)
 
 
 if __name__ == "__main__":

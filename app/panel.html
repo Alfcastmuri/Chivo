@@ -99,7 +99,8 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
   <h1>GESTOR</h1>
   <span class="estado" id="estadoProg"></span>
   <span class="espacio"></span>
-  <button id="btnAjustes">Programación</button>
+  <button id="btnAjustes">Ajustes</button>
+  <button id="btnSalir">Salir</button>
   <button id="btnCerrar">Cerrar panel</button>
 </header>
 <main>
@@ -121,7 +122,14 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
     <div class="fila" style="margin-top:14px">
       <button class="prim" id="ajGuardar">Activar / actualizar programación</button>
       <button class="peligro" id="ajQuitar">Quitar programación</button>
-      <span class="espacio" style="flex:1"></span>
+    </div>
+    <h2 style="margin-top:22px">Contraseña del panel</h2>
+    <div class="fila">
+      <input type="password" id="clActual" placeholder="Contraseña actual" autocomplete="current-password" style="flex:1;min-width:140px">
+      <input type="password" id="clNueva" placeholder="Nueva (mín. 6)" autocomplete="new-password" style="flex:1;min-width:140px">
+      <button id="clCambiar">Cambiar</button>
+    </div>
+    <div class="fila" style="margin-top:14px;justify-content:flex-end">
       <button id="ajCerrar">Cerrar</button>
     </div>
   </div>
@@ -131,8 +139,8 @@ code { font-family: Consolas, monospace; font-size: 12px; background: var(--fond
 <script>
 const TOKEN = "__TOKEN__";
 const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
-const VARIABLES = ["{categoria}", "{extension}", "{año}", "{mes}", "{mes_num}", "{dia}", "{nombre}", "{carpeta_origen}", "{origen}"];
-let datos = { servicios: [], categorias: [], carpetas_rapidas: {}, ajustes: {}, programacion: {} };
+const VARIABLES = ["{categoria}", "{procedencia}", "{camara}", "{sitio}", "{extension}", "{año}", "{mes}", "{mes_num}", "{dia}", "{nombre}", "{carpeta_origen}", "{origen}"];
+let datos = { servicios: [], categorias: [], procedencias: [], carpetas_rapidas: {}, ajustes: {}, programacion: {} };
 let actual = null;      // copia del servicio que se edita
 let sinGuardar = false;
 let avisosCarpeta = {};
@@ -143,6 +151,7 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 async function api(ruta, cuerpo = {}) {
   const r = await fetch(ruta, { method: "POST", headers: { "Content-Type": "application/json", "X-Gestor-Token": TOKEN }, body: JSON.stringify(cuerpo) });
   const j = await r.json();
+  if (r.status === 401) { sinGuardar = false; location.reload(); }
   if (!r.ok) throw new Error(j.error || "Error");
   return j;
 }
@@ -189,7 +198,7 @@ $("#lista").addEventListener("click", e => {
 $("#btnNuevo").onclick = () => {
   if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Descartarlos?")) return;
   abrir({ id: "", nombre: "Nuevo servicio", activo: false, origenes: [], subcarpetas: false,
-    horario: { tipo: "intervalo", cada: 8, unidad: "horas" }, conflicto: "renombrar", identicos: "papelera", esperar_minutos: 10, ignorar: [],
+    horario: { tipo: "intervalo", cada: 8, unidad: "horas" }, conflicto: "renombrar", identicos: "papelera", fecha_captura_fotos: true, esperar_minutos: 10, ignorar: [],
     reglas: [nuevaRegla()] });
   abiertas.add(actual.reglas[0]);
   pintarEditor();
@@ -234,6 +243,7 @@ function pintarEditor() {
     </div>
     <div class="fila">
       <label><input type="checkbox" data-k="subcarpetas" ${s.subcarpetas ? "checked" : ""}> Incluir subcarpetas</label>
+      <label title="${datos.pillow ? "Lee JPEG, HEIC, PNG, TIFF y WebP." : "Sin Pillow solo se lee la fecha de los JPEG."}"><input type="checkbox" data-k="fecha_captura_fotos" ${s.fecha_captura_fotos !== false ? "checked" : ""}> Ordenar fotos por fecha de captura (EXIF)</label>
       <label>Esperar <input type="number" min="0" data-k="esperar_minutos" value="${esc(s.esperar_minutos)}"> min desde la última modificación</label>
     </div>
     <div class="fila">
@@ -311,6 +321,7 @@ function pintarRegla(r, i) {
       <div class="et">SI</div>
       <div>
         <div class="fila"><span class="ayuda">Tipo:</span><div class="chips">${datos.categorias.map(n => `<span class="chip ${cats.includes(n) ? "on" : ""}" data-cat="${esc(n)}">${esc(n)}</span>`).join("")}</div></div>
+        <div class="fila"><span class="ayuda">Procedencia:</span><div class="chips">${datos.procedencias.map(n => `<span class="chip ${(c.procedencias || []).includes(n) ? "on" : ""}" data-proc="${esc(n)}">${esc(n)}</span>`).join("")}</div></div>
         <div class="fila">
           <div class="campo" style="flex:1;min-width:160px"><span>Extensiones (.pdf, .docx)</span><input type="text" data-c="extensiones" value="${esc(Array.isArray(c.extensiones) ? c.extensiones.join(", ") : c.extensiones || "")}"></div>
           <div class="campo"><span>Nombre</span><select data-c="nombre_modo">${[["contiene", "contiene"], ["empieza", "empieza por"], ["termina", "termina en"], ["regex", "expresión regular"]].map(([v, t]) => `<option value="${v}" ${(c.nombre_modo || "contiene") === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
@@ -336,7 +347,8 @@ function pintarRegla(r, i) {
         ${accion !== "papelera" ? `
         <div class="fila">
           <label>Fecha para {año}/{mes}/{dia}:
-            <select data-r="fecha">${[["modificacion", "Última modificación"], ["creacion", "Creación"], ["captura", "Captura de la foto (si no hay, modificación)"]].map(([v, t]) => `<option value="${v}" ${(r.fecha || "modificacion") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+            <select data-r="fecha">${[["modificacion", "Última modificación"], ["creacion", "Creación"]].map(([v, t]) => `<option value="${v}" ${(r.fecha === "creacion" ? "creacion" : "modificacion") === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+          <span class="ayuda">${actual.fecha_captura_fotos !== false ? "Las fotos usan la fecha de captura (si no la tienen, esta)." : ""}</span>
         </div>
         <div class="campo"><span>${accion === "renombrar" ? "Nuevo nombre" : "Renombrar al mover (opcional)"}, sin extensión, por ejemplo <code>{año}-{mes_num}-{dia}_{nombre}</code></span>
           <input type="text" data-r="nuevo_nombre" value="${esc(r.nuevo_nombre || "")}"></div>` : `<div class="ayuda">Los archivos van a la papelera de reciclaje de Windows, desde donde se pueden restaurar. GESTOR nunca borra nada de forma definitiva.</div>`}
@@ -349,6 +361,7 @@ const abiertas = new WeakSet();
 function resumenRegla(r) {
   const c = r.si || {}, partes = [];
   if ((c.categorias || []).length) partes.push(c.categorias.join(" o "));
+  if ((c.procedencias || []).length) partes.push("de " + c.procedencias.join(" o "));
   const ext = Array.isArray(c.extensiones) ? c.extensiones : (c.extensiones ? [c.extensiones] : []);
   if (ext.length) partes.push("extensión " + ext.join(", "));
   const modos = { contiene: "contiene", empieza: "empieza por", termina: "termina en", regex: "cumple" };
@@ -360,7 +373,7 @@ function resumenRegla(r) {
   const si = partes.length ? "Si es " + partes.join(", ") : "Cualquier archivo";
   const que = { mover: `mover a ${r.destino || "(falta destino)"}`, copiar: `copiar a ${r.destino || "(falta destino)"}`,
     renombrar: `renombrar como ${r.nuevo_nombre || "(falta nombre)"}`, papelera: "enviar a la papelera" }[r.accion || "mover"];
-  const fecha = r.fecha === "captura" ? " · fecha de captura" : r.fecha === "creacion" ? " · fecha de creación" : "";
+  const fecha = r.fecha === "creacion" ? " · fecha de creación" : "";
   return `${si} → ${que}${r.accion !== "papelera" ? fecha : ""}`;
 }
 
@@ -446,6 +459,10 @@ $("#editor").addEventListener("click", async e => {
     } else if (t.dataset.cat) {
       const cats = r.si.categorias = r.si.categorias || [];
       const n = t.dataset.cat; cats.includes(n) ? cats.splice(cats.indexOf(n), 1) : cats.push(n);
+      t.classList.toggle("on"); cambiado();
+    } else if (t.dataset.proc) {
+      const procs = r.si.procedencias = r.si.procedencias || [];
+      const n = t.dataset.proc; procs.includes(n) ? procs.splice(procs.indexOf(n), 1) : procs.push(n);
       t.classList.toggle("on"); cambiado();
     } else if (t.dataset.var) {
       const input = (ultimoDestino && regla && regla.contains(ultimoDestino)) ? ultimoDestino : regla.querySelector('[data-r="destino"]');
@@ -560,6 +577,19 @@ $("#ajGuardar").onclick = async () => {
 };
 $("#ajQuitar").onclick = async () => {
   const res = await api("/api/quitar-programacion"); datos.programacion = res.programacion; pintarProgramacion(); aviso(res.mensaje);
+};
+$("#clCambiar").onclick = async () => {
+  try {
+    const res = await api("/api/cambiar-clave", { actual: $("#clActual").value, nueva: $("#clNueva").value });
+    aviso(res.mensaje);
+    if (res.ok) { $("#clActual").value = ""; $("#clNueva").value = ""; }
+  } catch (e) { aviso("Error: " + e.message); }
+};
+$("#btnSalir").onclick = async () => {
+  if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Salir igualmente?")) return;
+  sinGuardar = false;
+  await api("/api/salir").catch(() => { });
+  location.reload();
 };
 $("#btnCerrar").onclick = async () => {
   if (sinGuardar && !confirm("Hay cambios sin guardar. ¿Cerrar igualmente?")) return;
