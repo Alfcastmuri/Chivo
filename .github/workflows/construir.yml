@@ -36,13 +36,16 @@ jobs:
           python -c "from PIL import Image, ImageDraw, ImageFont; i = Image.new('RGB', (1800, 600), 'white'); d = ImageDraw.Draw(i); d.text((60, 200), 'FECHA LIMITE DE PAGO 15 NOV 26', fill='black', font=ImageFont.truetype('arial.ttf', 80)); i.save('recibo.bmp')"
           python -c "import sys; sys.path.insert(0, 'app'); import ocr, bd; print('Idiomas/estado:', ocr.estado()); print('Texto leído:', repr(ocr.texto('recibo.bmp'))); print(bd.leer('ocr:error', None))"
 
+      - name: Probar la ventana propia (WebView2)
+        run: python -c "import webview, webview.platforms.winforms as w; print('WebView2 listo:', w.is_chromium() if hasattr(w, 'is_chromium') else 'ok')"
+
       - name: Instalar PyInstaller con cargador compilado desde el código fuente
         env:
           PYINSTALLER_COMPILE_BOOTLOADER: "1"
         run: python -m pip install --no-binary pyinstaller pyinstaller==6.11.1
 
       - name: Construir el .exe
-        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --noupx --name GESTOR --version-file version_info.txt --add-data "app/panel.html;." --add-data "app/login.html;." --hidden-import pystray._win32 --hidden-import watchdog.observers.read_directory_changes --collect-submodules pillow_heif --paths app app/gestor.py
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --noupx --name GESTOR --version-file version_info.txt --add-data "app/panel.html;." --add-data "app/login.html;." --hidden-import pystray._win32 --hidden-import watchdog.observers.read_directory_changes --collect-submodules pillow_heif --collect-all webview --paths app app/gestor.py
 
       - name: Comprobar que el motor arranca
         shell: pwsh

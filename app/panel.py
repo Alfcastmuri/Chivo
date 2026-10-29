@@ -13,7 +13,6 @@ import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
@@ -488,7 +487,7 @@ class Manejador(BaseHTTPRequestHandler):
             return {"ok": True}
         if ruta == "/api/preferencias":
             ajustes = nucleo.cargar_ajustes()
-            for clave in ("notificaciones", "icono_bandeja", "pausado"):
+            for clave in ("notificaciones", "icono_bandeja", "pausado", "ventana_propia"):
                 if clave in datos:
                     ajustes[clave] = bool(datos[clave])
             if datos.get("papelera") in ("gestor", "windows"):
@@ -897,7 +896,8 @@ def main():
             time.sleep(1)
     if not servidor:
         # Ya hay un panel de esta versión abierto: se reutiliza.
-        webbrowser.open(f"http://127.0.0.1:{PUERTO}/")
+        import ventana
+        ventana.abrir(f"http://127.0.0.1:{PUERTO}/")
         return
     try:
         nucleo.lanzar_residente()
@@ -906,9 +906,14 @@ def main():
     threading.Thread(target=vigilar_inactividad, daemon=True).start()
     url = f"http://127.0.0.1:{PUERTO}/"
     print(f"Panel de GESTOR en {url}  (cierra esta ventana o usa 'Cerrar panel' para salir)")
-    if "--sin-navegador" not in sys.argv:
-        webbrowser.open(url)
-    servidor.serve_forever()
+    if "--sin-navegador" in sys.argv:
+        servidor.serve_forever()
+        return
+    import ventana
+    threading.Thread(target=servidor.serve_forever, daemon=True).start()
+    if ventana.abrir(url):
+        os._exit(0)  # cerraste la ventana: se cierra el panel (el icono junto al reloj sigue)
+    threading.Event().wait()
 
 
 if __name__ == "__main__":

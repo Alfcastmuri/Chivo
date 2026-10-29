@@ -5,3 +5,4 @@ pypdf==5.1.0           # reglas por contenido de PDF
 watchdog==6.0.0        # modo "al instante"
 pystray==0.19.5        # icono junto al reloj
 segno==1.6.1           # código QR para abrir el panel en el celular
+pywebview==5.3.2 ; sys_platform == "win32"   # el panel en su propia ventana (WebView2 de Windows)

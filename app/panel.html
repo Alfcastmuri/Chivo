@@ -340,6 +340,7 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
     </div>
     <h2 style="margin-top:22px">Funcionamiento</h2>
     <div class="fila"><label><input type="checkbox" id="prefIcono"> Mostrar el icono junto al reloj</label></div>
+    <div class="fila"><label><input type="checkbox" id="prefVentana"> Abrir el panel en su propia ventana (si no, en el navegador)</label></div>
     <div class="fila"><label><input type="checkbox" id="prefNotif"> Notificaciones de Windows al ordenar</label></div>
     <div class="fila"><label><input type="checkbox" id="prefPausa"> Pausar todo</label></div>
     <div class="fila"><label>Lo que GESTOR quita va a
@@ -1411,6 +1412,7 @@ function pintarPreferencias() {
   const a = datos.ajustes;
   $("#prefIcono").checked = a.icono_bandeja !== false;
   $("#prefNotif").checked = a.notificaciones !== false;
+  $("#prefVentana").checked = a.ventana_propia !== false;
   $("#prefPausa").checked = !!a.pausado;
   $("#prefPapelera").value = a.papelera || "gestor";
   $("#prefRetencion").value = a.retencion_dias || 30;
@@ -1440,6 +1442,7 @@ async function guardarPreferencias(cambios) {
   } catch (e) { aviso("Error: " + e.message); }
 }
 $("#prefIcono").onchange = e => guardarPreferencias({ icono_bandeja: e.target.checked });
+$("#prefVentana").onchange = e => guardarPreferencias({ ventana_propia: e.target.checked });
 $("#prefNotif").onchange = e => guardarPreferencias({ notificaciones: e.target.checked });
 $("#prefPausa").onchange = e => guardarPreferencias({ pausado: e.target.checked });
 $("#btnPausaTodo").onclick = async () => { await guardarPreferencias({ pausado: !datos.ajustes.pausado }); aviso(datos.ajustes.pausado ? "Todo en pausa." : "Funcionando de nuevo."); };

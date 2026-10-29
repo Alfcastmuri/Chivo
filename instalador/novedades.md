@@ -1,5 +1,6 @@
-## Novedades de GESTOR 0.7.1
+## Novedades de GESTOR 0.8.0
 
+- **GESTOR se abre en su propia ventana**, como cualquier programa, sin barra de direcciones ni pestañas del navegador. Usa el motor de Edge que ya trae Windows. Si prefieres el navegador, se cambia en Ajustes → Funcionamiento.
 - **El Asistente vuelve al menú de la izquierda** (Organizar → 🧭 Asistente). Sigue también en Plantillas.
 
 ## Lo que trajo la 0.7.0
