@@ -1,4 +1,10 @@
-## Novedades de GESTOR 0.9.2
+## Novedades de GESTOR 0.9.3
+
+- **Lista para la Microsoft Store**: GESTOR reconoce cuándo se instaló desde la Store. En esa versión arranca con Windows desde el propio paquete (se apaga en Configuración › Aplicaciones › Inicio), revisa tus servicios sin la tarea programada y deja que la Store lo actualice.
+- **Nada cambia en la versión de siempre**: el instalador, la tarea programada y «Actualizar ahora» siguen igual.
+- **Política de privacidad** publicada: GESTOR no envía tus archivos a ningún lado.
+
+## Lo que trajo la 0.9.2
 
 - **Borrar desde el mapa del disco**: elige un archivo o una carpeta en el mapa y pulsa «Borrar». Una ventana te pregunta si estás seguro y te dice qué es, cuánto ocupa y dónde está. Va a la papelera, así que se puede recuperar.
 - **Los avisos ya no estorban**: los mensajes y las tarjetas de progreso se ocultan con un clic, y las terminadas desaparecen solas en 3 segundos.

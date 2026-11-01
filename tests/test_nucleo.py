@@ -906,3 +906,61 @@ class PruebaBorrarDesdeElMapa(unittest.TestCase):
         entrada = next(e for e in nucleo.listar_papelera() if e["origen"] == os.path.join(raiz, "sub"))
         nucleo.restaurar(entrada["id"])
         self.assertTrue(os.path.exists(os.path.join(raiz, "sub", "x.bin")))
+
+
+class PruebaVersionTienda(unittest.TestCase):
+    """La versión de la Microsoft Store: sin tarea programada ni actualizador propio."""
+
+    def setUp(self):
+        from unittest import mock
+        self.ajustes_antes = nucleo.cargar_ajustes()
+        self.parches = [mock.patch.object(nucleo, "ES_TIENDA", True),
+                        mock.patch.object(nucleo, "lanzar_residente", lambda: False)]
+        for p in self.parches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.parches:
+            p.stop()
+        nucleo.guardar_ajustes(self.ajustes_antes)
+
+    def test_fuera_de_la_tienda_no_se_detecta(self):
+        if not os.environ.get("GESTOR_TIENDA"):
+            self.assertEqual(nucleo._paquete_tienda(), "")
+
+    def test_programacion_sin_programador_de_tareas(self):
+        r = nucleo.programar_motor(7)
+        self.assertTrue(r["ok"])
+        self.assertEqual(nucleo.cargar_ajustes()["revisar_cada_minutos"], 7)
+        self.assertEqual(nucleo.estado_programacion(), {"instalada": True, "tienda": True})
+        self.assertTrue(nucleo.necesita_residente())  # el residente hace de tarea programada
+        nucleo.quitar_programacion()
+        self.assertFalse(nucleo.estado_programacion()["instalada"])
+        self.assertFalse(nucleo.actualizar_programacion())
+
+    def test_sin_actualizador_propio(self):
+        import actualizar
+        e = actualizar.estado()
+        self.assertTrue(e["tienda"])
+        self.assertFalse(e["nueva"] or e["puede_instalarse"] or e["activo"])
+        self.assertFalse(actualizar.instalar()["ok"])
+        self.assertIsNone(actualizar.mantenimiento())
+
+    def test_el_residente_lanza_el_motor(self):
+        from unittest import mock
+        import residente
+        nucleo.programar_motor(5)
+        reloj = residente.RelojDelMotor()
+        with mock.patch("subprocess.Popen") as popen:
+            reloj.atender()
+            popen.assert_not_called()  # todavía no toca
+            reloj.ultimo -= 600
+            reloj.atender()
+            self.assertEqual(popen.call_count, 1)
+            self.assertIn("--motor", popen.call_args[0][0])
+            ajustes = nucleo.cargar_ajustes()
+            ajustes["detenido"] = True
+            nucleo.guardar_ajustes(ajustes)
+            reloj.ultimo -= 600
+            reloj.atender()
+            self.assertEqual(popen.call_count, 1)  # «Cerrar GESTOR» lo detiene

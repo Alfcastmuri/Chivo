@@ -526,7 +526,7 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
       <input type="text" id="prefRfc" placeholder="XAXX010101000"></div>
     </div>
     <div class="tarjeta-op"><h4>Actualizaciones</h4>
-    <div class="fila"><label><input type="checkbox" id="prefActu"> Buscar versiones nuevas cada día</label><button class="chico" id="actuBuscar">Buscar ahora</button></div>
+    <div class="fila" id="actuFila"><label><input type="checkbox" id="prefActu"> Buscar versiones nuevas cada día</label><button class="chico" id="actuBuscar">Buscar ahora</button></div>
     <div class="ayuda" id="actuEstado"></div>
     </div>
     </div>
@@ -3254,6 +3254,8 @@ async function comprobarActualizacion(forzar) {
 }
 function pintarActualizacionAjustes() {
   const el = $("#actuEstado"); if (!el || !actu) return;
+  $("#actuFila").style.display = actu.tienda ? "none" : "";
+  if (actu.tienda) { el.textContent = `Tienes la ${actu.actual}. Esta copia se instaló desde la Microsoft Store, que la actualiza sola.`; return; }
   el.innerHTML = actu.nueva ? `<b>Versión nueva: ${esc(actu.version)}</b> (tienes la ${esc(actu.actual)}). <button class="chico prim" data-actu-instalar>Actualizar ahora</button>`
     : `Tienes la ${esc(actu.actual)}${actu.t ? `, revisado ${esc(fechaBonita(new Date(actu.t * 1000).toISOString()))}` : ""}.`;
 }

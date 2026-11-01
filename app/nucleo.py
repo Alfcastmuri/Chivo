@@ -19,9 +19,47 @@ import sys
 import time
 import uuid
 
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
+
+
+def _paquete_tienda():
+    """Nombre completo del paquete MSIX si GESTOR se instaló desde la Microsoft Store ("" si no).
+
+    En la versión de la Store, Windows arranca GESTOR con «identidad de paquete»: las actualizaciones las
+    da la Store y no se usan ni la tarea programada ni la carpeta Inicio (ver programar_motor).
+    GESTOR_TIENDA=1 lo simula (pruebas).
+    """
+    if os.environ.get("GESTOR_TIENDA"):
+        return os.environ["GESTOR_TIENDA"] if os.environ["GESTOR_TIENDA"] != "1" else "GESTOR (simulado)"
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+        largo = ctypes.c_uint32(0)
+        funcion = ctypes.windll.kernel32.GetCurrentPackageFullName
+        if funcion(ctypes.byref(largo), None) != 122:  # ERROR_INSUFFICIENT_BUFFER: hay paquete
+            return ""                                   # APPMODEL_ERROR_NO_PACKAGE (15700): no hay
+        buf = ctypes.create_unicode_buffer(largo.value)
+        return buf.value if funcion(ctypes.byref(largo), buf) == 0 else ""
+    except (AttributeError, OSError):
+        return ""
+
+
+PAQUETE_TIENDA = _paquete_tienda()
+ES_TIENDA = bool(PAQUETE_TIENDA)
+
+
+def _ejecutable_principal():
+    """GESTOR.exe aunque este proceso sea la copia «GESTOR-inicio.exe» que la Store abre al iniciar sesión."""
+    if not EMPAQUETADO:
+        return sys.executable
+    principal = os.path.join(os.path.dirname(sys.executable), "GESTOR.exe")
+    return principal if os.path.exists(principal) else sys.executable
+
+
+EJECUTABLE = _ejecutable_principal()
 
 # BASE: donde está el programa. DATOS: donde se guarda tu configuración y el historial.
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -3033,6 +3071,8 @@ def necesita_residente():
     ajustes = cargar_ajustes()
     if ajustes.get("detenido"):
         return False
+    if ES_TIENDA and ajustes.get("motor_automatico", True):
+        return True  # en la versión de la Store el residente es quien lanza el motor cada N minutos
     if ajustes.get("acceso_red") or (ajustes.get("mapa_archivos") or {}).get("activo", True):
         return True
     if ajustes.get("icono_bandeja", True) and ES_WINDOWS:
@@ -3047,7 +3087,7 @@ def lanzar_residente():
         return False
     import subprocess
     if EMPAQUETADO:
-        comando = [sys.executable, "--residente"]
+        comando = [EJECUTABLE, "--residente"]
     else:
         comando = [_pythonw(), os.path.join(BASE, "gestor.py"), "--residente"]
     flags = 0x00000008 | 0x00000200 | 0x08000000 if ES_WINDOWS else 0  # sin ventana y desligado
@@ -3157,7 +3197,7 @@ def comando_programado():
 
 def actualizar_programacion():
     """Si la tarea programada apunta a otra versión del .exe, la cambia a esta. Devuelve True si cambió."""
-    if not (ES_WINDOWS and EMPAQUETADO):
+    if not (ES_WINDOWS and EMPAQUETADO) or ES_TIENDA:
         return False
     actual = comando_programado()
     if not actual or _norm(actual) == _norm(sys.executable):
@@ -3191,12 +3231,21 @@ def _archivo_inicio():
 def _comando_motor(extra=""):
     """Comando que lanza el motor sin ventana: el .exe empaquetado o pythonw + gestor.py."""
     if EMPAQUETADO:
-        return f'"{sys.executable}" --motor{extra}'
+        return f'"{EJECUTABLE}" --motor{extra}'
     return f'"{_pythonw()}" "{os.path.join(BASE, "gestor.py")}" --motor{extra}'
 
 
 def programar_motor(minutos):
     """Crea (o actualiza) la tarea que lanza el motor cada N minutos, y el arranque al iniciar sesión."""
+    if ES_TIENDA:
+        # Dentro de un paquete MSIX la ruta del .exe cambia con cada actualización y la carpeta Inicio no se
+        # ve desde fuera: el arranque lo declara el paquete (startupTask) y el residente lanza el motor.
+        ajustes = cargar_ajustes()
+        ajustes["motor_automatico"] = True
+        ajustes["revisar_cada_minutos"] = int(minutos)
+        guardar_ajustes(ajustes)
+        lanzar_residente()
+        return {"ok": True, "mensaje": f"El motor se revisará cada {int(minutos)} minutos."}
     if not ES_WINDOWS:
         return {"ok": False, "mensaje": "Solo disponible en Windows."}
     import subprocess
@@ -3214,6 +3263,8 @@ def programar_motor(minutos):
 
 
 def estado_programacion():
+    if ES_TIENDA:
+        return {"instalada": bool(cargar_ajustes().get("motor_automatico", True)), "tienda": True}
     if not ES_WINDOWS:
         return {"instalada": False, "mensaje": "Solo disponible en Windows."}
     import subprocess
@@ -3223,6 +3274,11 @@ def estado_programacion():
 
 
 def quitar_programacion():
+    if ES_TIENDA:
+        ajustes = cargar_ajustes()
+        ajustes["motor_automatico"] = False
+        guardar_ajustes(ajustes)
+        return {"ok": True, "mensaje": "Programación quitada."}
     if not ES_WINDOWS:
         return {"ok": False, "mensaje": "Solo disponible en Windows."}
     import subprocess
