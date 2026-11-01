@@ -118,6 +118,41 @@ jobs:
           for ($i = 0; $i -lt 60 -and (Test-Path "$app\GESTOR.exe"); $i++) { Start-Sleep -Seconds 2 }
           if (Test-Path "$app\GESTOR.exe") { throw "La desinstalación no quitó GESTOR.exe" }
 
+      - name: Paquete para la Microsoft Store (MSIX)
+        shell: pwsh
+        run: |
+          python tienda/hacer_paquete.py dist\GESTOR salida\tienda\paquete
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo preparar el paquete" }
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $makeappx) { throw "No encontré makeappx.exe (Windows SDK)" }
+          & $makeappx.FullName pack /o /d salida\tienda\paquete /p "salida\GESTOR-Store-$env:GESTOR_VERSION.msix"
+          if ($LASTEXITCODE -ne 0) { throw "makeappx falló" }
+          Copy-Item tienda\probar-en-mi-pc.ps1, "tienda\Probar GESTOR de la Store.bat" -Destination salida\tienda
+          Compress-Archive -Path salida\tienda\* -DestinationPath "salida\GESTOR-Store-prueba-$env:GESTOR_VERSION.zip"
+
+      - name: Probar el paquete de la Store (instalarlo, comprobar que se reconoce y quitarlo)
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1 | Out-Null
+          $manifiesto = "salida\tienda\paquete\AppxManifest.xml"
+          Add-AppxPackage -Register $manifiesto
+          $pkg = Get-AppxPackage -Name ([xml](Get-Content $manifiesto -Encoding UTF8)).Package.Identity.Name
+          if (-not $pkg) { throw "No se registró el paquete" }
+          $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-tienda"
+          $env:GESTOR_SIN_RESIDENTE = "1"
+          $diag = "$env:RUNNER_TEMP\diagnostico-tienda.json"
+          $alias = "$env:LOCALAPPDATA\Microsoft\WindowsApps\gestor.exe"
+          if (-not (Test-Path $alias)) { throw "No se creó el alias gestor.exe" }
+          Start-Process -FilePath $alias -ArgumentList "--diagnostico", "`"$diag`"" -Wait
+          Get-Content $diag
+          if (-not (Get-Content $diag | ConvertFrom-Json).tienda) { throw "GESTOR no detectó que corre como paquete de la Store" }
+          $p = Start-Process -FilePath $alias -ArgumentList "--motor" -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "El motor del paquete no terminó" }
+          if (-not (Test-Path "$env:GESTOR_DATOS\gestor.db")) { throw "El motor del paquete no creó la base de datos" }
+          if (Test-Path "$env:GESTOR_DATOS\errores.log") { Get-Content "$env:GESTOR_DATOS\errores.log"; throw "El motor del paquete registró errores" }
+          $pkg | Remove-AppxPackage
+
       - name: Comprimir
         shell: pwsh
         run: |
@@ -135,6 +170,13 @@ jobs:
         with:
           name: GESTOR-Instalador
           path: salida/GESTOR-Instalador-*.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GESTOR-Store
+          path: |
+            salida/GESTOR-Store-*.msix
+            salida/GESTOR-Store-prueba-*.zip
 
       - uses: actions/upload-artifact@v4
         with:
