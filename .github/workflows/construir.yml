@@ -36,6 +36,13 @@ jobs:
           python -c "from PIL import Image, ImageDraw, ImageFont; i = Image.new('RGB', (1800, 600), 'white'); d = ImageDraw.Draw(i); d.text((60, 200), 'FECHA LIMITE DE PAGO 15 NOV 26', fill='black', font=ImageFont.truetype('arial.ttf', 80)); i.save('recibo.bmp')"
           python -c "import sys; sys.path.insert(0, 'app'); import ocr, bd; print('Idiomas/estado:', ocr.estado()); print('Texto leído:', repr(ocr.texto('recibo.bmp'))); print(bd.leer('ocr:error', None))"
 
+      - name: Probar la consulta de redes privadas de Windows (informativo)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-red"
+          python -c "import sys; sys.path.insert(0, 'app'); import red; print('Redes:', red.redes()); print('Privadas:', red.ips_privadas()); print('Cifrado:', red.cifrado_disponible())"
+
       - name: Probar la ventana propia (WebView2)
         run: python -c "import webview, webview.platforms.winforms as w; print('WebView2 listo:', getattr(w, 'is_chromium', '?'))"
 

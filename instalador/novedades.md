@@ -1,6 +1,7 @@
 ## Novedades de GESTOR 0.9.3
 
 - **Lista para la Microsoft Store**: GESTOR reconoce cuándo se instaló desde la Store. En esa versión arranca con Windows desde el propio paquete (se apaga en Configuración › Aplicaciones › Inicio), revisa tus servicios sin la tarea programada y deja que la Store lo actualice.
+- **Panel del celular más seguro**: ahora va cifrado (https) y solo se abre en redes que Windows marca como privadas. En un café o cualquier red pública se queda cerrado. La primera vez el celular avisa del certificado: es normal, lo crea tu propia PC.
 - **Nada cambia en la versión de siempre**: el instalador, la tarea programada y «Actualizar ahora» siguen igual.
 - **Política de privacidad** publicada: GESTOR no envía tus archivos a ningún lado.
 

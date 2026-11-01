@@ -179,14 +179,17 @@ class Aprendiz:
 
 
 class PanelEnRed:
-    """El panel en la red de casa (para el celular). Solo si se activa en Ajustes y hay contraseña."""
+    """El panel en la red de casa (para el celular). Solo si se activa en Ajustes, hay contraseña y la red es privada."""
 
     def __init__(self):
         self.servidor = None
 
     def recargar(self):
         import panel
+        import red
+        # Solo en una red privada de Windows: si te conectas a una pública (un café), se cierra.
         quiere = bool(nucleo.cargar_ajustes().get("acceso_red")) and panel.hay_clave()
+        quiere = quiere and red.cifrado_disponible() and red.hay_red_privada()
         if quiere and not self.servidor:
             try:
                 self.servidor = panel.servidor_en_red()

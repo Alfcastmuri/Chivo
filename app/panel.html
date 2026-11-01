@@ -533,7 +533,8 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
     <div data-pest="ajustes:celular">
     <div class="tarjeta-op"><h4>Desde el celular</h4>
     <p class="ayuda">Abre el panel desde el celular u otro equipo conectado a tu misma red de casa, con tu contraseña. Desde ahí puedes revisar y aprobar el modo prueba.
-      La conexión no va cifrada: úsalo solo en tu red de casa, no en redes públicas. Windows puede preguntarte si permites el acceso: elige "Redes privadas".</p>
+      La conexión va cifrada (https) y solo se abre en redes que Windows marca como <b>privadas</b>: en un café o cualquier red pública se queda cerrado.
+      Windows puede preguntarte si permites el acceso: elige "Redes privadas".</p>
     <div class="fila"><label><input type="checkbox" id="prefRed"> Permitir abrir el panel desde mi red de casa</label></div>
     <div id="redInfo" class="ayuda"></div>
     </div>
@@ -2102,8 +2103,18 @@ $("#prefRed").onchange = async e => {
 async function pintarRed() {
   try {
     const r = await api("/api/red");
-    $("#redInfo").innerHTML = r.activo ? `<div class="qr">${r.qr ? `<div class="qr-img">${r.qr}</div>` : ""}<div>Apunta con la cámara del celular a este código
-      (conectado al mismo Wi-Fi) o abre <b><code>${esc(r.url)}</code></b>. Tarda unos segundos en estar listo.</div></div>` : "";
+    if (!r.activo) { $("#redInfo").innerHTML = ""; return; }
+    if (!r.cifrado) { $("#redInfo").innerHTML = `<div class="aviso">Falta el componente de cifrado, así que el panel del celular no se abre. Reinstala GESTOR.</div>`; return; }
+    if (!r.red_privada) {
+      const nombres = (r.redes || []).map(x => esc(x.nombre || x.ip)).join(", ");
+      $("#redInfo").innerHTML = `<div class="aviso">Tu red${nombres ? ` (${nombres})` : ""} está marcada como <b>pública</b>, así que el panel del celular está cerrado.
+        Si es tu red de casa, cámbiala a «Red privada» en Configuración › Red e Internet › Wi-Fi (o Ethernet) › Propiedades.</div>`;
+      return;
+    }
+    $("#redInfo").innerHTML = `<div class="qr">${r.qr ? `<div class="qr-img">${r.qr}</div>` : ""}<div>Apunta con la cámara del celular a este código
+      (conectado al mismo Wi-Fi) o abre <b><code>${esc(r.url)}</code></b>. Tarda unos segundos en estar listo.
+      <br><br>La primera vez el celular avisará de que la conexión «no es privada» o el certificado «no es de confianza»: es normal, porque el certificado lo creó tu propia PC.
+      Pulsa «Configuración avanzada» y «Continuar». Si quieres comprobarlo, la huella del certificado empieza por <code>${esc((r.huella || "").slice(0, 23))}</code>.</div></div>`;
   } catch (e) { }
 }
 $("#btnRespBase").onclick = async () => {
