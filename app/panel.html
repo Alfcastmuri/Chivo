@@ -1296,11 +1296,13 @@ function dona(items, { tam = 150, centro = "", sub = "" } = {}) {
       <text x="21" y="27" text-anchor="middle" style="font-size:3.2px;fill:var(--suave)">${esc(sub)}</text></svg>`,
     leyenda: `<div class="leyenda">${items.map(([n, v], i) => `<span><i style="background:${colores[i]}"></i>${esc(n)}<b>${v.toLocaleString("es")}</b></span>`).join("")}</div>` };
 }
+// Un disco casi vacío no es «0 %»: por debajo de 1 se dice «<1%».
+const pctTexto = p => p > 0 && p < 1 ? "<1%" : p < 100 && p > 99 ? ">99%" : Math.round(p) + "%";
 function anillo(pct, texto, sub, alerta) {
   const r = 15.9155, p = Math.max(0, Math.min(100, pct));
   return `<div class="anillo"><svg viewBox="0 0 42 42" width="92" height="92"><circle r="${r}" cx="21" cy="21" fill="none" stroke="var(--fondo)" stroke-width="4.5"/>
     <circle r="${r}" cx="21" cy="21" fill="none" stroke="${alerta ? "var(--peligro)" : "var(--acento)"}" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${p} ${100 - p}" stroke-dashoffset="25"/>
-    <text x="21" y="23.5" text-anchor="middle" style="font-size:8px;font-weight:700;fill:var(--texto)">${Math.round(p)}%</text></svg><b>${esc(texto)}</b><span class="ayuda">${esc(sub)}</span></div>`;
+    <text x="21" y="23.5" text-anchor="middle" style="font-size:8px;font-weight:700;fill:var(--texto)">${pctTexto(p)}</text></svg><b>${esc(texto)}</b><span class="ayuda">${esc(sub)}</span></div>`;
 }
 function barras(items, { formato = v => v.toLocaleString("es") } = {}) {
   const max = Math.max(1, ...items.map(x => x[1])), colores = coloresGrafica(items.length);
@@ -2337,7 +2339,7 @@ async function cargarEspacio(recargar) {
   const total = [...espacio.marcadas].reduce((a, ruta) => a + ([...r.grandes, ...r.instaladores, ...r.viejos_descargas].find(f => f.ruta === ruta) || {}).bytes || 0, 0);
   cont.innerHTML = `
     <h2>Espacio en disco</h2>
-    ${r.discos.map(d => { const usado = 100 - d.libre * 100 / d.total; const poco = d.libre * 100 / d.total < (r.umbral || 0); return `
+    ${r.discos.filter(d => d.total).map(d => { const usado = 100 - d.libre * 100 / d.total; const poco = d.libre * 100 / d.total < (r.umbral || 0); return `
       <div class="fila"><b style="width:40px">${esc(d.letra)}</b><div class="barra" style="flex:1"><div style="width:${usado.toFixed(0)}%;${poco ? "background:var(--peligro)" : ""}"></div></div>
       <span class="ayuda">${mb(d.libre)} libres de ${mb(d.total)}${poco ? " · <b style='color:var(--peligro)'>poco espacio</b>" : ""}</span></div>`; }).join("")}
     <p class="ayuda">GESTOR te avisa si un disco baja del ${r.umbral || 0} % libre (cámbialo en Ajustes).</p>

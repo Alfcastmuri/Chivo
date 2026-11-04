@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -2388,6 +2388,25 @@ def tamano_legible(b):
 
 # --------------------------------------------------------------------------- espacio en disco
 
+def _uso_disco(raiz, intentos=3):
+    """shutil.disk_usage, pero sin dar por buenos los ceros.
+
+    Un USB recién conectado, un lector de tarjetas o un disco que despierta a veces responden
+    «total 0» durante un momento; eso pintaba el indicador del inicio a 0. Se reintenta y,
+    si sigue en cero, el disco no se muestra hasta la próxima vez.
+    """
+    for i in range(intentos):
+        try:
+            u = shutil.disk_usage(raiz)
+        except OSError:
+            return None
+        if u.total > 0:
+            return u
+        if i + 1 < intentos:
+            time.sleep(0.2)
+    return None
+
+
 def unidades_fijas():
     """[{"letra", "total", "libre"}] de los discos con letra (o "/" fuera de Windows)."""
     salida = []
@@ -2400,14 +2419,13 @@ def unidades_fijas():
             raiz = f"{chr(65 + i)}:\\"
             if ctypes.windll.kernel32.GetDriveTypeW(raiz) not in (2, 3):  # extraíble o fijo
                 continue
-            try:
-                u = shutil.disk_usage(raiz)
-            except OSError:
-                continue
-            salida.append({"letra": raiz[:2], "total": u.total, "libre": u.free})
+            u = _uso_disco(raiz)
+            if u:
+                salida.append({"letra": raiz[:2], "total": u.total, "libre": u.free})
     else:
-        u = shutil.disk_usage(os.path.expanduser("~"))
-        salida.append({"letra": "/", "total": u.total, "libre": u.free})
+        u = _uso_disco(os.path.expanduser("~"))
+        if u:
+            salida.append({"letra": "/", "total": u.total, "libre": u.free})
     return salida
 
 

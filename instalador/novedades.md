@@ -1,4 +1,9 @@
-## Novedades de GESTOR 0.9.2
+## Novedades de GESTOR 0.9.3
+
+- **El indicador de espacio ya no marca 0 de golpe**: cuando un disco (sobre todo un USB o un lector de tarjetas) contesta «0 bytes» por un momento, GESTOR vuelve a preguntar y, si sigue igual, no lo muestra en vez de pintar un 0.
+- **Discos casi vacíos**: el anillo dice «<1%» en lugar de «0%».
+
+## Lo que trajo la 0.9.2
 
 - **Borrar desde el mapa del disco**: elige un archivo o una carpeta en el mapa y pulsa «Borrar». Una ventana te pregunta si estás seguro y te dice qué es, cuánto ocupa y dónde está. Va a la papelera, así que se puede recuperar.
 - **Los avisos ya no estorban**: los mensajes y las tarjetas de progreso se ocultan con un clic, y las terminadas desaparecen solas en 3 segundos.

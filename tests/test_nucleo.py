@@ -887,6 +887,22 @@ class PruebaUnSoloUso(PruebaServicio):
         self.assertTrue(nucleo.cargar_servicios()[0]["activo"])
 
 
+class PruebaUsoDeDisco(unittest.TestCase):
+    def test_un_cero_momentaneo_no_llega_al_panel(self):
+        from collections import namedtuple
+        from unittest import mock
+        U = namedtuple("U", "total used free")
+        respuestas = [U(0, 0, 0), U(500, 200, 300)]
+        with mock.patch.object(nucleo.shutil, "disk_usage", side_effect=lambda r: respuestas.pop(0)), \
+                mock.patch.object(nucleo.time, "sleep"):
+            self.assertEqual(nucleo._uso_disco("C:\\").total, 500)
+        with mock.patch.object(nucleo.shutil, "disk_usage", return_value=U(0, 0, 0)), \
+                mock.patch.object(nucleo.time, "sleep"):
+            self.assertIsNone(nucleo._uso_disco("C:\\"))
+            if not nucleo.ES_WINDOWS:
+                self.assertEqual(nucleo.unidades_fijas(), [])
+
+
 class PruebaBorrarDesdeElMapa(unittest.TestCase):
     def test_solo_dentro_de_lo_medido_y_a_la_papelera(self):
         import disco
