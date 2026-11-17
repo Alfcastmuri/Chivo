@@ -5,8 +5,12 @@
   - *Mapa del disco*: el mapa llena el espacio de la izquierda y el detalle queda a la derecha.
   - *Colores*: la vista previa y el modo a la izquierda, las opciones a la derecha.
   - *Ajustes*: las opciones se reparten en dos columnas y los botones siempre quedan a la vista.
+- **Lista para la Microsoft Store**: GESTOR reconoce cuándo se instaló desde la Store. En esa versión arranca con Windows desde el propio paquete (se apaga en Configuración › Aplicaciones › Inicio), revisa tus servicios sin la tarea programada y deja que la Store lo actualice.
+- **Panel del celular más seguro**: ahora va cifrado (https) y solo se abre en redes que Windows marca como privadas. En un café o cualquier red pública se queda cerrado. La primera vez el celular avisa del certificado: es normal, lo crea tu propia PC.
+- **Nada cambia en la versión de siempre**: el instalador, la tarea programada y «Actualizar ahora» siguen igual.
+- **Política de privacidad** publicada: GESTOR no envía tus archivos a ningún lado.
 
-## Novedades de GESTOR 0.9.4
+## Lo que trajo la 0.9.4
 
 - **Inicio sin barras de desplazamiento**: todo el resumen cabe en la ventana y se adapta a la resolución de tu pantalla, con un margen ajustado abajo y a la derecha. En pantallas bajas se compacta solo.
 - **Organizar, reordenado como una app profesional**: todo alineado arriba y a lo ancho de la ventana, sin espacios vacíos.

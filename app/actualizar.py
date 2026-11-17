@@ -3,6 +3,8 @@
 Una vez al día pregunta a GitHub si hay una versión nueva. Si la hay, te avisa y en el panel aparece
 «Actualizar ahora»: con un clic se descarga el instalador nuevo y se instala en silencio
 (respaldando antes la base de datos); al terminar, GESTOR vuelve a abrirse solo.
+
+En la versión de la Microsoft Store no se hace nada de esto: las actualizaciones las da la Store.
 """
 
 import json
@@ -47,6 +49,9 @@ def puede_instalarse_solo():
 
 
 def estado():
+    if nucleo.ES_TIENDA:
+        return {"actual": nucleo.VERSION, "nueva": False, "puede_instalarse": False, "pagina": "",
+                "activo": False, "tienda": True}
     a = bd.leer("actualizacion", {}) or {}
     nueva = bool(a.get("version")) and version_tupla(a["version"]) > version_tupla(nucleo.VERSION)
     return {**a, "actual": nucleo.VERSION, "nueva": nueva, "puede_instalarse": puede_instalarse_solo(),
@@ -54,6 +59,8 @@ def estado():
 
 
 def comprobar(forzar=False):
+    if nucleo.ES_TIENDA:
+        return estado()
     previo = bd.leer("actualizacion", {}) or {}
     if not forzar and time.time() - previo.get("t", 0) < CADA_HORAS * 3600:
         return estado()
@@ -96,6 +103,8 @@ def descargar(e):
 
 def instalar():
     """Descarga e instala la versión nueva. El instalador cierra GESTOR y lo vuelve a abrir al terminar."""
+    if nucleo.ES_TIENDA:
+        return {"ok": False, "mensaje": "Esta copia se instaló desde la Microsoft Store: se actualiza sola desde ahí."}
     e = comprobar(forzar=True)
     if not e["nueva"]:
         return {"ok": False, "mensaje": f'Ya tienes la última versión ({nucleo.VERSION}).'}
@@ -112,6 +121,8 @@ def instalar():
 
 def mantenimiento():
     """Lo llama el motor: una consulta al día y un aviso por cada versión nueva."""
+    if nucleo.ES_TIENDA:
+        return
     if not nucleo.cargar_ajustes().get("buscar_actualizaciones", True):
         return
     e = comprobar()

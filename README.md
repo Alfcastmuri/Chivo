@@ -24,6 +24,13 @@ Lo mismo se puede hacer por línea de órdenes: `GESTOR.exe --detener`, `--reini
 Desinstalar (desde Configuración de Windows) quita el programa y la tarea programada, pero no tus
 datos (`%APPDATA%\GESTOR`).
 
+## Microsoft Store
+
+GESTOR también se puede publicar en la Microsoft Store como paquete MSIX. Cada compilación de GitHub Actions
+crea el artefacto **GESTOR-Store**, con el `.msix` para Partner Center y un `.zip` para probarlo en tu PC.
+Los pasos, los textos de la ficha y lo que cambia en esa versión están en [tienda/LEEME.md](tienda/LEEME.md).
+La política de privacidad está en [docs/privacidad.html](docs/privacidad.html).
+
 ## Cómo se usa
 
 1. Usa el instalador, o descarga `GESTOR-windows.zip`, descomprímelo donde quieras y abre `GESTOR.exe`.

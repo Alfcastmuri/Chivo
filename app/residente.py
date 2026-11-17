@@ -179,14 +179,17 @@ class Aprendiz:
 
 
 class PanelEnRed:
-    """El panel en la red de casa (para el celular). Solo si se activa en Ajustes y hay contraseña."""
+    """El panel en la red de casa (para el celular). Solo si se activa en Ajustes, hay contraseña y la red es privada."""
 
     def __init__(self):
         self.servidor = None
 
     def recargar(self):
         import panel
+        import red
+        # Solo en una red privada de Windows: si te conectas a una pública (un café), se cierra.
         quiere = bool(nucleo.cargar_ajustes().get("acceso_red")) and panel.hay_clave()
+        quiere = quiere and red.cifrado_disponible() and red.hay_red_privada()
         if quiere and not self.servidor:
             try:
                 self.servidor = panel.servidor_en_red()
@@ -248,7 +251,7 @@ class Bandeja:
     def _abrir_panel(self, *_):
         import subprocess
         if nucleo.EMPAQUETADO:
-            comando = [sys.executable]
+            comando = [nucleo.EJECUTABLE]
         else:
             comando = [nucleo._pythonw(), os.path.join(nucleo.BASE, "gestor.py")]
         subprocess.Popen(comando, creationflags=0x08000000 if nucleo.ES_WINDOWS else 0)
@@ -299,6 +302,43 @@ class Bandeja:
         self.icono.update_menu()
 
 
+class RelojDelMotor:
+    """Solo en la versión de la Microsoft Store: lanza el motor cada N minutos (hace de tarea programada).
+
+    Dentro de un paquete MSIX la ruta de GESTOR.exe cambia con cada actualización, así que una tarea del
+    Programador de tareas se quedaría apuntando a la versión vieja. El residente arranca al iniciar sesión
+    (startupTask del paquete) y se encarga de esto.
+    """
+
+    def __init__(self):
+        self.ultimo = time.time() - self.cada() + 60  # la primera revisión, al minuto de arrancar
+        self.proceso = None
+
+    @staticmethod
+    def cada():
+        return max(1, int(nucleo.cargar_ajustes().get("revisar_cada_minutos") or 5)) * 60
+
+    def atender(self):
+        if not nucleo.ES_TIENDA:
+            return
+        ajustes = nucleo.cargar_ajustes()
+        if ajustes.get("detenido") or not ajustes.get("motor_automatico", True):
+            return
+        if time.time() - self.ultimo < self.cada():
+            return
+        if self.proceso and self.proceso.poll() is None:
+            return  # la revisión anterior sigue en marcha
+        self.ultimo = time.time()
+        import subprocess
+        if nucleo.EMPAQUETADO:
+            comando = [nucleo.EJECUTABLE, "--motor"]
+        else:
+            comando = [nucleo._pythonw(), os.path.join(nucleo.BASE, "gestor.py"), "--motor"]
+        self.proceso = subprocess.Popen(comando, creationflags=0x08000000 if nucleo.ES_WINDOWS else 0,
+                                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
+
+
 def main(args):
     # Un solo residente a la vez: el puerto hace de cerrojo y permite saber si está en marcha.
     try:
@@ -327,6 +367,7 @@ def main(args):
     en_red = PanelEnRed()
     import mapa
     vigia = mapa.Vigia()
+    reloj = RelojDelMotor()
     salir = threading.Event()
     bandeja = None
     if "--sin-icono" not in args and nucleo.cargar_ajustes().get("icono_bandeja", True):
@@ -367,6 +408,7 @@ def main(args):
                 vigilante.atender()
                 aprendiz.atender()
                 vigia.atender()
+                reloj.atender()
                 avisos, posicion = nucleo.leer_avisos_desde(posicion)
                 if bandeja:
                     for a in avisos[-3:]:

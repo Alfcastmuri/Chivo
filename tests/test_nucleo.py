@@ -922,3 +922,140 @@ class PruebaBorrarDesdeElMapa(unittest.TestCase):
         entrada = next(e for e in nucleo.listar_papelera() if e["origen"] == os.path.join(raiz, "sub"))
         nucleo.restaurar(entrada["id"])
         self.assertTrue(os.path.exists(os.path.join(raiz, "sub", "x.bin")))
+
+
+class PruebaVersionTienda(unittest.TestCase):
+    """La versión de la Microsoft Store: sin tarea programada ni actualizador propio."""
+
+    def setUp(self):
+        from unittest import mock
+        self.ajustes_antes = nucleo.cargar_ajustes()
+        self.parches = [mock.patch.object(nucleo, "ES_TIENDA", True),
+                        mock.patch.object(nucleo, "lanzar_residente", lambda: False)]
+        for p in self.parches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.parches:
+            p.stop()
+        nucleo.guardar_ajustes(self.ajustes_antes)
+
+    def test_fuera_de_la_tienda_no_se_detecta(self):
+        if not os.environ.get("GESTOR_TIENDA"):
+            self.assertEqual(nucleo._paquete_tienda(), "")
+
+    def test_programacion_sin_programador_de_tareas(self):
+        r = nucleo.programar_motor(7)
+        self.assertTrue(r["ok"])
+        self.assertEqual(nucleo.cargar_ajustes()["revisar_cada_minutos"], 7)
+        self.assertEqual(nucleo.estado_programacion(), {"instalada": True, "tienda": True})
+        self.assertTrue(nucleo.necesita_residente())  # el residente hace de tarea programada
+        nucleo.quitar_programacion()
+        self.assertFalse(nucleo.estado_programacion()["instalada"])
+        self.assertFalse(nucleo.actualizar_programacion())
+
+    def test_sin_actualizador_propio(self):
+        import actualizar
+        e = actualizar.estado()
+        self.assertTrue(e["tienda"])
+        self.assertFalse(e["nueva"] or e["puede_instalarse"] or e["activo"])
+        self.assertFalse(actualizar.instalar()["ok"])
+        self.assertIsNone(actualizar.mantenimiento())
+
+    def test_el_residente_lanza_el_motor(self):
+        from unittest import mock
+        import residente
+        nucleo.programar_motor(5)
+        reloj = residente.RelojDelMotor()
+        with mock.patch("subprocess.Popen") as popen:
+            reloj.atender()
+            popen.assert_not_called()  # todavía no toca
+            reloj.ultimo -= 600
+            reloj.atender()
+            self.assertEqual(popen.call_count, 1)
+            self.assertIn("--motor", popen.call_args[0][0])
+            ajustes = nucleo.cargar_ajustes()
+            ajustes["detenido"] = True
+            nucleo.guardar_ajustes(ajustes)
+            reloj.ultimo -= 600
+            reloj.atender()
+            self.assertEqual(popen.call_count, 1)  # «Cerrar GESTOR» lo detiene
+
+
+class PruebaPanelCelularSeguro(unittest.TestCase):
+    """El panel del celular: solo en redes privadas de Windows y cifrado."""
+
+    def setUp(self):
+        self.antes = os.environ.get("GESTOR_REDES")
+
+    def tearDown(self):
+        if self.antes is None:
+            os.environ.pop("GESTOR_REDES", None)
+        else:
+            os.environ["GESTOR_REDES"] = self.antes
+
+    def test_solo_redes_privadas(self):
+        import red
+        os.environ["GESTOR_REDES"] = "192.168.1.20=Private,10.0.0.5=Public,172.16.0.9=DomainAuthenticated,8.8.8.8=Private"
+        self.assertEqual(sorted(red.ips_privadas()), ["172.16.0.9", "192.168.1.20"])
+        self.assertTrue(red.ip_permitida("192.168.1.20"))
+        self.assertFalse(red.ip_permitida("10.0.0.5"))      # red pública (un café)
+        self.assertFalse(red.ip_permitida("8.8.8.8"))       # no es una dirección de red local
+        self.assertEqual(red.ip_para_celular("10.0.0.5"), "192.168.1.20")
+        os.environ["GESTOR_REDES"] = "10.0.0.5=Public"
+        self.assertFalse(red.hay_red_privada())
+        self.assertIsNone(red.ip_para_celular("10.0.0.5"))
+
+    def test_no_abre_sin_red_privada(self):
+        import panel
+        os.environ["GESTOR_REDES"] = "10.0.0.5=Public"
+        with self.assertRaises(OSError):
+            panel.servidor_en_red()
+
+    def test_cifrado_de_extremo_a_extremo(self):
+        import http.client
+        import ssl
+        import threading
+        import panel
+        import red
+        if not red.cifrado_disponible():
+            self.skipTest("sin cryptography")
+        if not panel.hay_clave():
+            panel.guardar_clave("clave-de-prueba-123")
+        contexto_cliente = ssl.create_default_context()
+        contexto_cliente.check_hostname = False
+        contexto_cliente.verify_mode = ssl.CERT_NONE
+
+        def arrancar(redes):
+            os.environ["GESTOR_REDES"] = redes
+            servidor = panel.ServidorCifrado(("127.0.0.1", 0), panel.ManejadorRed, red.contexto_tls())
+            threading.Thread(target=servidor.serve_forever, daemon=True).start()
+            return servidor
+
+        def pedir(servidor):
+            c = http.client.HTTPSConnection("127.0.0.1", servidor.server_address[1], timeout=10, context=contexto_cliente)
+            c.request("GET", "/")
+            certificado = c.sock.getpeercert(binary_form=True)
+            r = c.getresponse()
+            cuerpo = r.read()
+            c.close()
+            return r.status, cuerpo, certificado
+
+        # En la prueba el «celular» llega por 127.0.0.1, que hace de red local; solo cambia su categoría.
+        servidor = arrancar("127.0.0.1=Private")
+        try:
+            estado, cuerpo, certificado = pedir(servidor)
+            self.assertEqual(estado, 200)                         # la página de entrada, por https
+            self.assertIn(b"<html", cuerpo.lower())
+            esperado = ":".join(f"{b:02X}" for b in __import__("hashlib").sha256(certificado).digest())
+            self.assertEqual(red.huella(), esperado)               # la huella que enseña el panel es la real
+            with self.assertRaises((ssl.SSLError, ConnectionError, http.client.HTTPException, OSError)):
+                c = http.client.HTTPConnection("127.0.0.1", servidor.server_address[1], timeout=5)
+                c.request("GET", "/")
+                c.getresponse().read()                             # sin cifrar no responde
+            os.environ["GESTOR_REDES"] = "127.0.0.1=Public"
+            red._cache.update(t=0.0, redes=None)
+            self.assertEqual(pedir(servidor)[0], 403)              # red pública: rechazado
+        finally:
+            servidor.shutdown()
+            servidor.server_close()

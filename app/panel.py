@@ -394,7 +394,8 @@ class Manejador(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(cuerpo)))
-        self.send_header("Set-Cookie", f"gestor_sesion={sesion}; HttpOnly; SameSite=Strict; Path=/")
+        seguro = "; Secure" if self.en_red else ""
+        self.send_header("Set-Cookie", f"gestor_sesion={sesion}; HttpOnly; SameSite=Strict; Path=/{seguro}")
         self.end_headers()
         self.wfile.write(cuerpo)
 
@@ -790,9 +791,16 @@ class Manejador(BaseHTTPRequestHandler):
             r = next(x for x in respaldo.lista() if x["id"] == datos["id"])
             return {"ok": True, "ruta": respaldo.restaurar_version(r, datos["ruta"])}
         if ruta == "/api/red":
-            url = f"http://{ip_local()}:{PUERTO_RED}/"
-            return {"activo": bool(nucleo.cargar_ajustes().get("acceso_red")), "hay_clave": hay_clave(),
-                    "url": url, "qr": qr_svg(url), "residente": nucleo.residente_activo()}
+            import red
+            activo = bool(nucleo.cargar_ajustes().get("acceso_red"))
+            ip = red.ip_para_celular(ip_local()) if activo else None
+            url = f"https://{ip}:{PUERTO_RED}/" if ip else ""
+            if activo and red.cifrado_disponible():
+                red.asegurar_certificado()
+            return {"activo": activo, "hay_clave": hay_clave(), "url": url, "qr": qr_svg(url),
+                    "residente": nucleo.residente_activo(), "red_privada": bool(ip),
+                    "cifrado": red.cifrado_disponible(), "huella": red.huella() if activo else "",
+                    "redes": [{"ip": k, **v} for k, v in red.redes().items()] if activo else []}
         if ruta in ("/api/aplanar/simular", "/api/aplanar/ejecutar"):
             opciones = {k: datos[k] for k in ("nombre_con_carpeta", "borrar_vacias", "identicos") if k in datos}
             return nucleo.aplanar(datos.get("carpeta", ""), simular=ruta.endswith("simular"), **opciones)
@@ -892,18 +900,48 @@ class ManejadorRed(Manejador):
 
     def _host_valido(self):
         import ipaddress
+        import red
         try:
             cliente = ipaddress.ip_address(self.client_address[0])
         except ValueError:
             return False
-        return (cliente.is_private or cliente.is_loopback) and bool(self.headers.get("Host")) and hay_clave()
+        # Solo celulares de la red local, y solo si la conexión entró por una red que Windows marca como privada.
+        return (cliente.is_private and red.ip_permitida(self.connection.getsockname()[0])
+                and bool(self.headers.get("Host")) and hay_clave())
 
     def _origen_valido(self):
-        return self.headers.get("Origin") == f'http://{self.headers.get("Host")}'
+        return self.headers.get("Origin") == f'https://{self.headers.get("Host")}'
+
+
+class ServidorCifrado(ThreadingHTTPServer):
+    """El panel del celular por https. El saludo TLS se hace en el hilo de cada conexión, no en el que acepta."""
+
+    def __init__(self, direccion, manejador, contexto):
+        self.contexto = contexto
+        super().__init__(direccion, manejador)
+
+    def get_request(self):
+        conexion, direccion = self.socket.accept()
+        conexion.settimeout(120)
+        return self.contexto.wrap_socket(conexion, server_side=True, do_handshake_on_connect=False), direccion
+
+    def finish_request(self, request, client_address):
+        import ssl
+        try:
+            request.do_handshake()
+        except (ssl.SSLError, OSError):
+            return  # alguien que no habla https (o que rechazó el certificado)
+        super().finish_request(request, client_address)
 
 
 def servidor_en_red():
-    return ThreadingHTTPServer(("0.0.0.0", PUERTO_RED), ManejadorRed)
+    """Abre el panel del celular. Sin red privada o sin cifrado no se abre (OSError)."""
+    import red
+    if not red.cifrado_disponible():
+        raise OSError("Falta el componente de cifrado: el panel del celular no se abre sin cifrar.")
+    if not red.hay_red_privada():
+        raise OSError("No hay ninguna red privada: el panel del celular se queda cerrado.")
+    return ServidorCifrado(("0.0.0.0", PUERTO_RED), ManejadorRed, red.contexto_tls())
 
 
 def main():
