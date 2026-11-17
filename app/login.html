@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GESTOR</title>
+<style>
+:root { --fondo: #f5f6f8; --panel: #ffffff; --texto: #1d2330; --suave: #6b7383; --borde: #dfe3ea;
+  --acento: #2f6fde; --acento-texto: #ffffff; --peligro: #c23434; --peligro-suave: #fbe9e9; }
+@media (prefers-color-scheme: dark) {
+  :root { --fondo: #15181e; --panel: #1e222a; --texto: #e7eaf0; --suave: #9aa3b2; --borde: #323844;
+    --acento: #5b93f0; --acento-texto: #0d1420; --peligro: #ee6b6b; --peligro-suave: #3d2223; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: var(--fondo); color: var(--texto); font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+form { background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 28px; width: 100%; max-width: 360px; }
+h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: .5px; }
+p { color: var(--suave); margin: 0 0 18px; }
+label { display: block; font-size: 12px; color: var(--suave); margin: 12px 0 4px; }
+input { width: 100%; font: inherit; color: var(--texto); background: var(--panel); border: 1px solid var(--borde); border-radius: 6px; padding: 9px 10px; }
+input:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
+button { width: 100%; margin-top: 18px; font: inherit; font-weight: 600; border: 0; border-radius: 6px; padding: 10px;
+  background: var(--acento); color: var(--acento-texto); cursor: pointer; }
+button:disabled { opacity: .6; }
+.error { display: none; margin-top: 12px; padding: 8px 10px; border-radius: 6px; background: var(--peligro-suave); color: var(--peligro); font-size: 13px; }
+.ayuda { font-size: 12px; color: var(--suave); margin-top: 16px; }
+code { font-family: Consolas, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<form id="f" autocomplete="off">
+  <h1>GESTOR</h1>
+  <p id="intro"></p>
+  <label for="clave">Contraseña</label>
+  <input type="password" id="clave" autocomplete="current-password" autofocus required>
+  <div id="bloqueRepetir" hidden>
+    <label for="repetir">Repite la contraseña</label>
+    <input type="password" id="repetir" autocomplete="new-password">
+  </div>
+  <button id="btn"></button>
+  <div class="error" id="error"></div>
+  <div class="ayuda" id="ayuda"></div>
+</form>
+<script>
+const MODO = "__MODO__";
+const crear = MODO === "crear";
+document.getElementById("intro").textContent = crear
+  ? "Crea una contraseña para proteger el panel. Te la pedirá cada vez que lo abras."
+  : "Escribe tu contraseña para abrir el panel.";
+document.getElementById("btn").textContent = crear ? "Crear contraseña y entrar" : "Entrar";
+document.getElementById("bloqueRepetir").hidden = !crear;
+document.getElementById("ayuda").innerHTML = crear
+  ? "Mínimo 6 caracteres. Los servicios activos siguen funcionando aunque no abras el panel."
+  : "¿La olvidaste? Cierra GESTOR, borra el archivo <code>%APPDATA%\\GESTOR\\credenciales.json</code> y vuelve a abrirlo para crear una nueva. Tus servicios no se pierden.";
+
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const clave = document.getElementById("clave").value;
+  const err = document.getElementById("error");
+  err.style.display = "none";
+  if (crear && clave !== document.getElementById("repetir").value) {
+    err.textContent = "Las contraseñas no coinciden."; err.style.display = "block"; return;
+  }
+  const btn = document.getElementById("btn"); btn.disabled = true;
+  try {
+    const r = await fetch(crear ? "/auth/crear" : "/auth/entrar", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clave }) });
+    const j = await r.json();
+    if (r.ok) { location.reload(); return; }
+    err.textContent = j.error || "No se pudo entrar."; err.style.display = "block";
+  } catch (x) { err.textContent = "El panel no responde. ¿Lo cerraste?"; err.style.display = "block"; }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
