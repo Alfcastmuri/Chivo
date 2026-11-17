@@ -1,9 +1,25 @@
-## Novedades de GESTOR 0.9.3
+## Novedades de GESTOR 0.9.5
 
 - **Lista para la Microsoft Store**: GESTOR reconoce cuándo se instaló desde la Store. En esa versión arranca con Windows desde el propio paquete (se apaga en Configuración › Aplicaciones › Inicio), revisa tus servicios sin la tarea programada y deja que la Store lo actualice.
 - **Panel del celular más seguro**: ahora va cifrado (https) y solo se abre en redes que Windows marca como privadas. En un café o cualquier red pública se queda cerrado. La primera vez el celular avisa del certificado: es normal, lo crea tu propia PC.
 - **Nada cambia en la versión de siempre**: el instalador, la tarea programada y «Actualizar ahora» siguen igual.
 - **Política de privacidad** publicada: GESTOR no envía tus archivos a ningún lado.
+
+## Lo que trajo la 0.9.4
+
+- **Inicio sin barras de desplazamiento**: todo el resumen cabe en la ventana y se adapta a la resolución de tu pantalla, con un margen ajustado abajo y a la derecha. En pantallas bajas se compacta solo.
+- **Organizar, reordenado como una app profesional**: todo alineado arriba y a lo ancho de la ventana, sin espacios vacíos.
+  - *Asistente*: a la izquierda eliges la carpeta y ves lo que encontró; a la derecha marcas las propuestas.
+  - *Plantillas*: tarjetas en cuadrícula y, al lado, el detalle de la que elijas con sus reglas y el botón para crearla. Ya no hay que bajar por una lista larga.
+  - *Sacar a la raíz*: carpeta y opciones a la izquierda, vista previa a la derecha.
+  - *Adjuntos de correo*: configuración y última revisión a la izquierda, reglas por remitente a la derecha.
+  - *Servicios*: la lista y el editor ocupan toda la altura y los botones Guardar, Simular y Ejecutar quedan siempre a la vista.
+- Solo las listas largas (por ejemplo, muchas reglas en una pantalla chica) se desplazan por dentro.
+
+## Lo que trajo la 0.9.3
+
+- **El indicador de espacio ya no marca 0 de golpe**: cuando un disco (sobre todo un USB o un lector de tarjetas) contesta «0 bytes» por un momento, GESTOR vuelve a preguntar y, si sigue igual, no lo muestra en vez de pintar un 0.
+- **Discos casi vacíos**: el anillo dice «<1%» en lugar de «0%».
 
 ## Lo que trajo la 0.9.2
 

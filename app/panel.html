@@ -421,9 +421,114 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
 }
 .paletas { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 .paleta { height: 100%; }
+/* ---------------- 0.9.4: el Inicio cabe entero en la ventana, sin barras de desplazamiento.
+   Solo en pantallas de al menos 1000 x 600; en ventanas más chicas (o el celular) se desplaza como antes. */
+@media (min-width: 1000px) and (min-height: 600px) {
+  body.ajustada { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  body.ajustada > header, body.ajustada > .banda { flex: none; }
+  body.ajustada > .marco { flex: 1; min-height: 0; max-width: none; width: 100%; margin: 0; grid-template-rows: minmax(0, 1fr); }
+  /* el menú lateral se encoge con la ventana en vez de empujar la página hacia abajo */
+  body.ajustada nav.lateral { position: static; align-self: stretch; min-height: 0; overflow: hidden; gap: 8px; padding-bottom: 14px; }
+  body.ajustada nav.lateral button.mosaico { flex: 0 1 auto; min-height: 0; overflow: hidden; }
+  body.ajustada nav.lateral button.mosaico svg { flex: none; }
+  body.ajustada .contenido { min-height: 0; height: 100%; padding: 0 16px 16px 6px; }
+  body.en-inicio #vistaInicio { padding: 0; flex: 1; min-height: 0; max-width: none; margin: 0; display: flex; flex-direction: column; }
+  body.en-inicio #inicio { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  body.en-inicio #inicio > [data-pest].on { flex: 1; min-height: 0 !important; }
+  body.en-inicio #inicio .tablero { height: 100%; grid-auto-rows: minmax(0, 1fr); gap: 14px; }
+  body.en-inicio #inicio [data-pest="inicio:resumen"] .tablero { grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
+  body.en-inicio #inicio [data-pest="inicio:actividad"] .tablero { grid-template-rows: minmax(0, 1fr) minmax(0, 1.35fr); }
+  body.en-inicio #inicio .tablero > .panelito { overflow: hidden; display: flex; flex-direction: column; }
+  body.en-inicio #inicio .kpis { height: auto; }
+  body.en-inicio #inicio .kpis > .panelito { overflow: hidden; }
+  body.en-inicio #inicio .graf:not(.mini) { flex: 1 1 0; min-height: 40px; height: auto !important; }
+  body.en-inicio #inicio .atajos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 10px; }
+  body.en-inicio #inicio .atajos button { width: auto; min-height: 0; padding: 6px 4px; justify-content: center; }
+  body.en-inicio #inicio .renglon { flex: none; }
+}
+@media (min-width: 1000px) and (min-height: 600px) and (max-height: 820px) {
+  body.en-inicio #inicio .tablero, body.en-inicio #inicio .kpis { gap: 10px; }
+  body.en-inicio:not(.cuaderno) #inicio .panelito { padding: 12px 16px; }
+  body.en-inicio #inicio .kpi .num { font-size: 22px; }
+  body.en-inicio #inicio .saludo { font-size: 17px; }
+  body.en-inicio #inicio .pestanas-int { padding-bottom: 4px; }
+  body.en-inicio #inicio .atajos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  body.en-inicio #inicio .atajos button { flex-direction: row; gap: 6px; padding: 4px 8px; }
+  body.en-inicio #inicio .atajos button svg { width: 16px; height: 16px; flex: none; }
+  body.ajustada nav.lateral { gap: 6px; padding-top: 10px; }
+  body.ajustada nav.lateral button.mosaico { padding: 7px 4px 6px; gap: 3px; font-size: 11px; }
+  body.ajustada nav.lateral button.mosaico svg { width: 20px; height: 20px; }
+}
+/* pantallas bajas (por ejemplo 1366 x 768 con la barra de tareas): todo más compacto para que nada se corte */
+@media (min-width: 1000px) and (min-height: 600px) and (max-height: 760px) {
+  body.en-inicio #inicio .kpi .graf.mini { display: none; }
+  body.en-inicio:not(.cuaderno) #inicio .panelito { padding: 10px 14px; }
+  body.en-inicio #inicio .panelito > h3 { margin-bottom: 6px; }
+  body.en-inicio #inicio .renglon { padding-top: 3px; padding-bottom: 3px; }
+  body.en-inicio #inicio .cifras b { font-size: 18px; }
+  body.en-inicio #inicio .cifras div { padding: 5px 8px; }
+  body.en-inicio #inicio .estado-hero .semaforo { font-size: 17px; }
+  body.en-inicio #inicio > div:first-child { margin-bottom: 8px !important; }
+  body.en-inicio #inicio .pestanas-int button { padding-top: 6px; padding-bottom: 6px; }
+}
+/* ---------------- 0.9.4: vistas que caben en la ventana (Organizar). Contenido alineado arriba,
+   margen ajustado abajo y a la derecha; solo las listas se desplazan si no caben. */
+.contenido > main.vista.on { max-width: none; margin: 0; }
+.contenido { padding: 0 16px 16px 6px; }
+.subnav.on { max-width: none; padding: 18px 0 0; }
+.tarjeta-pl .etiqueta { margin: 0; }
+.cab-vista { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+.cab-vista h2 { margin: 0 0 4px !important; }
+.cab-vista p { margin: 0; max-width: 1100px; }
+.cab-vista .herramientas { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; flex: none; }
+.dos-col { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.col-lateral { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.col-lateral .tarjeta-op { margin: 0; }
+.col-lateral .tarjeta-op > input[type=text] { margin-bottom: 8px; }
+.col-principal { min-width: 0; display: flex; flex-direction: column; }
+.opciones-v { display: flex; flex-direction: column; gap: 10px; }
+.opciones-v h4 { margin-bottom: 0; }
+.propuesta { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--fondo); margin-bottom: 8px; cursor: pointer; }
+.propuesta > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.propuesta .ayuda { overflow-wrap: anywhere; }
+.maestro-detalle { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+.tarjetas-pl { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; align-content: start; padding: 3px; }
+.tarjeta-pl { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; height: auto; white-space: normal; overflow: visible; }
+.tarjeta-pl b { font-size: 14px; }
+.tarjeta-pl .ayuda { display: -webkit-box; -webkit-line-clamp: 2; line-height: 1.4; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; }
+.tarjeta-pl.on { box-shadow: 0 0 0 2px var(--acento) !important; }
+.detalle-pl { background: var(--fondo); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.detalle-pl h3 { margin: 0; font-size: 16px; }
+.detalle-pl > *:not(.zona-lista) { flex: none; }
+.detalle-pl > p.ayuda { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.detalle-pl > .ayuda:not(p) { font-size: 12px; }
+.opciones-v .campo { align-items: flex-start; text-align: left; }
+.opciones-v .campo select { width: 100%; }
+.reglas-pl label { display: flex; gap: 8px; padding: 4px 0; font-size: 13px; }
+.zona-lista { min-height: 0; }
+.zona-lista::-webkit-scrollbar { width: 8px; } .zona-lista::-webkit-scrollbar-thumb { background: var(--borde); border-radius: 4px; }
+@media (max-width: 999px) { .dos-col, .maestro-detalle { grid-template-columns: 1fr; } .cab-vista { flex-direction: column; } }
+@media (min-width: 1000px) and (min-height: 600px) {
+  body.ajustada .contenido > main.vista.on:not(#vistaInicio) { flex: 1; min-height: 0; padding: 0; }
+  body.ajustada main.vista.simple.on > .caja.editor { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
+  body.ajustada main.vista.simple.on > .caja.editor > div:only-child { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  body.ajustada .dos-col, body.ajustada .maestro-detalle { flex: 1; min-height: 0; align-items: stretch; }
+  body.ajustada .col-lateral, body.ajustada .col-principal, body.ajustada .detalle-pl { min-height: 0; overflow: hidden; }
+  body.ajustada .col-principal > .zona-lista, body.ajustada .detalle-pl > .zona-lista, body.ajustada .maestro-detalle > .zona-lista { flex: 1 1 auto; overflow-y: auto; }
+  body.ajustada .maestro-detalle > .zona-lista { height: 100%; }
+  body.ajustada .acciones { position: static; flex: none; }
+  /* Servicios: la lista y el editor ocupan toda la altura; el contenido de cada pestaña se desplaza dentro */
+  body.ajustada #vistaServicios.on { grid-template-rows: minmax(0, 1fr); }
+  body.ajustada #vistaServicios .caja.lista { align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
+  body.ajustada #vistaServicios #lista { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  body.ajustada #vistaServicios #aprendido { flex: none; max-height: 40%; overflow-y: auto; }
+  body.ajustada #editor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  body.ajustada #editor > * { flex: none; }
+  body.ajustada #editor > [data-pest].on { flex: 1 1 auto; min-height: 0 !important; overflow-y: auto; }
+}
 </style>
 </head>
-<body>
+<body class="en-inicio ajustada">
 <header>
   <h1>GESTOR <span class="ayuda" id="version" style="font-weight:400"></span></h1>
   <span class="espacio"></span>
@@ -442,7 +547,7 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
 <div class="contenido">
 <div class="subnav" id="subnav"></div>
 <main class="vista simple on" id="vistaInicio"><div id="inicio"><div class="vacio">Cargando…</div></div></main>
-<main class="vista simple" id="vistaRaiz"><div class="caja editor" id="raiz"><h2>Sacar todo a la raíz</h2><div id="aplanar"></div></div></main>
+<main class="vista simple" id="vistaRaiz"><div class="caja editor" id="raiz"><div id="aplanar"></div></div></main>
 <main class="vista" id="vistaServicios">
   <div class="caja lista">
     <h2>Servicios</h2>
@@ -1201,6 +1306,8 @@ $("#pestanas").addEventListener("click", e => {
 $("#subnav").addEventListener("click", e => { const b = e.target.closest("[data-vista]"); if (b) mostrarVista(b.dataset.vista); });
 function mostrarVista(nombre) {
   vistaActual = nombre;
+  document.body.classList.toggle("en-inicio", nombre === "Inicio");
+  document.body.classList.toggle("ajustada", ["Inicio", "Asistente", "Servicios", "Plantillas", "Raiz", "Correo"].includes(nombre));
   if (nombre === "Copias") { nombre = "Respaldo"; setTimeout(() => cambiarPestana("resp", "usb")); }
   const [g, , vistas] = grupoDe(nombre);
   ultimaDelGrupo[g] = nombre;
@@ -1285,7 +1392,7 @@ function minilinea(serie) {
   const n = serie.length, max = Math.max(1, ...serie);
   if (n < 2) return "";
   const pts = serie.map((v, i) => `${(i / (n - 1) * 100).toFixed(1)},${(28 - 24 * v / max).toFixed(1)}`).join(" ");
-  return `<svg class="graf" viewBox="0 0 100 30" preserveAspectRatio="none" style="height:30px;margin-top:6px"><polyline points="${pts}" fill="none" stroke="var(--acento)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  return `<svg class="graf mini" viewBox="0 0 100 30" preserveAspectRatio="none" style="height:30px;margin-top:6px"><polyline points="${pts}" fill="none" stroke="var(--acento)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
 }
 function dona(items, { tam = 150, centro = "", sub = "" } = {}) {
   const total = items.reduce((a, x) => a + x[1], 0) || 1, colores = coloresGrafica(items.length), r = 15.9155;
@@ -1297,11 +1404,13 @@ function dona(items, { tam = 150, centro = "", sub = "" } = {}) {
       <text x="21" y="27" text-anchor="middle" style="font-size:3.2px;fill:var(--suave)">${esc(sub)}</text></svg>`,
     leyenda: `<div class="leyenda">${items.map(([n, v], i) => `<span><i style="background:${colores[i]}"></i>${esc(n)}<b>${v.toLocaleString("es")}</b></span>`).join("")}</div>` };
 }
+// Un disco casi vacío no es «0 %»: por debajo de 1 se dice «<1%».
+const pctTexto = p => p > 0 && p < 1 ? "<1%" : p < 100 && p > 99 ? ">99%" : Math.round(p) + "%";
 function anillo(pct, texto, sub, alerta) {
   const r = 15.9155, p = Math.max(0, Math.min(100, pct));
   return `<div class="anillo"><svg viewBox="0 0 42 42" width="92" height="92"><circle r="${r}" cx="21" cy="21" fill="none" stroke="var(--fondo)" stroke-width="4.5"/>
     <circle r="${r}" cx="21" cy="21" fill="none" stroke="${alerta ? "var(--peligro)" : "var(--acento)"}" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="${p} ${100 - p}" stroke-dashoffset="25"/>
-    <text x="21" y="23.5" text-anchor="middle" style="font-size:8px;font-weight:700;fill:var(--texto)">${Math.round(p)}%</text></svg><b>${esc(texto)}</b><span class="ayuda">${esc(sub)}</span></div>`;
+    <text x="21" y="23.5" text-anchor="middle" style="font-size:8px;font-weight:700;fill:var(--texto)">${pctTexto(p)}</text></svg><b>${esc(texto)}</b><span class="ayuda">${esc(sub)}</span></div>`;
 }
 function barras(items, { formato = v => v.toLocaleString("es") } = {}) {
   const max = Math.max(1, ...items.map(x => x[1])), colores = coloresGrafica(items.length);
@@ -2143,47 +2252,54 @@ async function pintarPlantillas(recargar) {
     plant.lista.forEach(p => { plant.marcadas[p.clave] = new Set(p.reglas.map((r, i) => r.marcada ? i : -1).filter(i => i >= 0)); plant.origenes[p.clave] = [...p.origenes]; });
   }
   const docs = Object.values(plant.documentos || {});
+  if (!plant.lista.some(p => p.clave === plant.abierta)) plant.abierta = (plant.lista[0] || {}).clave || null;
+  const p = plant.lista.find(x => x.clave === plant.abierta);
   cont.innerHTML = `
-    <div class="fila" style="justify-content:space-between"><h2 style="margin:0">Plantillas</h2>
-      <button data-ir-asistente>🧭 Crear con el asistente</button></div>
-    <p class="ayuda">Servicios listos para cada tipo de carpeta. Los documentos van a las carpetas que <b>ya tienes en Documentos</b>
-      ${docs.length ? `(he encontrado: ${docs.map(d => esc(nombreCorto(d))).join(", ")})` : "(no encontré subcarpetas conocidas: lo que no encaje irá a una carpeta genérica dentro de Documentos)"}.
-      Si hace falta crear una carpeta, siempre es dentro de Documentos. Cada servicio arranca <b>en modo prueba</b>: verás lo que haría y lo apruebas con un clic.</p>
-    <div class="fila"><label>Días de espera para Vaciar Descargas y Escritorio: <input type="number" id="plDias" min="0" value="${plant.dias}" style="width:70px"></label>
-      <button class="chico" id="plRecargar">Aplicar</button></div>
-    ${plant.lista.map(p => `
-      <div class="grupo-dup">
-        <div class="fila" style="justify-content:space-between;flex-wrap:nowrap;align-items:flex-start">
-          <div style="flex:1"><b>${esc(p.nombre)}</b>${p.ya_existe ? ` <span class="ayuda">(ya tienes un servicio con este nombre)</span>` : ""}<div class="ayuda">${esc(p.descripcion)}</div></div>
-          <button class="chico" data-pl-abrir="${esc(p.clave)}">${plant.abierta === p.clave ? "Cerrar" : "Ver reglas"}</button>
-        </div>
-        ${plant.abierta === p.clave ? `
-          <div class="ayuda" style="margin-top:6px">Carpeta: ${plant.origenes[p.clave].map(o => `<code>${esc(o)}</code>`).join(" ")} <button class="chico" data-pl-carpeta="${esc(p.clave)}">Cambiar…</button></div>
-          ${p.reglas.map((r, i) => `<label style="display:flex;gap:6px;padding:3px 0;font-family:inherit;font-size:13px"><input type="checkbox" data-pl-regla="${i}" ${plant.marcadas[p.clave].has(i) ? "checked" : ""}> ${esc(r.texto)}</label>`).join("")}
-          ${p.servicio.carpetas ? `<div class="ayuda">Carpetas enteras sin usar en ${p.servicio.carpetas.dias} días → <code>${esc(p.servicio.carpetas.destino)}</code>. Lo que esté en <code>${esc(p.servicio.carpeta_mantener)}</code> no se toca.</div>` : ""}
-          <div class="ayuda">Archivos con el mismo nombre y distinta extensión (factura.pdf + factura.xml) se mueven juntos.</div>
-          <div class="fila" style="margin-top:8px"><button class="prim" data-pl-crear="${esc(p.clave)}">Crear servicio (en modo prueba)</button></div>` : ""}
-      </div>`).join("")}`;
+    <div class="cab-vista"><div><h2>Plantillas</h2>
+      <p class="ayuda" title="${docs.length ? "Encontré: " + esc(docs.map(d => nombreCorto(d)).join(", ")) : ""}">Servicios listos para cada tipo de carpeta. Los documentos van a las carpetas que <b>ya tienes en Documentos</b>${docs.length ? ` (${docs.length} encontradas)` : ""} y cada servicio arranca <b>en modo prueba</b>.</p></div>
+      <div class="herramientas"><label>Días de espera en Descargas y Escritorio <input type="number" id="plDias" min="0" value="${plant.dias}" style="width:70px"></label>
+        <button class="chico" id="plRecargar">Aplicar</button><button data-ir-asistente>🧭 Crear con el asistente</button></div></div>
+    <div class="maestro-detalle">
+      <div class="zona-lista tarjetas-pl">${plant.lista.map(x => `
+        <button type="button" class="tarjeta-pl ${x.clave === plant.abierta ? "on" : ""}" data-pl-abrir="${esc(x.clave)}" title="${esc(x.descripcion)}">
+          <b>${esc(x.nombre)}</b>${x.ya_existe ? `<span class="etiqueta">ya la tienes</span>` : ""}
+          <span class="ayuda">${esc(x.descripcion)}</span></button>`).join("")}</div>
+      ${p ? `<div class="detalle-pl">
+        <h3>${esc(p.nombre)}${p.ya_existe ? ` <span class="ayuda">(ya tienes un servicio con este nombre)</span>` : ""}</h3>
+        <p class="ayuda" style="margin-top:0" title="${esc(p.descripcion)}">${esc(p.descripcion)}</p>
+        <div class="fila"><span class="ayuda">Carpeta:</span>${plant.origenes[p.clave].map(o => `<code>${esc(o)}</code>`).join(" ")}<button class="chico" data-pl-carpeta="${esc(p.clave)}">Cambiar…</button></div>
+        <div class="zona-lista reglas-pl">${p.reglas.map((r, i) => `<label><input type="checkbox" data-pl-regla="${i}" ${plant.marcadas[p.clave].has(i) ? "checked" : ""}> <span>${esc(r.texto)}</span></label>`).join("")}</div>
+        ${p.servicio.carpetas ? `<div class="ayuda">Carpetas enteras sin usar en ${p.servicio.carpetas.dias} días → <code>${esc(p.servicio.carpetas.destino)}</code>. Lo que esté en <code>${esc(p.servicio.carpeta_mantener)}</code> no se toca.</div>` : ""}
+        <div class="ayuda">Archivos con el mismo nombre y distinta extensión (factura.pdf + factura.xml) se mueven juntos.</div>
+        <div class="acciones"><button class="prim" data-pl-crear="${esc(p.clave)}">Crear servicio (en modo prueba)</button></div>
+      </div>` : `<div class="detalle-pl vacio">Elige una plantilla.</div>`}
+    </div>`;
 }
 let apl = { carpeta: "", nombre_con_carpeta: false, borrar_vacias: true, identicos: "papelera", res: null, hecho: null };
 function pintarAplanar() {
   const r = apl.res;
-  return `<p class="ayuda">Saca los archivos de todas las subcarpetas (a cualquier profundidad) y los deja sueltos en la carpeta elegida.
-      Primero ves la lista; después se puede deshacer. La subcarpeta <code>Mantener</code> no se toca.</p>
-    <div class="fila"><input type="text" id="apCarpeta" value="${esc(apl.carpeta)}" placeholder="Carpeta, por ejemplo D:\\Fotos del viaje" style="flex:1;min-width:200px">
-      <button class="chico" id="apElegir">Elegir…</button></div>
-    <div class="fila">
-      <label title="Vacaciones\\foto1.jpg → «Vacaciones - foto1.jpg»"><input type="checkbox" id="apNombre" ${apl.nombre_con_carpeta ? "checked" : ""}> Poner el nombre de la subcarpeta delante</label>
-      <label><input type="checkbox" id="apVacias" ${apl.borrar_vacias ? "checked" : ""}> Borrar las subcarpetas que queden vacías</label>
-      <label>Archivos idénticos: <select id="apIdenticos">${[["papelera", "dejar solo uno (el resto a la papelera)"], ["carpeta", "moverlos a Duplicados"], ["conflicto", "conservar todos (archivo (1))"]]
-        .map(([v, t]) => `<option value="${v}" ${apl.identicos === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-    </div>
-    <p class="ayuda">Si dos archivos distintos se llaman igual, el segundo queda como «archivo (1)».</p>
-    <div class="fila"><button id="apVer">Ver qué haría</button>
-      ${r && r.ok && r.operaciones.length ? `<button class="prim" id="apHacer">Sacar ${r.operaciones.length} archivos a la raíz</button>` : ""}
-      ${apl.hecho ? `<button id="apDeshacer">Deshacer</button>` : ""}</div>
-    ${r ? (!r.ok ? `<div class="aviso error">${esc(r.mensaje)}</div>` : `<div class="aviso ${r.operaciones.length ? "okmsg" : ""}">${r.simulado ? `Movería ${r.operaciones.length} archivos de las subcarpetas a la raíz.` : `Hecho: ${r.operaciones.length} archivos en la raíz${(r.carpetas_borradas || []).length ? `, ${r.carpetas_borradas.length} carpetas vacías borradas` : ""}${r.errores.length ? `, ${r.errores.length} con error` : ""}.`}</div>
-      ${r.operaciones.length ? `<div class="resultado" style="max-height:280px"><table><tr><th>Archivo</th><th>Queda como</th></tr>${r.operaciones.slice(0, 300).map(o => `<tr><td title="${esc(o.origen)}">${esc(o.origen.slice(apl.carpeta.length).replace(/^[\\/]/, ""))}</td><td>${o.accion === "papelera" ? `<b>Duplicado</b> → papelera` : esc(nombreCorto(o.destino))}</td></tr>`).join("")}</table>${r.operaciones.length > 300 ? `<p class="ayuda">Y ${r.operaciones.length - 300} más…</p>` : ""}</div>` : ""}`) : ""}`;
+  const previa = r ? (!r.ok ? `<div class="aviso error">${esc(r.mensaje)}</div>` : `<div class="aviso ${r.operaciones.length ? "okmsg" : ""}">${r.simulado ? `Movería ${r.operaciones.length} archivos de las subcarpetas a la raíz.` : `Hecho: ${r.operaciones.length} archivos en la raíz${(r.carpetas_borradas || []).length ? `, ${r.carpetas_borradas.length} carpetas vacías borradas` : ""}${r.errores.length ? `, ${r.errores.length} con error` : ""}.`}</div>
+      ${r.operaciones.length ? `<div class="zona-lista"><table><tr><th>Archivo</th><th>Queda como</th></tr>${r.operaciones.slice(0, 300).map(o => `<tr><td title="${esc(o.origen)}">${esc(o.origen.slice(apl.carpeta.length).replace(/^[\\/]/, ""))}</td><td>${o.accion === "papelera" ? `<b>Duplicado</b> → papelera` : esc(nombreCorto(o.destino))}</td></tr>`).join("")}</table>${r.operaciones.length > 300 ? `<p class="ayuda">Y ${r.operaciones.length - 300} más…</p>` : ""}</div>` : ""}`)
+    : `<div class="vacio">Elige una carpeta y pulsa «Ver qué haría». Aquí verás cada archivo y dónde quedaría, antes de mover nada.</div>`;
+  return `<div class="cab-vista"><div><h2>Sacar todo a la raíz</h2>
+      <p class="ayuda">Saca los archivos de todas las subcarpetas (a cualquier profundidad) y los deja sueltos en la carpeta elegida. Primero ves la lista; después se puede deshacer. La subcarpeta <code>Mantener</code> no se toca.</p></div></div>
+    <div class="dos-col">
+      <div class="col-lateral">
+        <div class="tarjeta-op"><h4>1. Carpeta</h4>
+          <input type="text" id="apCarpeta" value="${esc(apl.carpeta)}" placeholder="Por ejemplo D:\\Fotos del viaje" style="width:100%">
+          <div class="fila" style="margin-bottom:0"><button class="chico" id="apElegir">Elegir…</button></div></div>
+        <div class="tarjeta-op opciones-v"><h4>2. Opciones</h4>
+          <label title="Vacaciones\\foto1.jpg → «Vacaciones - foto1.jpg»"><input type="checkbox" id="apNombre" ${apl.nombre_con_carpeta ? "checked" : ""}> Poner el nombre de la subcarpeta delante</label>
+          <label><input type="checkbox" id="apVacias" ${apl.borrar_vacias ? "checked" : ""}> Borrar las subcarpetas que queden vacías</label>
+          <label class="campo"><span>Archivos idénticos</span><select id="apIdenticos">${[["papelera", "Dejar solo uno (el resto a la papelera)"], ["carpeta", "Moverlos a Duplicados"], ["conflicto", "Conservar todos (archivo (1))"]]
+            .map(([v, t]) => `<option value="${v}" ${apl.identicos === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+          <p class="ayuda" style="margin:0">Si dos archivos distintos se llaman igual, el segundo queda como «archivo (1)».</p></div>
+        <div class="fila"><button id="apVer">Ver qué haría</button>
+          ${r && r.ok && r.operaciones.length ? `<button class="prim" id="apHacer">Sacar ${r.operaciones.length} archivos</button>` : ""}
+          ${apl.hecho ? `<button id="apDeshacer">Deshacer</button>` : ""}</div>
+      </div>
+      <div class="col-principal"><h3 class="tit-col" style="margin-top:0">3. Vista previa</h3>${previa}</div>
+    </div>`;
 }
 function leerAplanar() {
   apl.carpeta = $("#apCarpeta").value.trim(); apl.nombre_con_carpeta = $("#apNombre").checked;
@@ -2221,7 +2337,7 @@ $("#plantillas").addEventListener("click", async e => {
   if (t.dataset.irAsistente !== undefined) { mostrarVista("Asistente"); return; }
   try {
     if (t.id === "plRecargar") { plant.dias = +$("#plDias").value || 0; pintarPlantillas(true); }
-    else if (t.dataset.plAbrir) { plant.abierta = plant.abierta === t.dataset.plAbrir ? null : t.dataset.plAbrir; pintarPlantillas(); }
+    else if (t.closest("[data-pl-abrir]")) { plant.abierta = t.closest("[data-pl-abrir]").dataset.plAbrir; pintarPlantillas(); }
     else if (t.dataset.plCarpeta) {
       const res = await api("/api/elegir-carpeta", { inicial: plant.origenes[t.dataset.plCarpeta][0] || "" });
       if (res.carpeta) { if (!res.permitida) { aviso(res.aviso); return; } plant.origenes[t.dataset.plCarpeta] = [res.carpeta]; }
@@ -2348,7 +2464,7 @@ async function cargarEspacio(recargar) {
   const total = [...espacio.marcadas].reduce((a, ruta) => a + ([...r.grandes, ...r.instaladores, ...r.viejos_descargas].find(f => f.ruta === ruta) || {}).bytes || 0, 0);
   cont.innerHTML = `
     <h2>Espacio en disco</h2>
-    ${r.discos.map(d => { const usado = 100 - d.libre * 100 / d.total; const poco = d.libre * 100 / d.total < (r.umbral || 0); return `
+    ${r.discos.filter(d => d.total).map(d => { const usado = 100 - d.libre * 100 / d.total; const poco = d.libre * 100 / d.total < (r.umbral || 0); return `
       <div class="fila"><b style="width:40px">${esc(d.letra)}</b><div class="barra" style="flex:1"><div style="width:${usado.toFixed(0)}%;${poco ? "background:var(--peligro)" : ""}"></div></div>
       <span class="ayuda">${mb(d.libre)} libres de ${mb(d.total)}${poco ? " · <b style='color:var(--peligro)'>poco espacio</b>" : ""}</span></div>`; }).join("")}
     <p class="ayuda">GESTOR te avisa si un disco baja del ${r.umbral || 0} % libre (cámbialo en Ajustes).</p>
@@ -2413,26 +2529,36 @@ async function pintarAsistente(analizar) {
     asistente.limpiar = asistente.analisis.copias > 0;
   }
   const a = asistente.analisis;
+  const total = a.sugerencias.reduce((t, x) => t + (x.bytes || 0), 0);
   cont.innerHTML = `
-    <h2>Asistente</h2>
-    <p class="ayuda">Analiza una carpeta y te propone reglas según lo que encuentra. Después puedes revisarlas, simular y activarlas.</p>
-    <div class="fila">
-      <input type="text" id="asCarpeta" value="${esc(asistente.carpeta)}" style="flex:1">
-      <button id="asElegir">Elegir…</button>
-      ${Object.entries(datos.carpetas_rapidas).slice(0, 3).map(([n, r]) => `<button class="chico" data-as-rapida="${esc(r)}">${esc(n)}</button>`).join("")}
-      <button class="prim" id="asAnalizar">Analizar</button>
-    </div>
-    <section>
-      <h3>${a.total} archivos sueltos en la carpeta</h3>
-      ${a.sugerencias.length ? a.sugerencias.map(s => `
-        <div class="fila"><label><input type="checkbox" data-as-clave="${esc(s.clave)}" ${asistente.elegidas.has(s.clave) ? "checked" : ""}>
-          <span>Tienes <b>${esc(s.texto)}</b> (${mb(s.bytes)}). <span class="ayuda">${esc(resumenRegla(s.regla))}</span></span></label></div>`).join("")
-        : `<p class="ayuda">No hay nada que proponer: la carpeta ya está ordenada.</p>`}
-      ${a.copias ? `<div class="fila"><label><input type="checkbox" id="asLimpiar" ${asistente.limpiar ? "checked" : ""}>
-        <span><b>${a.copias} archivos</b> tienen restos como "(1)" o "copia" en el nombre: limpiar los nombres (y avisar si eran duplicados).</span></label></div>` : ""}
-    </section>
-    ${a.sugerencias.length ? `<div class="acciones"><button class="prim" id="asCrear">Crear el servicio con lo marcado</button>
-      <span class="ayuda">Se crea desactivado para que lo revises y lo simules antes.</span></div>` : ""}`;
+    <div class="cab-vista"><div><h2>Asistente</h2>
+      <p class="ayuda">Analiza una carpeta y te propone reglas según lo que encuentra. Después puedes revisarlas, simular y activarlas.</p></div></div>
+    <div class="dos-col">
+      <div class="col-lateral">
+        <div class="tarjeta-op"><h4>1. Carpeta</h4>
+          <input type="text" id="asCarpeta" value="${esc(asistente.carpeta)}" style="width:100%">
+          <div class="fila"><button id="asElegir">Elegir…</button>
+            ${Object.entries(datos.carpetas_rapidas).slice(0, 3).map(([n, r]) => `<button class="chico" data-as-rapida="${esc(r)}">${esc(n)}</button>`).join("")}</div>
+          <button class="prim" id="asAnalizar" style="width:100%">Analizar</button></div>
+        <div class="tarjeta-op"><h4>Lo que encontré</h4>
+          <div class="cifras" style="grid-template-columns:1fr 1fr"><div><b>${a.total.toLocaleString("es")}</b><span>archivos sueltos</span></div>
+            <div><b>${a.sugerencias.length}</b><span>propuestas (${mb(total)})</span></div></div>
+          ${a.copias ? `<p class="ayuda" style="margin-bottom:0">${a.copias.toLocaleString("es")} archivos tienen restos como «(1)» o «copia» en el nombre.</p>` : ""}</div>
+      </div>
+      <div class="col-principal">
+        <h3 class="tit-col" style="margin-top:0">2. Propuestas · marca las que quieras</h3>
+        <div class="zona-lista lista-prop">
+        ${a.sugerencias.length ? a.sugerencias.map(s => `
+          <label class="propuesta"><input type="checkbox" data-as-clave="${esc(s.clave)}" ${asistente.elegidas.has(s.clave) ? "checked" : ""}>
+            <span><span>Tienes <b>${esc(s.texto)}</b> <span class="etiqueta">${mb(s.bytes)}</span></span><span class="ayuda">${esc(resumenRegla(s.regla))}</span></span></label>`).join("")
+          : `<p class="ayuda">No hay nada que proponer: la carpeta ya está ordenada.</p>`}
+        ${a.copias ? `<label class="propuesta"><input type="checkbox" id="asLimpiar" ${asistente.limpiar ? "checked" : ""}>
+          <span><span><b>${a.copias.toLocaleString("es")} archivos</b> con restos como "(1)" o "copia"</span><span class="ayuda">Limpiar los nombres (y avisar si eran duplicados).</span></span></label>` : ""}
+        </div>
+        ${a.sugerencias.length ? `<div class="acciones"><button class="prim" id="asCrear">Crear el servicio con lo marcado</button>
+          <span class="ayuda" style="align-self:center">Se crea desactivado para que lo revises y lo simules antes.</span></div>` : ""}
+      </div>
+    </div>`;
 }
 $("#asistente").addEventListener("click", async e => {
   const t = e.target;
@@ -3184,25 +3310,29 @@ async function cargarCorreo() {
 function pintarCorreo() {
   const c = cor.res, u = c.ultimo || {}, enMarcha = c.trabajo && c.trabajo.estado === "en marcha";
   $("#correo").innerHTML = `
-    <h2>Adjuntos de correo</h2>
-    <p class="ayuda">Cada 15 minutos GESTOR mira los correos nuevos de Outlook y guarda sus adjuntos según quién te los envió: en una carpeta por contacto o en la que elijas para cada remitente.
-      Funciona con Outlook clásico (el de Office). El «nuevo Outlook» y WhatsApp no dejan que otro programa sepa quién envió un archivo: los de WhatsApp se siguen ordenando con la procedencia «WhatsApp» en tus servicios.</p>
+    <div class="cab-vista"><div><h2>Adjuntos de correo</h2>
+      <p class="ayuda" title="El «nuevo Outlook» y WhatsApp no dejan que otro programa sepa quién envió un archivo: los de WhatsApp se siguen ordenando con la procedencia «WhatsApp» en tus servicios.">Cada 15 minutos GESTOR mira los correos nuevos de Outlook clásico (el de Office) y guarda sus adjuntos según quién te los envió. El «nuevo Outlook» y WhatsApp no lo permiten.</p></div></div>
     ${c.windows ? "" : `<p class="ayuda"><b>Solo funciona en Windows.</b></p>`}
-    <div class="fila"><label><input type="checkbox" id="crActivo" ${c.activo ? "checked" : ""}> <b>Guardar los adjuntos de Outlook automáticamente</b></label></div>
-    <div class="fila"><span>Carpeta base:</span><code style="flex:1">${esc(c.carpeta)}</code>${datos.en_red ? "" : `<button class="chico" id="crCarpeta">Cambiar…</button>`}</div>
-    <div class="fila"><label><input type="checkbox" id="crContacto" ${c.por_contacto ? "checked" : ""}> Una subcarpeta por contacto para los demás remitentes</label>
-      <label>La primera vez, revisar los últimos <input type="number" id="crDias" min="1" max="365" value="${c.dias_atras}"> días</label></div>
-    <section><h3>Reglas por remitente</h3>
-      <p class="ayuda">Si el correo o el nombre del remitente contiene el texto, el adjunto va a esa carpeta. Por ejemplo: <code>cfe.gob.mx</code> → Documentos\\Casa\\Luz.</p>
-      ${c.reglas.map((r, i) => `<div class="fila"><input type="text" value="${esc(r.remitente)}" data-cr-rem="${i}" placeholder="correo o nombre" style="flex:1">
-        <span>→</span><input type="text" value="${esc(r.carpeta)}" data-cr-car="${i}" placeholder="carpeta" style="flex:2">
-        ${datos.en_red ? "" : `<button class="chico" data-cr-elegir="${i}">Elegir…</button>`}<button class="chico peligro" data-cr-quitar="${i}">✕</button></div>`).join("")}
-      <div class="fila"><button class="chico" id="crAnadir">+ Añadir regla</button><button class="prim" id="crGuardar">Guardar</button></div>
-    </section>
-    <section><h3>Última revisión</h3>
-      ${u.fecha ? `<p>${esc(fechaBonita(u.fecha))}: ${u.revisados || 0} correos revisados, <b>${u.guardados || 0} adjuntos guardados</b>.${u.error ? ` <span style="color:var(--peligro)">${esc(u.error)}</span>` : ""}</p>` : `<p class="ayuda">Todavía no se ha revisado.</p>`}
-      <button id="crRevisar" ${enMarcha || !c.windows ? "disabled" : ""}>${enMarcha ? "Revisando Outlook…" : "Revisar ahora"}</button>
-    </section>`;
+    <div class="dos-col">
+      <div class="col-lateral">
+        <div class="tarjeta-op opciones-v"><h4>Configuración</h4>
+          <label><input type="checkbox" id="crActivo" ${c.activo ? "checked" : ""}> <b>Guardar los adjuntos automáticamente</b></label>
+          <div class="campo"><span>Carpeta base</span><div class="fila" style="margin:0;flex-wrap:nowrap"><code style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.carpeta)}">${esc(c.carpeta)}</code>${datos.en_red ? "" : `<button class="chico" id="crCarpeta">Cambiar…</button>`}</div></div>
+          <label><input type="checkbox" id="crContacto" ${c.por_contacto ? "checked" : ""}> Una subcarpeta por contacto para los demás remitentes</label>
+          <label>La primera vez, revisar los últimos <input type="number" id="crDias" min="1" max="365" value="${c.dias_atras}" style="width:70px"> días</label></div>
+        <div class="tarjeta-op"><h4>Última revisión</h4>
+          ${u.fecha ? `<p style="margin-top:0">${esc(fechaBonita(u.fecha))}: ${u.revisados || 0} correos revisados, <b>${u.guardados || 0} adjuntos guardados</b>.${u.error ? ` <span style="color:var(--peligro)">${esc(u.error)}</span>` : ""}</p>` : `<p class="ayuda" style="margin-top:0">Todavía no se ha revisado.</p>`}
+          <button id="crRevisar" ${enMarcha || !c.windows ? "disabled" : ""}>${enMarcha ? "Revisando Outlook…" : "Revisar ahora"}</button></div>
+      </div>
+      <div class="col-principal">
+        <h3 class="tit-col" style="margin-top:0">Reglas por remitente</h3>
+        <p class="ayuda" style="margin-top:0">Si el correo o el nombre del remitente contiene el texto, el adjunto va a esa carpeta. Por ejemplo: <code>cfe.gob.mx</code> → Documentos\\Casa\\Luz.</p>
+        <div class="zona-lista">${c.reglas.map((r, i) => `<div class="fila"><input type="text" value="${esc(r.remitente)}" data-cr-rem="${i}" placeholder="correo o nombre" style="flex:1">
+          <span>→</span><input type="text" value="${esc(r.carpeta)}" data-cr-car="${i}" placeholder="carpeta" style="flex:2">
+          ${datos.en_red ? "" : `<button class="chico" data-cr-elegir="${i}">Elegir…</button>`}<button class="chico peligro" data-cr-quitar="${i}">✕</button></div>`).join("") || `<div class="vacio">Sin reglas: cada adjunto va a la carpeta de su contacto.</div>`}</div>
+        <div class="acciones"><button class="chico" id="crAnadir">+ Añadir regla</button><button class="prim" id="crGuardar">Guardar</button></div>
+      </div>
+    </div>`;
 }
 function leerCorreo() {
   const c = cor.res;
