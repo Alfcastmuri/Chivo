@@ -72,14 +72,30 @@
   // si no están enteros en el diccionario, se traduce trozo a trozo.
   const O = { en: " or ", pt: " ou ", fr: " ou " }[idioma] || " o ";
   const sinLetras = t => !LETRAS.test(t) || /^[.,\w:\\/-]+$/.test(t) && !/[áéíóúñ]/.test(t) && /[.\\:/\d]/.test(t);
+  // Parte por sep sin cortar lo que va entre «» o comillas (las palabras que buscas pueden llevar comas).
+  function partir(texto, sep) {
+    const salida = [];
+    let nivel = 0, desde = 0;
+    for (let i = 0; i < texto.length; i++) {
+      const c = texto[i];
+      if (c === "«" || c === "“") nivel++;
+      else if ((c === "»" || c === "”") && nivel) nivel--;
+      else if (!nivel && texto.startsWith(sep, i)) { salida.push(texto.slice(desde, i)); desde = i + sep.length; i += sep.length - 1; }
+    }
+    salida.push(texto.slice(desde));
+    return salida;
+  }
   function porTrozos(limpio) {
     for (const [sep, junta, todos] of [[" · ", " · ", false], [" → ", " → ", false], [", ", ", ", true], [" o ", O, true]]) {
       if (!limpio.includes(sep)) continue;
-      const trozos = limpio.split(sep);
+      const trozos = partir(limpio, sep);
+      if (trozos.length < 2) continue;
       const hechos = trozos.map(t => traducir(t));
       const cambiados = hechos.filter((h, i) => h !== trozos[i]).length;
       if (!cambiados) continue;
-      if (todos && hechos.some((h, i) => h === trozos[i] && !sinLetras(trozos[i]))) continue;
+      // «Instaladores» se escribe igual en portugués: está en el diccionario, cuenta como traducido.
+      const conocido = (h, i) => h !== trozos[i] || sinLetras(trozos[i]) || buscar(normal(trozos[i])) !== null;
+      if (todos && !hechos.every(conocido)) continue;
       return hechos.join(junta);
     }
     return null;
