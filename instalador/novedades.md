@@ -1,3 +1,7 @@
+## Novedades de GESTOR 0.9.6
+
+- **GESTOR en tu idioma**: español, English, Português y Français. Elige el idioma arriba, junto a «Cuaderno»; «Automático» usa el idioma de Windows. Las fechas y los números también siguen el idioma elegido. Las carpetas que GESTOR crea en tu disco conservan su nombre.
+
 ## Novedades de GESTOR 0.9.5
 
 - **Todas las pestañas con el mismo formato que Inicio y Organizar**: cada sección ocupa la ventana completa, alineada arriba y con un margen ajustado abajo y a la derecha. Ya no hay barras de desplazamiento en la página; solo se desplazan las listas largas.

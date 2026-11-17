@@ -22,6 +22,7 @@ import aprendizaje
 import bd
 import correo
 import disco
+import idioma
 import informe
 import mapa
 import nucleo
@@ -361,10 +362,10 @@ class Manejador(BaseHTTPRequestHandler):
             if not self._sesion_valida():
                 with open(os.path.join(nucleo.BASE, "login.html"), "rb") as f:
                     html = f.read().replace(b"__MODO__", b"entrar" if hay_clave() else b"crear")
-                return self._responder(200, html, "text/html; charset=utf-8")
+                return self._responder(200, idioma.inyectar(html), "text/html; charset=utf-8")
             with open(os.path.join(nucleo.BASE, "panel.html"), "rb") as f:
                 html = f.read().replace(b"__TOKEN__", TOKEN.encode())
-            return self._responder(200, html, "text/html; charset=utf-8")
+            return self._responder(200, idioma.inyectar(html), "text/html; charset=utf-8")
         return self._responder(404, {"error": "No encontrado"})
 
     def _sesion_valida(self):
@@ -402,6 +403,10 @@ class Manejador(BaseHTTPRequestHandler):
     def do_POST(self):
         global ultima_actividad
         ruta = urlparse(self.path).path
+        if ruta == "/idioma":
+            if not self._host_valido() or not self._origen_valido():
+                return self._responder(403, {"error": "Acceso no permitido"})
+            return self._responder(200, {"idioma": idioma.guardar_eleccion(str(self._leer().get("idioma", "")))})
         if ruta in ("/auth/entrar", "/auth/crear"):
             if not self._host_valido() or not self._origen_valido():
                 return self._responder(403, {"error": "Acceso no permitido"})

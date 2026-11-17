@@ -43,6 +43,9 @@ MANIFIESTO = """<?xml version="1.0" encoding="utf-8"?>
   </Dependencies>
   <Resources>
     <Resource Language="es-MX"/>
+    <Resource Language="en-US"/>
+    <Resource Language="pt-BR"/>
+    <Resource Language="fr-FR"/>
   </Resources>
   <Applications>
     <Application Id="GESTOR" Executable="GESTOR\\GESTOR.exe" EntryPoint="Windows.FullTrustApplication">

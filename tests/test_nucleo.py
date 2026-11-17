@@ -1059,3 +1059,52 @@ class PruebaPanelCelularSeguro(unittest.TestCase):
         finally:
             servidor.shutdown()
             servidor.server_close()
+
+
+class PruebaIdiomas(unittest.TestCase):
+    """Traducción de la interfaz: diccionarios completos y plantillas con valores."""
+
+    def setUp(self):
+        import idioma
+        self.idioma = idioma
+        idioma._diccionarios.clear()
+        idioma._plantillas.clear()
+
+    def test_diccionarios_validos(self):
+        import re
+        for codigo, _ in self.idioma.IDIOMAS[1:]:
+            d = self.idioma.diccionario(codigo)
+            self.assertGreater(len(d), 1500, codigo)
+            for es, otro in d.items():
+                self.assertEqual(len(re.findall(r"\{\d*\}", es)), len(re.findall(r"\{\d*\}", otro)), (codigo, es))
+
+    def test_exacto_y_plantilla(self):
+        t = self.idioma.t
+        self.assertEqual(t("Pausar todo", "en"), "Pause all")
+        self.assertEqual(t("Pausar todo", "es"), "Pausar todo")
+        self.assertEqual(t("12 archivos", "fr"), "12 fichiers")
+        self.assertEqual(t("Texto que no existe", "en"), "Texto que no existe")
+
+    def test_plantilla_reordena_valores(self):
+        self.assertEqual(self.idioma.t("Mueves a «Facturas» los archivos con «cfe». ¿Lo hago yo la próxima vez? "
+                                       "Míralo en el panel.", "en"),
+                         "You move files with «cfe» to «Facturas». Should I do it next time? Check it in the panel.")
+
+    def test_plantillas_cortas_no_se_usan(self):
+        # «de {}» encajaría con media frase en español: se ignora.
+        self.assertEqual(self.idioma.t("de cualquier cosa", "en"), "de cualquier cosa")
+
+    def test_inyectar_en_la_pagina(self):
+        os.environ["GESTOR_IDIOMA"] = "pt"
+        try:
+            html = self.idioma.inyectar(b"<html><head><title>x</title></head><body></body></html>")
+        finally:
+            del os.environ["GESTOR_IDIOMA"]
+        self.assertIn(b"window.GESTOR_I18N=", html)
+        self.assertIn(b'"idioma": "pt"', html)
+        self.assertLess(html.index(b"GESTOR_I18N"), html.index(b"</head>"))
+
+    def test_eleccion_guardada(self):
+        self.assertEqual(self.idioma.guardar_eleccion("fr"), "fr")
+        self.assertEqual(self.idioma.eleccion(), "fr")
+        self.assertEqual(self.idioma.guardar_eleccion("klingon"), "auto")
