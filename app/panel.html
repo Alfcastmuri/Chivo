@@ -510,7 +510,10 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
 @media (max-width: 999px) { .dos-col, .maestro-detalle { grid-template-columns: 1fr; } .cab-vista { flex-direction: column; } }
 @media (min-width: 1000px) and (min-height: 600px) {
   body.ajustada .contenido > main.vista.on:not(#vistaInicio) { flex: 1; min-height: 0; padding: 0; }
-  body.ajustada main.vista.simple.on > .caja.editor { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
+  body.ajustada main.vista.simple.on { display: flex; flex-direction: column; gap: 14px; }
+  body.ajustada main.vista.simple.on > .pestanas-int { flex: none; }
+  body.ajustada main.vista.simple.on > .caja.editor { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+  body.ajustada main.vista.simple.on > .caja.editor > * { flex-shrink: 0; }
   body.ajustada main.vista.simple.on > .caja.editor > div:only-child { display: flex; flex-direction: column; min-height: 0; flex: 1; }
   body.ajustada .dos-col, body.ajustada .maestro-detalle { flex: 1; min-height: 0; align-items: stretch; }
   body.ajustada .col-lateral, body.ajustada .col-principal, body.ajustada .detalle-pl { min-height: 0; overflow: hidden; }
@@ -525,6 +528,53 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
   body.ajustada #editor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   body.ajustada #editor > * { flex: none; }
   body.ajustada #editor > [data-pest].on { flex: 1 1 auto; min-height: 0 !important; overflow-y: auto; }
+}
+@media (min-width: 1000px) and (min-height: 600px) {
+  body.ajustada .tm-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; flex: 1 1 auto !important; min-height: 0; }
+  body.ajustada .tm-izq { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  body.ajustada .tm-izq .tm-camino { flex: none; }
+  body.ajustada .tm-marco.tm-llena { flex: 1 1 0; min-height: 200px; }
+  body.ajustada .tm-marco.tm-llena canvas { position: absolute; inset: 0; height: 100% !important; }
+  body.ajustada .tm-der { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+  body.ajustada .tm-der > * { flex: none; }
+  body.ajustada .tm-der .tm-ext { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; padding-top: 6px; }
+  body.ajustada .tm-der .tm-ext .resultado { flex: 1 1 0; max-height: none !important; margin: 0; overflow-y: auto; }
+  body.ajustada #colores [data-pest="colores:comb"].on { display: flex; flex-direction: column; min-height: 0; flex: 1 1 0; }
+  body.ajustada #colores .lista-paletas { flex: 1 1 0; overflow-y: auto; padding: 3px; }
+  body.ajustada #tipos > section:last-child { flex: 1 1 0 !important; min-height: 0; display: flex; flex-direction: column; }
+  body.ajustada #tipos .lista-tipos { flex: 1 1 0; overflow-y: auto; }
+}
+.envoltura-tabla { min-height: 0; }
+.lista-resp { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr)); gap: 12px; align-content: start; }
+.lista-resp > .grupo-dup { margin: 0; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  body.ajustada main.vista.on > [data-pest] { min-height: 0 !important; }
+  body.ajustada .subnav:not(.on) ~ main.vista.on { margin-top: 18px; }
+  /* Colores: la vista previa y el modo a la izquierda; pestañas y combinaciones a la derecha */
+  body.ajustada #colores { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto; column-gap: 18px; }
+  body.ajustada #colores > h2, body.ajustada #colores > p.ayuda { grid-column: 1 / -1; }
+  body.ajustada #colores > .previa { grid-column: 1; grid-row: 3 / span 2; grid-template-columns: 1fr; align-content: start; margin: 0 0 10px; padding: 12px; gap: 10px; overflow: hidden; min-height: 0; }
+  body.ajustada #colores > .previa .previa-info { grid-column: auto; }
+  body.ajustada #colores > .previa .mq-cuerpo { padding: 6px; }
+  body.ajustada #colores > .fila { grid-column: 1; grid-row: 5; margin: 0; }
+  body.ajustada #colores > .pestanas-int { grid-column: 2; grid-row: 3; margin-top: 0; }
+  body.ajustada #colores > [data-pest] { grid-column: 2; grid-row: 4 / span 2; min-height: 0 !important; overflow: hidden; }
+  body.ajustada #colores > [data-pest].on:not([data-pest="colores:comb"]) { display: block; }
+}
+@media (min-width: 1000px) and (min-height: 600px) and (max-height: 820px) {
+  body.ajustada #colores > .previa { grid-template-columns: 1fr 1fr; }
+  body.ajustada #colores > .previa .previa-info { grid-column: 1 / -1; }
+  body.ajustada #colores > .previa .maqueta { font-size: 10px; }
+  body.ajustada #colores > .previa .mq-lado { display: none; }
+}
+/* 0.9.5: Ajustes cabe en la ventana: cabecera, pestañas y botones fijos; tarjetas en dos columnas en pantallas anchas */
+#modalAjustes .caja { display: flex; flex-direction: column; max-height: calc(100vh - 32px); min-height: 0; }
+#modalAjustes .caja > * { flex: none; }
+#modalAjustes .caja > [data-pest].on { flex: 1 1 auto; min-height: 0 !important; overflow-y: auto; }
+@media (min-width: 1000px) {
+  #modalAjustes .caja { max-width: 1040px; }
+  #modalAjustes [data-pest].on { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; align-items: start; }
+  #modalAjustes [data-pest].on > .tarjeta-op { margin: 0; }
 }
 </style>
 </head>
@@ -1306,7 +1356,7 @@ $("#subnav").addEventListener("click", e => { const b = e.target.closest("[data-
 function mostrarVista(nombre) {
   vistaActual = nombre;
   document.body.classList.toggle("en-inicio", nombre === "Inicio");
-  document.body.classList.toggle("ajustada", ["Inicio", "Asistente", "Servicios", "Plantillas", "Raiz", "Correo"].includes(nombre));
+  document.body.classList.add("ajustada");
   if (nombre === "Copias") { nombre = "Respaldo"; setTimeout(() => cambiarPestana("resp", "usb")); }
   const [g, , vistas] = grupoDe(nombre);
   ultimaDelGrupo[g] = nombre;
@@ -1352,6 +1402,37 @@ function igualarPestanas() {
     if (paneles.length > 1) paneles.forEach(p => p.style.minHeight = alto + "px");
   });
 }
+// Con el formato ajustado a la ventana: si una caja no cabe, su lista o tabla más grande se desplaza por dentro
+// (nunca la página entera). Se recalcula al cambiar el contenido o el tamaño de la ventana.
+function ajustarCajas() {
+  const activo = document.body.classList.contains("ajustada") && innerWidth >= 1000 && innerHeight >= 600;
+  document.querySelectorAll("[data-auto-lista]").forEach(x => { x.style.maxHeight = ""; x.style.overflowY = ""; delete x.dataset.autoLista; });
+  if (!activo) return;
+  document.querySelectorAll("main.vista.on .caja.editor").forEach(caja => {
+    if (!caja.offsetParent || caja.closest("#vistaInicio")) return;
+    const sobra = caja.scrollHeight - caja.clientHeight;
+    if (sobra <= 1) return;
+    const visibles = [...caja.querySelectorAll(".zona-lista, .resultado, table, section, ul, .paletas, [data-pest].on")].filter(x => x.offsetParent && !x.closest("[data-auto-lista]"));
+    if (!visibles.length) return;
+    let el = visibles.reduce((a, b) => b.offsetHeight > a.offsetHeight ? b : a);
+    // si dentro hay una lista que ocupa casi todo, se desplaza solo esa
+    const dentro = visibles.filter(x => x !== el && el.contains(x) && x.offsetHeight >= el.offsetHeight * .6);
+    if (dentro.length) el = dentro.reduce((a, b) => b.offsetHeight > a.offsetHeight ? b : a);
+    if (el.tagName === "TABLE") {
+      if (!el.parentElement.classList.contains("envoltura-tabla")) { const d = document.createElement("div"); d.className = "envoltura-tabla"; el.replaceWith(d); d.appendChild(el); }
+      el = el.parentElement;
+    }
+    el.dataset.autoLista = "1";
+    el.style.maxHeight = Math.max(120, el.offsetHeight - sobra - 6) + "px";
+    el.style.overflowY = "auto";
+    const resto = caja.scrollHeight - caja.clientHeight;  // segunda pasada por si el cambio movió otras cosas
+    if (resto > 1) el.style.maxHeight = Math.max(120, el.offsetHeight - resto - 6) + "px";
+  });
+}
+let ajustando = 0;
+const pedirAjuste = () => { clearTimeout(ajustando); ajustando = setTimeout(ajustarCajas, 150); };
+new MutationObserver(pedirAjuste).observe(document.body, { childList: true, subtree: true });
+window.addEventListener("resize", pedirAjuste);
 let igualando = 0;
 new MutationObserver(() => { clearTimeout(igualando); igualando = setTimeout(igualarPestanas, 120); })
   .observe(document.body, { childList: true, subtree: true });
@@ -1936,8 +2017,8 @@ function pintarColores() {
     <div ${enPest("colores", "comb")}>
       <div class="filtros"><span class="ayuda">Tipo:</span>${chips(tipos, col.tipo, "f-tipo")}</div>
       <div class="filtros"><span class="ayuda">Color:</span>${chips(colores, col.color, "f-color")}</div>
-      ${grupos.length ? grupos.map(([g, l]) => `<h3 class="tit-col">${esc(g)} <span class="ayuda">${l.length}</span></h3>
-        <div class="paletas">${l.map(p => muestra(p.nombre, p.colores, actual === p.nombre, p.propia)).join("")}</div>`).join("")
+      ${grupos.length ? `<div class="zona-lista lista-paletas">` + grupos.map(([g, l]) => `<h3 class="tit-col">${esc(g)} <span class="ayuda">${l.length}</span></h3>
+        <div class="paletas">${l.map(p => muestra(p.nombre, p.colores, actual === p.nombre, p.propia)).join("")}</div>`).join("") + `</div>`
         : `<div class="vacio">${col.tipo === "Mis combinaciones" ? "Aún no guardas combinaciones. Créalas en «Mi combinación» o desde una imagen." : "No hay combinaciones con ese filtro."}</div>`}
     </div>
     <div ${enPest("colores", "mia")}>
@@ -2870,7 +2951,7 @@ function pintarRespaldo() {
     <h2>Respaldo con versiones</h2>
     <p class="ayuda">Copia una carpeta a OneDrive, Google Drive o un disco. En <code>Actual</code> queda una copia al día; en <code>Versiones</code>, cómo estaba
       cada archivo antes de cambiar o de borrarse. Nunca se pierde nada: las versiones se guardan los días que elijas.</p>
-    ${resp.lista.map((x, i) => { const e = r.estado[x.id] || {}, tr = r.trabajos[x.id] || {}; return `
+    <div class="zona-lista lista-resp">${resp.lista.map((x, i) => { const e = r.estado[x.id] || {}, tr = r.trabajos[x.id] || {}; return `
       <div class="grupo-dup" data-resp="${i}">
         <div class="fila"><input type="text" data-rk="nombre" value="${esc(x.nombre)}" style="width:160px">
           <label><input type="checkbox" data-rk="activo" ${x.activo !== false ? "checked" : ""}> Activo</label>
@@ -2886,7 +2967,7 @@ function pintarRespaldo() {
           <button class="chico" data-resp-ver ${x.id ? "" : "disabled"}>Buscar versiones…</button></div>
         ${resp.abierta === i ? `<div class="fila"><input type="text" id="rvTexto" placeholder="nombre del archivo" style="flex:1"><button class="chico" data-resp-buscar>Buscar</button></div>
           ${(resp.versiones[x.id] || []).length ? `<div class="resultado" style="max-height:260px"><table><tr><th>Versión</th><th>Archivo</th><th></th></tr>${resp.versiones[x.id].map(v => `<tr><td>${esc(v.version)}</td><td>${esc(v.relativa)} <span class="ayuda">${mb(v.bytes)}</span></td><td><button class="chico" data-resp-restaurar="${esc(v.ruta)}">Restaurar</button></td></tr>`).join("")}</table></div>` : ""}` : ""}
-      </div>`; }).join("")}
+      </div>`; }).join("")}</div>
     <div class="fila"><button id="rpNuevo">+ Nuevo respaldo</button><button class="prim" id="rpGuardar">Guardar</button></div>
     <p class="ayuda">Se hace solo, con la programación automática (no con No molestar activo).</p>`;
 }
@@ -3060,18 +3141,18 @@ function pintarDisco() {
     <div class="fila">${tm.lugares.map(l => `<button class="chico" data-tm-medir="${esc(l.ruta)}" ${enMarcha ? "disabled" : ""}>${esc(l.nombre)}${l.total ? ` <span class="ayuda">(${mb(l.total - l.libre)} usados)</span>` : ""}</button>`).join("")}
       ${datos.en_red ? "" : `<button class="chico" id="tmElegir" ${enMarcha ? "disabled" : ""}>Elegir carpeta…</button>`}
       ${enMarcha ? `<span class="ayuda">Midiendo… (puede tardar unos minutos en un disco entero)</span><button class="chico" id="tmCancelar">Cancelar</button>` : ""}</div>
-    ${r ? `<div class="fila tm-camino">${tm.camino.map((n, i) => `<a href="#" data-tm-subir="${i}">${esc(i ? n[0] : r.raiz)}</a>`).join(" › ")}
+    ${r ? `<div class="tm-dos"><div class="tm-izq"><div class="fila tm-camino">${tm.camino.map((n, i) => `<a href="#" data-tm-subir="${i}">${esc(i ? n[0] : r.raiz)}</a>`).join(" › ")}
         <span class="ayuda">· ${mb(actual[1])} · ${(actual[4] || 0).toLocaleString("es")} archivos · medido ${esc(fechaBonita(r.fecha))} en ${r.segundos} s</span></div>
-      <div class="tm-marco"><canvas id="tmLienzo"></canvas><div class="tm-info" id="tmInfo"></div></div>
-      <div id="tmSel" class="tm-sel">${pintarSelTm()}</div>
+      <div class="tm-marco ${document.body.classList.contains("ajustada") && innerWidth >= 1000 && innerHeight >= 600 ? "tm-llena" : ""}"><canvas id="tmLienzo"></canvas><div class="tm-info" id="tmInfo"></div></div></div>
+      <div class="tm-der"><div id="tmSel" class="tm-sel">${pintarSelTm()}</div>
       <div class="tm-leyenda">${(tm.ordenTipos || []).map(([t, b]) => `<span><i class="tm-color" style="background:${tm.colorTipo[t]}"></i>${esc(t)} <span class="ayuda">${mb(b)}</span></span>`).join("")}
         <span><i class="tm-color" style="background:${tm.chicos}"></i>Archivos pequeños agrupados</span></div>
-      <section><h3>Extensiones <button class="chico" data-ir="Tipos">Editar tipos de archivo</button></h3><div class="resultado" style="max-height:300px"><table>
+      <section class="tm-ext"><h3>Extensiones <button class="chico" data-ir="Tipos">Editar tipos de archivo</button></h3><div class="resultado zona-lista"><table>
         <tr><th></th><th>Extensión</th><th>Tipo</th><th>Ocupa</th><th>%</th><th>Archivos</th></tr>
         ${r.tipos.slice(0, 60).map(t => `<tr><td><span class="tm-color" style="background:${tm.colorExt[t[0] === "(sin extensión)" ? "" : t[0]] || tm.chicos}"></span></td>
           <td><b>${esc(t[0])}</b></td><td class="ayuda">${esc(t[3])}</td><td>${mb(t[1])}</td>
           <td>${(t[1] * 100 / (r.bytes || 1)).toFixed(1)} %</td><td>${t[2].toLocaleString("es")}</td></tr>`).join("")}
-      </table></div></section>` : `<p class="ayuda">${enMarcha ? "" : "Elige qué medir: tu carpeta de usuario es rápida; un disco entero tarda más."}</p>`}`;
+      </table></div></section></div></div>` : `<p class="ayuda">${enMarcha ? "" : "Elige qué medir: tu carpeta de usuario es rápida; un disco entero tarda más."}</p>`}`;
   if (r) requestAnimationFrame(dibujarTm);
 }
 function pintarSelTm() {
@@ -3090,7 +3171,8 @@ function rutaTm(cadena) {
 }
 function dibujarTm() {
   const lienzo = $("#tmLienzo"); if (!lienzo) return;
-  const W = Math.max(200, Math.floor(lienzo.parentElement.clientWidth)), H = Math.max(260, Math.min(560, Math.floor(W * 0.55)));
+  const marco = lienzo.parentElement, lleno = getComputedStyle(marco).position === "relative" && marco.classList.contains("tm-llena") && marco.clientHeight > 150;
+  const W = Math.max(200, Math.floor(marco.clientWidth)), H = lleno ? Math.floor(marco.clientHeight) : Math.max(260, Math.min(560, Math.floor(W * 0.55)));
   const dpr = window.devicePixelRatio || 1;
   lienzo.width = W * dpr; lienzo.height = H * dpr; lienzo.style.height = H + "px";
   const ctx = lienzo.getContext("2d"); ctx.scale(dpr, dpr);
@@ -3425,9 +3507,9 @@ function pintarTipos() {
     </section>
     <section><h3>Todos los tipos</h3>
       <div class="fila"><input type="text" id="tpBuscar" placeholder="Buscar una extensión o un tipo: mkv, cad, fuentes…" value="${esc(tipos.filtro)}" style="flex:1"></div>
-      ${visibles.map(([t, ex]) => `<div class="tipo-caja"><h4>${esc(t)} <span class="ayuda">${ex.length} extensiones</span>${r.originales.includes(t) ? "" : `<span class="etiqueta verde">tuyo</span>`}</h4>
+      <div class="zona-lista lista-tipos">${visibles.map(([t, ex]) => `<div class="tipo-caja"><h4>${esc(t)} <span class="ayuda">${ex.length} extensiones</span>${r.originales.includes(t) ? "" : `<span class="etiqueta verde">tuyo</span>`}</h4>
         <div class="exts">${ex.map(e => r.propias[e] ? `<code class="propia" title="Añadida por ti">${esc(e)}<span class="x" data-tp-quitar="${esc(e)}" title="Quitar">✕</span></code>` : `<code>${esc(e)}</code>`).join("")}</div></div>`).join("")
-        || `<p class="ayuda">Ninguna extensión coincide. Añádela arriba.</p>`}
+        || `<p class="ayuda">Ninguna extensión coincide. Añádela arriba.</p>`}</div>
     </section>`;
 }
 async function guardarTipos(cuerpo, mensaje) {

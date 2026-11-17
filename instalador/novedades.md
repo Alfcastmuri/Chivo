@@ -1,3 +1,11 @@
+## Novedades de GESTOR 0.9.5
+
+- **Todas las pestañas con el mismo formato que Inicio y Organizar**: cada sección ocupa la ventana completa, alineada arriba y con un margen ajustado abajo y a la derecha. Ya no hay barras de desplazamiento en la página; solo se desplazan las listas largas.
+  - *Encontrar, Espacio, Proteger, Al día y Personalizar*: los paneles y sus pestañas internas se adaptan a la altura de tu pantalla.
+  - *Mapa del disco*: el mapa llena el espacio de la izquierda y el detalle queda a la derecha.
+  - *Colores*: la vista previa y el modo a la izquierda, las opciones a la derecha.
+  - *Ajustes*: las opciones se reparten en dos columnas y los botones siempre quedan a la vista.
+
 ## Novedades de GESTOR 0.9.4
 
 - **Inicio sin barras de desplazamiento**: todo el resumen cabe en la ventana y se adapta a la resolución de tu pantalla, con un margen ajustado abajo y a la derecha. En pantallas bajas se compacta solo.
