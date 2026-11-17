@@ -18,6 +18,7 @@ import traceback
 import webbrowser
 
 import nucleo
+from idioma import t
 
 QUIETUD_SEGUNDOS = 8      # tras el último cambio en una carpeta, se espera esto antes de actuar
 ESPERA_ARCHIVO = 5        # un archivo tiene que llevar esto sin modificarse para moverlo
@@ -233,19 +234,19 @@ class Bandeja:
         p = self.pystray
 
         def servicios_menu():
-            elementos = [p.MenuItem(s.get("nombre", "Sin nombre"), self._ejecutar(s["id"]))
+            elementos = [p.MenuItem(s.get("nombre") or t("Sin nombre"), self._ejecutar(s["id"]))
                          for s in nucleo.cargar_servicios() if s.get("activo")]
-            return elementos or [p.MenuItem("No hay servicios activos", None, enabled=False)]
+            return elementos or [p.MenuItem(t("No hay servicios activos"), None, enabled=False)]
 
         return p.Menu(
-            p.MenuItem("Abrir panel", self._abrir_panel, default=True),
-            p.MenuItem("Ejecutar ahora", p.Menu(servicios_menu)),
-            p.MenuItem(lambda _: "Reanudar" if nucleo.cargar_ajustes().get("pausado") else "Pausar todo",
+            p.MenuItem(t("Abrir panel"), self._abrir_panel, default=True),
+            p.MenuItem(t("Ejecutar ahora"), p.Menu(servicios_menu)),
+            p.MenuItem(lambda _: t("Reanudar") if nucleo.cargar_ajustes().get("pausado") else t("Pausar todo"),
                        self._pausar),
-            p.MenuItem("Notificaciones", self._notificaciones,
+            p.MenuItem(t("Notificaciones"), self._notificaciones,
                        checked=lambda _: nucleo.cargar_ajustes().get("notificaciones", True)),
             p.Menu.SEPARATOR,
-            p.MenuItem("Cerrar GESTOR (detener todo)", self._salir),
+            p.MenuItem(t("Cerrar GESTOR (detener todo)"), self._salir),
         )
 
     def _abrir_panel(self, *_):
@@ -292,7 +293,7 @@ class Bandeja:
 
     def notificar(self, titulo, texto):
         try:
-            self.icono.notify(texto, titulo)
+            self.icono.notify(t(texto), t(titulo))
         except Exception:
             pass
 
