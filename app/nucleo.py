@@ -1443,7 +1443,7 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
                         st = os.stat(ruta)
                     except OSError:
                         continue
-                    if ahora - st.st_mtime < esperar:
+                    if esperar > 0 and ahora - st.st_mtime < esperar:  # sin espera nunca se salta (en Windows el reloj va ~15 ms por detrás de la fecha del archivo)
                         listos = None  # un hermano aún se está descargando: se espera a todo el grupo
                         break
                     if ya_hechos.get(_norm(ruta)) == int(st.st_mtime):
