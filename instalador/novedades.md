@@ -1,3 +1,9 @@
+## Novedades de GESTOR 0.9.7
+
+- **Traducción completa en inglés, portugués y francés**: se tradujeron los textos que se habían quedado en español, como las barras de progreso («Buscando duplicados», «Comparando contenido»…), las propuestas del Asistente, el recuento por tipo de archivo, los nombres de las armonías de color, los mensajes de «Guardado», los avisos de Windows (resumen de la semana, pagos, vencimientos, copias) y el informe mensual en PDF, que ahora sale en tu idioma.
+- **Servicios con nombre en tu idioma**: los servicios que creas desde Plantillas se llaman en el idioma elegido («Empty Downloads», «Vider Téléchargements»…) y los que ya tenías se muestran traducidos.
+- **El resplandor de los marcos ya no invade a los vecinos**: la sombra y el brillo de cada panel quedan siempre detrás de todos los paneles, así los bordes y el contenido de las secciones de al lado se ven limpios.
+
 ## Novedades de GESTOR 0.9.6
 
 - **GESTOR en tu idioma**: español, English, Português y Français. Elige el idioma arriba, junto a «Cuaderno»; «Automático» usa el idioma de Windows. Las fechas y los números también siguen el idioma elegido. Las carpetas que GESTOR crea en tu disco conservan su nombre.

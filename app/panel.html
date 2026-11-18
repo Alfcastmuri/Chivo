@@ -274,6 +274,16 @@ body.cuaderno #btnCuaderno { background: #fff1a8; border-color: #e0c860; }
 body:not(.cuaderno) .caja, body:not(.cuaderno) .panelito { border: 0; border-radius: var(--radio); box-shadow: var(--sombra); }
 body:not(.cuaderno) .panelito { padding: 18px 20px; }
 body:not(.cuaderno) .panelito.destacado { box-shadow: var(--sombra), inset 0 0 0 2px color-mix(in srgb, var(--acento) 55%, transparent); }
+/* 0.9.7: el resplandor (sombra y brillo) de los marcos va SIEMPRE detrás de todos los marcos. Con box-shadow,
+   el marco que viene después pinta su resplandor encima del de al lado (sobre todo en rejillas); en un ::before
+   con z-index -1 se pinta en la capa de abajo, antes que el fondo y el contenido de cualquier marco.
+   Solo los marcos de primer nivel: uno dentro de otro conserva su sombra normal (si no, quedaría debajo del fondo
+   del marco de fuera). El menú «…» (details.mas) ya está posicionado y las ventanas (.modal) se desplazan
+   por dentro (overflow), que recortaría el resplandor: esos dos se quedan como estaban. */
+body:not(.cuaderno) :is(.caja, .panelito):not(:is(.caja, .panelito, details.mas, .modal) *) { position: relative; box-shadow: none; }
+body:not(.cuaderno) :is(.caja, .panelito):not(:is(.caja, .panelito, details.mas, .modal) *)::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: var(--sombra); z-index: -1; pointer-events: none; }
+body:not(.cuaderno) .panelito.destacado:not(:is(.caja, .panelito, details.mas, .modal) *) { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--acento) 55%, transparent); }
 body:not(.cuaderno) header { background: var(--fondo); border-bottom: 0; }
 body:not(.cuaderno) button { border-radius: 999px; border-color: transparent; box-shadow: var(--sombra-chica); padding: 7px 16px; transition: box-shadow .15s, transform .1s; }
 body:not(.cuaderno) button:hover { border-color: transparent; color: var(--acento); }
@@ -438,10 +448,15 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
   body.en-inicio #inicio .tablero { height: 100%; grid-auto-rows: minmax(0, 1fr); gap: 14px; }
   body.en-inicio #inicio [data-pest="inicio:resumen"] .tablero { grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
   body.en-inicio #inicio [data-pest="inicio:actividad"] .tablero { grid-template-rows: minmax(0, 1fr) minmax(0, 1.35fr); }
-  body.en-inicio #inicio .tablero > .panelito { overflow: hidden; display: flex; flex-direction: column; }
+  /* recortan por dentro (el último bloque) y no el marco, que recortaría su resplandor */
+  body.en-inicio #inicio .tablero > .panelito { display: flex; flex-direction: column; }
+  body.en-inicio #inicio .tablero > .panelito > * { flex-shrink: 0; }
+  body.en-inicio #inicio .tablero > .panelito > :last-child:not(h3) { flex-shrink: 1; min-height: 0; overflow: hidden; }
   body.en-inicio #inicio .kpis { height: auto; }
-  body.en-inicio #inicio .kpis > .panelito { overflow: hidden; }
+  body.en-inicio #inicio .kpis > .panelito { min-width: 0; }
+  body.en-inicio #inicio .kpis > .panelito > * { max-width: 100%; overflow: hidden; }
   body.en-inicio #inicio .graf:not(.mini) { flex: 1 1 0; min-height: 40px; height: auto !important; }
+  body.en-inicio #inicio .atajos { padding: 4px 10px 12px 6px; margin: -4px -10px -12px -6px; }
   body.en-inicio #inicio .atajos { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 10px; }
   body.en-inicio #inicio .atajos button { width: auto; min-height: 0; padding: 6px 4px; justify-content: center; }
   body.en-inicio #inicio .renglon { flex: none; }
@@ -512,7 +527,7 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
   body.ajustada .contenido > main.vista.on:not(#vistaInicio) { flex: 1; min-height: 0; padding: 0; }
   body.ajustada main.vista.simple.on { display: flex; flex-direction: column; gap: 14px; }
   body.ajustada main.vista.simple.on > .pestanas-int { flex: none; }
-  body.ajustada main.vista.simple.on > .caja.editor { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+  body.ajustada main.vista.simple.on > .caja.editor { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
   body.ajustada main.vista.simple.on > .caja.editor > * { flex-shrink: 0; }
   body.ajustada main.vista.simple.on > .caja.editor > div:only-child { display: flex; flex-direction: column; min-height: 0; flex: 1; }
   body.ajustada .dos-col, body.ajustada .maestro-detalle { flex: 1; min-height: 0; align-items: stretch; }
@@ -525,7 +540,7 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
   body.ajustada #vistaServicios .caja.lista { align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
   body.ajustada #vistaServicios #lista { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   body.ajustada #vistaServicios #aprendido { flex: none; max-height: 40%; overflow-y: auto; }
-  body.ajustada #editor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  body.ajustada #editor { display: flex; flex-direction: column; min-height: 0; }
   body.ajustada #editor > * { flex: none; }
   body.ajustada #editor > [data-pest].on { flex: 1 1 auto; min-height: 0 !important; overflow-y: auto; }
 }

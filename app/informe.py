@@ -14,6 +14,7 @@ import time
 
 import bd
 import nucleo
+from idioma import t
 
 MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
          "octubre", "noviembre", "diciembre"]
@@ -53,6 +54,7 @@ class PDF:
         return len(str(s)) * tam * (0.56 if negrita else 0.5)
 
     def texto(self, x, y, s, tam=10, negrita=False, color=TEXTO, derecha=False):
+        s = t(str(s))     # el informe sale en el idioma elegido en GESTOR
         if derecha:
             x -= self.ancho(s, tam, negrita)
         r, g, b = color
@@ -193,6 +195,8 @@ def datos(anio=None, mes=None):
 def generar(anio=None, mes=None, ruta=None):
     d = datos(anio, mes)
     nombre_mes = f'{MESES[d["inicio"].month]} de {d["inicio"].year}'
+    if t("enero") != "enero":       # en otro idioma: «October 2026», «outubro 2026»
+        nombre_mes = f'{t(MESES[d["inicio"].month])} {d["inicio"].year}'
     ruta = ruta or os.path.join(carpeta_informes(), f'Informe GESTOR {d["inicio"]:%Y-%m}.pdf')
     pdf = PDF()
     m, w = pdf.MARGEN, pdf.ANCHO - 2 * pdf.MARGEN

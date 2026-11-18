@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.9.6"
+VERSION = "0.9.7"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -2407,11 +2407,13 @@ def aviso_semanal(ahora=None):
     r = resumen_semana(ahora)
     if not r["movidos"] and not r["papelera"]:
         return False
-    partes = [f'{r["movidos"]} archivos ordenados']
+    from idioma import t  # aquí y no arriba: idioma importa nucleo
+    # Cada trozo se traduce por separado: la frase entera no está en el diccionario.
+    partes = [t(f'{r["movidos"]} archivos ordenados')]
     if r["papelera"]:
-        partes.append(f'{r["papelera"]} a la papelera ({tamano_legible(r["bytes_papelera"])} liberables)')
+        partes.append(t(f'{r["papelera"]} a la papelera ({tamano_legible(r["bytes_papelera"])} liberables)'))
     top = sorted(r["por_servicio"].items(), key=lambda x: -x[1])[:3]
-    texto = ", ".join(partes) + ". " + " · ".join(f"{n}: {c}" for n, c in top)
+    texto = ", ".join(partes) + ". " + " · ".join(f"{t(n)}: {c}" for n, c in top)
     avisar("Resumen de la semana", texto)
     return True
 
