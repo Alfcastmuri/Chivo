@@ -28,12 +28,14 @@
         const partes = normal(origen).split(/\{\d*\}/);
         const letras = (partes.join("").match(/\p{L}/gu) || []).length;
         // «de {}», «{} a {}»: encajarían con cualquier cosa. Sí vale si empieza fijo y en mayúscula («Si es {}»).
-        if (letras < 5 && !(partes[0].length >= 3 && /^\p{Lu}/u.test(partes[0]))) continue;
+        // «{} de {} ({} %)»: solo vale si todos los valores son números (ver buscar).
+        const numerica = letras < 5 && !(partes[0].length >= 3 && /^\p{Lu}/u.test(partes[0]));
+        if (numerica && (letras < 2 || partes.length < 3)) continue;
         const re = new RegExp("^" + partes.map(escapar).join("(.*?)") + "$", "s");
         // Un valor pegado a «\» es parte de una ruta: no se traduce (la carpeta se llama así en el disco).
         // Lo mismo entre «» o comillas: es un dato tuyo (una carpeta, una palabra que buscas).
         const ruta = partes.slice(0, -1).map((p, i) => /[\\«"“']$/.test(p) || /^[\\»"”']/.test(partes[i + 1]));
-        plantillas.push({ re, destino, fijo: partes.join("").length, letras, ruta });
+        plantillas.push({ re, destino, fijo: partes.join("").length, letras, ruta, numerica });
       } else {
         exactos.set(normal(origen), destino);
       }
@@ -54,15 +56,18 @@
   const BORDES = /^([^\p{L}\p{N}¿¡«"'(]*)(.*?)([^\p{L}\p{N}»"'.!?…)]*)$/su;
 
   // minimo: parte de las letras del texto que debe ser fija en la plantilla (0 = cualquiera).
-  function buscar(limpio, minimo = 0) {
+  // compuestos: si es true, acepta valores con « → » o « · » (se usa cuando trozo a trozo no bastó).
+  const NUMERO = /^[\d\s.,:%~+\-\/]*$/;
+  function buscar(limpio, minimo = 0, compuestos = false) {
     let salida = exactos.get(limpio);
     if (salida !== undefined) return salida;
     const total = minimo ? (limpio.match(/\p{L}/gu) || []).length : 0;
     for (const p of plantillas) {
       const m = p.re.exec(limpio);
       if (!m || minimo && p.letras < total * minimo) continue;
+      if (p.numerica && !m.slice(1).every(v => NUMERO.test(v))) continue;
       // Un valor con « → » o « · » es media frase compuesta: mejor trozo a trozo (porTrozos).
-      if (m.slice(1).some((v, k) => !p.ruta[k] && /\s[→·]\s/.test(v))) continue;
+      if (!compuestos && m.slice(1).some((v, k) => !p.ruta[k] && /\s[→·]\s/.test(v))) continue;
       return rellenar(p.destino, m.slice(1), p.ruta);
     }
     return null;
@@ -90,7 +95,15 @@
       if (!limpio.includes(sep)) continue;
       const trozos = partir(limpio, sep);
       if (trozos.length < 2) continue;
-      const hechos = trozos.map(t => traducir(t));
+      // «se actualiza solo con cada cambio» puede estar en el diccionario como «· se actualiza solo…».
+      const conSeparador = (t, i) => {
+        const h = traducir(t);
+        if (h !== t || !i || !sep.trim()) return h;
+        const prefijo = sep.trimStart();
+        const otro = buscar(normal(prefijo + t));
+        return otro !== null && otro.startsWith(prefijo.trim()) ? otro.slice(prefijo.trim().length).trimStart() : h;
+      };
+      const hechos = trozos.map(conSeparador);
       const cambiados = hechos.filter((h, i) => h !== trozos[i]).length;
       if (!cambiados) continue;
       // «Instaladores» se escribe igual en portugués: está en el diccionario, cuenta como traducido.
@@ -110,6 +123,7 @@
     if (salida === undefined) {
       salida = buscar(limpio);
       if (salida === null) salida = porTrozos(limpio);
+      if (salida === null) salida = buscar(limpio, 0, true);
       if (salida === null) {
         // «+ Imágenes», «GESTOR clásico ✓», «📓 Cuaderno»: se traduce lo de en medio y se dejan los símbolos.
         const m = BORDES.exec(limpio);
@@ -201,6 +215,8 @@
       if (h.nodeType === 3) { if (LETRAS.test(h.nodeValue)) texto = true; }
       else if (h.nodeType === 1) {
         if (!FORMATO.has(h.tagName) || h.id || h.children.length || [...h.attributes].some(a => a.name.startsWith("data-"))) return;
+        // Un <span> vacío es un adorno (el punto de color de un servicio), no formato: la frase se perdería.
+        if (h.tagName !== "BR" && !h.textContent.trim()) return;
         formato = true;
       }
     }

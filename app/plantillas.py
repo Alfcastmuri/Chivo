@@ -9,6 +9,7 @@ import os
 import re
 
 import nucleo
+from idioma import t
 
 # Tipos de documento: (clave, nombres de carpeta que lo representan, palabras en el nombre del
 # archivo, palabras en el contenido o None). Los nombres se comparan sin acentos ni mayúsculas.
@@ -323,7 +324,8 @@ def catalogo(dias=14):
         envueltas = servicio.pop("reglas")
         salida.append({"clave": clave, "nombre": nombre, "descripcion": descripcion,
                        "origenes": servicio["origenes"], "servicio": servicio, "reglas": envueltas,
-                       "ya_existe": any(s.get("nombre") == servicio["nombre"] for s in nucleo.cargar_servicios())})
+                       "ya_existe": any(s.get("nombre") in (servicio["nombre"], t(servicio["nombre"]))
+                                        for s in nucleo.cargar_servicios())})
     return salida
 
 
@@ -345,6 +347,7 @@ def crear(clave, indices=None, origenes=None, dias=14, modo_prueba=True):
                 raise ValueError(f"{o}: {aviso}")
         servicio["origenes"] = origenes
     servicio["modo_prueba"] = bool(modo_prueba)
+    servicio["nombre"] = t(servicio["nombre"])     # «Vaciar Descargas» → «Empty Downloads» si GESTOR está en inglés
     servicios = nucleo.cargar_servicios()
     servicios.append(servicio)
     nucleo.guardar_servicios(servicios)

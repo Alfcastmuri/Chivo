@@ -811,13 +811,22 @@ class PruebaVersion07(unittest.TestCase):
 
     def test_informe_pdf(self):
         import informe
+        from unittest import mock
         destino = os.path.join(self.raiz, "informe.pdf")
-        r = informe.generar(ruta=destino)
+        with mock.patch.dict(os.environ, {"GESTOR_IDIOMA": "es"}):
+            r = informe.generar(ruta=destino)
         self.assertTrue(r["ok"])
         with open(destino, "rb") as f:
             contenido = f.read()
         self.assertTrue(contenido.startswith(b"%PDF-1.4") and contenido.rstrip().endswith(b"%%EOF"))
         self.assertIn(b"Informe de GESTOR", contenido)
+        # en otro idioma, el informe sale traducido (también el mes)
+        with mock.patch.dict(os.environ, {"GESTOR_IDIOMA": "fr"}):
+            informe.generar(anio=2026, mes=10, ruta=destino)
+        with open(destino, "rb") as f:
+            contenido = f.read()
+        self.assertIn(b"Rapport GESTOR", contenido)
+        self.assertIn(b"octobre 2026", contenido.lower())
 
     def test_mapa_del_disco(self):
         import disco
