@@ -2,6 +2,8 @@
 
 - **Traducción completa en inglés, portugués y francés**: se tradujeron los textos que se habían quedado en español, como las barras de progreso («Buscando duplicados», «Comparando contenido»…), las propuestas del Asistente, el recuento por tipo de archivo, los nombres de las armonías de color, los mensajes de «Guardado», los avisos de Windows (resumen de la semana, pagos, vencimientos, copias) y el informe mensual en PDF, que ahora sale en tu idioma.
 - **Servicios con nombre en tu idioma**: los servicios que creas desde Plantillas se llaman en el idioma elegido («Empty Downloads», «Vider Téléchargements»…) y los que ya tenías se muestran traducidos.
+- **Pestañas más claras**: las secciones (arriba, a todo lo ancho) y las pestañas de dentro de cada sección ya no se ven iguales. Las de dentro son un selector compacto, más chico y separado, así se nota cuál está dentro de cuál.
+- **Más aire entre secciones**: hay una distancia mínima entre paneles, entre las pestañas y su contenido, y entre tarjetas, para que nada se vea amontonado.
 - **El resplandor de los marcos ya no invade a los vecinos**: la sombra y el brillo de cada panel quedan siempre detrás de todos los paneles, así los bordes y el contenido de las secciones de al lado se ven limpios.
 
 ## Novedades de GESTOR 0.9.6

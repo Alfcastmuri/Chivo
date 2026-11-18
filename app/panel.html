@@ -591,6 +591,31 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
   #modalAjustes [data-pest].on { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; align-items: start; }
   #modalAjustes [data-pest].on > .tarjeta-op { margin: 0; }
 }
+/* 0.9.7: distancia mínima entre secciones. Las pestañas de arriba ya no tocan el marco de abajo, y entre marcos
+   vecinos queda siempre al menos --sep (el resplandor necesita ese aire); entre tarjetas chicas, --sep-chica. */
+:root { --sep: 16px; --sep-chica: 10px; }
+.subnav.on { padding-bottom: var(--sep) !important; }
+.pestanas-int { margin-bottom: var(--sep); }
+body.en-inicio #inicio .tablero, body.en-inicio #inicio .kpis, .tablero, .kpis { gap: var(--sep); }
+.dos-col, .maestro-detalle { gap: var(--sep); }
+.carpeta { margin-bottom: var(--sep-chica); }
+.propuesta { margin-bottom: var(--sep-chica); }
+.col-lateral { gap: var(--sep-chica); }
+/* 0.9.7: dos niveles de pestañas que se distinguen a simple vista.
+   Nivel 1 (.subnav, las secciones del menú lateral): botones grandes a todo lo ancho, como hasta ahora.
+   Nivel 2 (.pestanas-int, dentro de una sección o ventana): un control segmentado, un solo carril hundido
+   del ancho de su contenido, con botones más chicos sin sombra propia; la elegida lleva el color del tema
+   con texto blanco. Así no parecen otra fila de secciones pegada a la primera. */
+body:not(.cuaderno) .pestanas-int { display: flex !important; flex-wrap: nowrap; align-items: center; gap: 4px;
+  width: fit-content; max-width: 100%; align-self: flex-start; padding: 4px; border-radius: 999px;
+  background: var(--fondo); box-shadow: var(--hundido); overflow-x: auto; scrollbar-width: none; }
+body:not(.cuaderno) .pestanas-int::-webkit-scrollbar { display: none; }
+body:not(.cuaderno) .pestanas-int button { width: auto; flex: 0 0 auto; min-width: 110px; padding: 6px 18px; font-size: 13px;
+  font-weight: 600; background: transparent; color: var(--suave); box-shadow: none; }
+body:not(.cuaderno) .pestanas-int button:hover { color: var(--texto); }
+body:not(.cuaderno) .pestanas-int button.on, body:not(.cuaderno) .pestanas-int button.on:hover { background: var(--degradado);
+  color: var(--acento-texto); box-shadow: 0 3px 10px color-mix(in srgb, var(--acento) 30%, transparent); }
+body:not(.cuaderno) .pestanas-int button:active { transform: none; }
 </style>
 </head>
 <body class="en-inicio ajustada">
