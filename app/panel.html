@@ -616,6 +616,12 @@ body:not(.cuaderno) .pestanas-int button:hover { color: var(--texto); }
 body:not(.cuaderno) .pestanas-int button.on, body:not(.cuaderno) .pestanas-int button.on:hover { background: var(--degradado);
   color: var(--acento-texto); box-shadow: 0 3px 10px color-mix(in srgb, var(--acento) 30%, transparent); }
 body:not(.cuaderno) .pestanas-int button:active { transform: none; }
+
+/* Reorganizar: vista previa de cómo quedaría la carpeta */
+.arbol-previo { border-radius: 12px; background: var(--fondo-suave, color-mix(in srgb, var(--texto) 4%, transparent)); padding: 8px 4px; }
+.arbol-raiz { font-weight: 700; padding: 4px 10px 6px; }
+.arbol-fila { display: grid; grid-template-columns: 1fr auto 70px; gap: 12px; align-items: center; padding: 5px 10px 5px 28px; border-top: 1px solid color-mix(in srgb, var(--texto) 7%, transparent); }
+.arbol-fila .ayuda { text-align: right; }
 </style>
 </head>
 <body class="en-inicio ajustada">
@@ -637,7 +643,7 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
 <div class="contenido">
 <div class="subnav" id="subnav"></div>
 <main class="vista simple on" id="vistaInicio"><div id="inicio"><div class="vacio">Cargando…</div></div></main>
-<main class="vista simple" id="vistaRaiz"><div class="caja editor" id="raiz"><div id="aplanar"></div></div></main>
+<main class="vista simple" id="vistaRaiz" style="gap:16px"><div class="pestanas-int" data-tabs="raiz" style="margin:0"><button type="button" data-tab="reorg" class="on">Reorganizar con otro orden</button><button type="button" data-tab="aplanar" class="">Sacar todo a la raíz</button></div><div class="caja editor on" data-pest="raiz:reorg" id="reorgCaja"><div id="reorg"></div></div><div class="caja editor" data-pest="raiz:aplanar" id="raiz"><div id="aplanar"></div></div></main>
 <main class="vista" id="vistaServicios">
   <div class="caja lista">
     <h2>Servicios</h2>
@@ -798,7 +804,7 @@ const ICONOS = {
 const icono = (n, tam) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"${tam ? ` width="${tam}" height="${tam}"` : ""}>${ICONOS[n] || ""}</svg>`;
 const GRUPOS = [
   ["Inicio", "inicio", [["Inicio", "Resumen"]]],
-  ["Organizar", "organizar", [["Asistente", "🧭 Asistente"], ["Servicios", "Servicios y tareas"], ["Plantillas", "Plantillas"], ["Raiz", "Sacar a la raíz"], ["Correo", "Adjuntos de correo"]]],
+  ["Organizar", "organizar", [["Asistente", "🧭 Asistente"], ["Servicios", "Servicios y tareas"], ["Plantillas", "Plantillas"], ["Raiz", "Reorganizar"], ["Correo", "Adjuntos de correo"]]],
   ["Encontrar", "encontrar", [["Buscar", "Buscar"], ["Linea", "Línea de tiempo"], ["Duplicados", "Duplicados"]]],
   ["Espacio", "espacio", [["Espacio", "Mapa del disco"]]],
   ["Proteger", "proteger", [["Respaldo", "Respaldo y USB"], ["Papelera", "Papelera"]]],
@@ -1115,9 +1121,9 @@ function resumenRegla(r) {
   if (c.zip_descomprimido) partes.push("un ZIP ya descomprimido");
   if (c.solo_subcarpetas) partes.push("de una subcarpeta");
   const si = partes.length ? "Si es " + partes.join(", ") : "Cualquier archivo";
-  const que = { mover: `mover a ${r.destino || "(falta destino)"}`, copiar: `copiar a ${r.destino || "(falta destino)"}`,
+  const que = { mover: `mover a ${destinoLegible(r.destino) || "(falta destino)"}`, copiar: `copiar a ${destinoLegible(r.destino) || "(falta destino)"}`,
     renombrar: `renombrar como ${r.nuevo_nombre || "(limpiar nombre)"}`, papelera: "enviar a la papelera",
-    archivar: `archivar en ZIP mensual en ${r.destino || "{origen}\\Archivados"}` }[r.accion || "mover"];
+    archivar: `archivar en ZIP mensual en ${destinoLegible(r.destino || "{origen}\\Archivados")}` }[r.accion || "mover"];
   const fecha = r.fecha === "creacion" ? " · fecha de creación" : "";
   return `${si} → ${que}${r.accion !== "papelera" ? fecha : ""}`;
 }
@@ -1445,12 +1451,41 @@ function mostrarVista(nombre) {
   $("#subnav").innerHTML = vistas.length > 1 ? vistas.map(([v, t]) => `<button data-vista="${v}" class="${v === nombre ? "on" : ""}">${t}</button>`).join("") : "";
   document.querySelectorAll(".vista").forEach(v => v.classList.toggle("on", v.id === "vista" + nombre));
   window.scrollTo(0, 0);
-  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: () => { cargarDisco(); cargarEspacio(); }, Vencimientos: () => { cargarPagos(); cargarVencimientos(); },
+  ({ Inicio: cargarInicio, Colores: pintarColores, Raiz: () => { $("#aplanar").innerHTML = pintarAplanar(); pintarReorg(); }, Plantillas: pintarPlantillas, Buscar: cargarBuscar, Espacio: () => { cargarDisco(); cargarEspacio(); }, Vencimientos: () => { cargarPagos(); cargarVencimientos(); },
      Linea: cargarLinea, Correo: cargarCorreo, Tipos: cargarTipos, Respaldo: () => { cargarRespaldo(); cargarCopias(); },
      Asistente: pintarAsistente, Duplicados: pintarDuplicados, Papelera: () => { cargarRetenidos(); cargarPapelera(); },
      Copias: cargarCopias, Estadisticas: () => { cargarEstadisticas(); cargarInformes(); } }[nombre] || (() => { }))();
 }
-const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB";
+const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : b >= 1048576 ? (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + " MB"
+  : b > 0 ? Math.max(1, Math.round(b / 1024)) + " KB" : "0 MB";
+// Destinos en lenguaje de personas: «Imágenes › año › mes» en vez de «C:\Users\…\Pictures\{año}\{mes}».
+const NOMBRE_VARIABLE = { "año": "año", anio: "año", mes: "mes", mes_num: "mes", dia: "día", categoria: "tipo", extension: "extensión",
+  procedencia: "procedencia", camara: "cámara", sitio: "sitio", proveedor: "proveedor", rfc: "RFC", nombre: "nombre",
+  carpeta_origen: "carpeta de origen", carpeta_padre: "carpeta", subcarpeta: "subcarpeta", tipo_acceso: "tipo de acceso", dato: "dato" };
+function destinoLegible(destino) {
+  if (!destino) return "";
+  let d = String(destino), raiz = "";
+  const rapidas = Object.entries((datos && datos.carpetas_rapidas) || {}).sort((a, b) => b[1].length - a[1].length);
+  for (const [nombre, ruta] of rapidas) {
+    if (ruta && d.toLowerCase().startsWith(ruta.toLowerCase()) && /^([\\/]|$)/.test(d.slice(ruta.length))) { raiz = nombre; d = d.slice(ruta.length); break; }
+  }
+  if (!raiz && d.startsWith("{origen}")) { raiz = "la misma carpeta"; d = d.slice(8); }
+  const partes = d.split(/[\\/]+/).filter(Boolean).map(p => p.replace(/\{([a-zñ_]+)\}/g, (m, k) => NOMBRE_VARIABLE[k] || k));
+  if (!raiz && /^([A-Za-z]:|\/)/.test(String(destino)) && partes.length > 3) return "… › " + partes.slice(-3).join(" › ");
+  return [raiz, ...partes].filter(Boolean).join(" › ");
+}
+// Asistente: cómo quedan las carpetas de cada propuesta.
+const ORDENES = [["sugerido", "Como lo sugiere GESTOR"], ["año", "Por año"], ["año_mes", "Por año y mes"], ["extension", "Por extensión"], ["junto", "Todo junto, sin subcarpetas"]];
+function aplicarOrden(destino, orden) {
+  if (!destino || orden === "sugerido") return destino;
+  const sep = destino.includes("\\") ? "\\" : "/";
+  const partes = destino.split(/[\\/]/);
+  let corte = partes.findIndex((p, i) => i > 0 && p.includes("{"));
+  if (corte < 0) corte = partes.length;
+  const base = partes.slice(0, corte);
+  const extra = { "año": ["{año}"], "año_mes": ["{año}", "{mes}"], extension: ["{extension}"], junto: [] }[orden] || [];
+  return [...base, ...extra].join(sep);
+}
 
 // ---------------------------------------------------------------- pestañas de sección (en vez de páginas largas)
 const pestActual = {};
@@ -1696,7 +1731,7 @@ function pintarInicio() {
   </div>`;
 
   const atajos = [["Plantillas", "plantilla", "Plantillas"], ["Buscar", "buscar", "Buscar"], ["Duplicados", "copias", "Duplicados"],
-    ["Espacio", "espacio", "Mapa del disco"], ["Linea", "linea", "Línea de tiempo"], ["Raiz", "raiz", "Sacar a la raíz"], ["Vencimientos", "pago", "Pagos"]];
+    ["Espacio", "espacio", "Mapa del disco"], ["Linea", "linea", "Línea de tiempo"], ["Raiz", "raiz", "Reorganizar"], ["Vencimientos", "pago", "Pagos"]];
   const tarjetaAtajos = `<div class="panelito ancha"><h3>Accesos rápidos</h3>
     <div class="atajos">${atajos.map(([v, ic, t]) => `<button data-ir="${v}">${icono(ic)}<span>${esc(t)}</span></button>`).join("")}</div></div>`;
 
@@ -2493,6 +2528,72 @@ $("#raiz").addEventListener("click", async e => {
     try { await accionAplanar(t); } catch (err) { aviso("Error: " + err.message); $("#aplanar").innerHTML = pintarAplanar(); }
   }
 });
+// ---------------------------------------------------------------- reorganizar una carpeta ya ordenada
+let reo = { carpeta: "", esquema: "tipo", por_subcarpeta: false, borrar_vacias: true, limpiar: false, identicos: "papelera", res: null, hecho: null, esquemas: null };
+const EJEMPLO_ESQUEMA = { tipo: "Imágenes", "tipo_año": "Imágenes › 2026", "tipo_año_mes": "Imágenes › 2026 › 11-Noviembre", "año": "2026",
+  "año_mes": "2026 › 11-Noviembre", "año_tipo": "2026 › Imágenes", extension: "jpg", tipo_extension: "Imágenes › jpg", procedencia: "WhatsApp" };
+async function pintarReorg() {
+  if (!reo.esquemas) { try { reo.esquemas = (await api("/api/reorganizar/esquemas")).esquemas; } catch (e) { reo.esquemas = []; } }
+  const r = reo.res, base = reo.carpeta ? nombreCorto(reo.carpeta.replace(/[\\/]+$/, "")) : "";
+  const previa = r ? (!r.ok ? `<div class="aviso error">${esc(r.mensaje)}</div>`
+    : !r.operaciones.length ? `<div class="aviso okmsg">Esta carpeta ya está ordenada así: no hay nada que mover.</div>`
+    : `<div class="aviso okmsg">${r.simulado ? `Movería ${plural(r.operaciones.length, "archivo", "archivos")}. Así quedaría:` : `Listo: reorganicé ${plural(r.operaciones.length, "archivo", "archivos")}${(r.carpetas_borradas || []).length ? ` y quité ${plural(r.carpetas_borradas.length, "carpeta vacía", "carpetas vacías")}` : ""}${r.errores.length ? `. ${plural(r.errores.length, "archivo", "archivos")} con error` : ""}.`}</div>
+      <div class="arbol-previo"><div class="arbol-raiz">📁 ${esc(base)}</div>${r.resumen.map(c => `<div class="arbol-fila"><span>📁 ${esc(c.carpeta || "(suelto en la carpeta)")}</span><b>${plural(c.n, "archivo", "archivos")}</b><span class="ayuda">${mb(c.bytes)}</span></div>`).join("")}
+      ${r.otras_carpetas ? `<div class="ayuda" style="padding:4px 10px">Y ${plural(r.otras_carpetas, "carpeta", "carpetas")} más.</div>` : ""}</div>`) 
+    : `<div class="vacio">Elige una carpeta y cómo quieres que quede. Te enseño cómo quedaría antes de mover nada, y después se puede deshacer.</div>`;
+  $("#reorg").innerHTML = `<div class="cab-vista"><div><h2>Reorganizar con otro orden</h2>
+      <p class="ayuda">Vuelve a ordenar una carpeta que ya tenía subcarpetas, con el orden que elijas. Revisa todas las subcarpetas; la que se llama <code>Mantener</code> no se toca.</p></div></div>
+    <div class="dos-col">
+      <div class="col-lateral">
+        <div class="tarjeta-op"><h4>1. Carpeta</h4>
+          <input type="text" id="reCarpeta" value="${esc(reo.carpeta)}" placeholder="Por ejemplo D:\\Fotos" style="width:100%">
+          <div class="fila" style="margin-bottom:0"><button class="chico" id="reElegir">Elegir…</button>
+          ${Object.entries(datos.carpetas_rapidas || {}).slice(0, 3).map(([n, ruta]) => `<button class="chico" data-re-rapida="${esc(ruta)}">${esc(n)}</button>`).join("")}</div></div>
+        <div class="tarjeta-op"><h4>2. ¿Cómo quieres que quede?</h4>
+          <select id="reEsquema" style="width:100%">${(reo.esquemas || []).map(e => `<option value="${e.clave}" ${reo.esquema === e.clave ? "selected" : ""}>${e.nombre} · ${EJEMPLO_ESQUEMA[e.clave] || ""}</option>`).join("")}</select>
+          <div class="opciones-v" style="margin-top:8px">
+          <label title="Trabajo\\Proyecto A se queda; dentro se ordena por tipo"><input type="checkbox" id="rePorSub" ${reo.por_subcarpeta ? "checked" : ""}> Conservar las subcarpetas principales y ordenar dentro de cada una</label>
+          <label><input type="checkbox" id="reVacias" ${reo.borrar_vacias ? "checked" : ""}> Quitar las carpetas que queden vacías</label>
+          <label title="Quita «(1)», «copia» y espacios dobles"><input type="checkbox" id="reLimpiar" ${reo.limpiar ? "checked" : ""}> Limpiar los nombres de los archivos</label>
+          <label class="campo"><span>Archivos idénticos</span><select id="reIdenticos">${[["papelera", "Dejar solo uno (el resto a la papelera)"], ["carpeta", "Moverlos a Duplicados"], ["conflicto", "Conservar todos"]]
+            .map(([v, t]) => `<option value="${v}" ${reo.identicos === v ? "selected" : ""}>${t}</option>`).join("")}</select></label></div></div>
+        <div class="fila"><button id="reVer">Ver cómo quedaría</button>
+          ${r && r.ok && r.simulado && r.operaciones.length ? `<button class="prim" id="reHacer">Reorganizar ${plural(r.operaciones.length, "archivo", "archivos")}</button>` : ""}
+          ${reo.hecho ? `<button id="reDeshacer">Deshacer</button>` : ""}</div>
+      </div>
+      <div class="col-principal"><h3 class="tit-col" style="margin-top:0">3. Así quedaría</h3>${previa}</div>
+    </div>`;
+}
+function leerReorg() {
+  reo.carpeta = $("#reCarpeta").value.trim(); reo.esquema = $("#reEsquema").value; reo.por_subcarpeta = $("#rePorSub").checked;
+  reo.borrar_vacias = $("#reVacias").checked; reo.limpiar = $("#reLimpiar").checked; reo.identicos = $("#reIdenticos").value;
+}
+$("#reorgCaja").addEventListener("change", e => { if (e.target.closest("#reorg") && e.target.id !== "reCarpeta") { leerReorg(); reo.res = null; pintarReorg(); } });
+$("#reorgCaja").addEventListener("click", async e => {
+  const t = e.target;
+  try {
+    if (t.dataset.reRapida) { reo.carpeta = t.dataset.reRapida; reo.res = null; }
+    else if (t.id === "reElegir") {
+      leerReorg(); const res = await api("/api/elegir-carpeta", { inicial: reo.carpeta });
+      if (res.carpeta) { reo.carpeta = res.carpeta; reo.res = null; }
+    } else if (t.id === "reVer") {
+      leerReorg(); if (!reo.carpeta) { aviso("Elige una carpeta."); return; }
+      t.disabled = true; t.textContent = "Mirando…";
+      reo.res = await api("/api/reorganizar/simular", reo);
+    } else if (t.id === "reHacer") {
+      leerReorg();
+      if (!confirm(`¿Reorganizar ${reo.res.operaciones.length} archivos de ${reo.carpeta}? Se puede deshacer.`)) return;
+      t.disabled = true; t.textContent = "Moviendo…";
+      reo.res = await api("/api/reorganizar/ejecutar", reo); reo.hecho = reo.res.ok && reo.res.operaciones.length > 0;
+    } else if (t.id === "reDeshacer") {
+      if (!confirm("¿Devolver los archivos a donde estaban?")) return;
+      const res = await api("/api/reorganizar/deshacer", { carpeta: reo.carpeta });
+      aviso(res.ok ? `Listo: ${plural(res.devueltos, "archivo volvió", "archivos volvieron")} a su lugar.` : res.mensaje);
+      reo.hecho = null; reo.res = null;
+    } else return;
+  } catch (err) { aviso("Error: " + err.message); }
+  pintarReorg();
+});
 $("#plantillas").addEventListener("click", async e => {
   const t = e.target;
   if (t.dataset.irAsistente !== undefined) { mostrarVista("Asistente"); return; }
@@ -2679,7 +2780,8 @@ $("#archivoImportar").onchange = async e => {
 };
 
 // ---------------------------------------------------------------- asistente
-let asistente = { carpeta: "", analisis: null, elegidas: new Set(), limpiar: false };
+let asistente = { carpeta: "", analisis: null, elegidas: new Set(), limpiar: false, orden: "sugerido" };
+const reglaConOrden = r => Object.assign({}, r, { destino: aplicarOrden(r.destino, asistente.orden) });
 async function pintarAsistente(analizar) {
   const cont = $("#asistente");
   if (!asistente.carpeta) asistente.carpeta = datos.carpetas_rapidas.Descargas || "";
@@ -2705,22 +2807,26 @@ async function pintarAsistente(analizar) {
           <div class="cifras" style="grid-template-columns:1fr 1fr"><div><b>${a.total.toLocaleString("es")}</b><span>archivos sueltos</span></div>
             <div><b>${a.sugerencias.length}</b><span>propuestas (${mb(total)})</span></div></div>
           ${a.copias ? `<p class="ayuda" style="margin-bottom:0">${a.copias.toLocaleString("es")} archivos tienen restos como «(1)» o «copia» en el nombre.</p>` : ""}</div>
+        ${a.sugerencias.length ? `<div class="tarjeta-op"><h4>¿Cómo las ordeno?</h4>
+          <select id="asOrden" style="width:100%">${ORDENES.map(([v, t]) => `<option value="${v}" ${asistente.orden === v ? "selected" : ""}>${t}</option>`).join("")}</select>
+          <p class="ayuda" style="margin-bottom:0">Cambia las subcarpetas que se crean dentro de cada destino.</p></div>` : ""}
       </div>
       <div class="col-principal">
         <h3 class="tit-col" style="margin-top:0">2. Propuestas · marca las que quieras</h3>
         <div class="zona-lista lista-prop">
         ${a.sugerencias.length ? a.sugerencias.map(s => `
           <label class="propuesta"><input type="checkbox" data-as-clave="${esc(s.clave)}" ${asistente.elegidas.has(s.clave) ? "checked" : ""}>
-            <span><span>Tienes <b>${esc(s.texto)}</b> <span class="etiqueta">${mb(s.bytes)}</span></span><span class="ayuda">${esc(resumenRegla(s.regla))}</span></span></label>`).join("")
+            <span><span>Tienes <b>${esc(s.texto)}</b> <span class="etiqueta">${mb(s.bytes)}</span></span><span class="ayuda">${esc(resumenRegla(reglaConOrden(s.regla)))}</span></span></label>`).join("")
           : `<p class="ayuda">No hay nada que proponer: la carpeta ya está ordenada.</p>`}
         ${a.copias ? `<label class="propuesta"><input type="checkbox" id="asLimpiar" ${asistente.limpiar ? "checked" : ""}>
           <span><span><b>${a.copias.toLocaleString("es")} archivos</b> con restos como "(1)" o "copia"</span><span class="ayuda">Limpiar los nombres (y avisar si eran duplicados).</span></span></label>` : ""}
         </div>
-        ${a.sugerencias.length ? `<div class="acciones"><button class="prim" id="asCrear">Crear el servicio con lo marcado</button>
-          <span class="ayuda" style="align-self:center">Se crea desactivado para que lo revises y lo simules antes.</span></div>` : ""}
+        ${a.sugerencias.length ? `<div class="acciones"><button class="prim" id="asCrear">Ordenar así</button>
+          <span class="ayuda" style="align-self:center">Primero en modo prueba: te enseño lo que haría y nada se mueve sin tu visto bueno.</span></div>` : ""}
       </div>
     </div>`;
 }
+$("#asistente").addEventListener("change", e => { if (e.target.id === "asOrden") { asistente.orden = e.target.value; pintarAsistente(); } });
 $("#asistente").addEventListener("click", async e => {
   const t = e.target;
   try {
@@ -2733,7 +2839,7 @@ $("#asistente").addEventListener("click", async e => {
       t.checked ? asistente.elegidas.add(t.dataset.asClave) : asistente.elegidas.delete(t.dataset.asClave);
     } else if (t.id === "asLimpiar") { asistente.limpiar = t.checked; }
     else if (t.id === "asCrear") {
-      const reglas = asistente.analisis.sugerencias.filter(s => asistente.elegidas.has(s.clave)).map(s => s.regla);
+      const reglas = asistente.analisis.sugerencias.filter(s => asistente.elegidas.has(s.clave)).map(s => reglaConOrden(s.regla));
       if (!reglas.length) { aviso("Marca al menos una propuesta."); return; }
       const res = await api("/api/asistente/crear", { carpeta: asistente.carpeta, reglas, limpiar: asistente.limpiar });
       await api("/api/preferencias", { asistente_visto: true });

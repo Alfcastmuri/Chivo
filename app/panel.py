@@ -143,7 +143,8 @@ def primera_vez():
 
 # Llamadas que pueden tardar: se muestran con barra de progreso y cronómetro en el panel.
 PROCESOS_LARGOS = {"/api/simular": "Simulando", "/api/ejecutar": "Ordenando", "/api/aplanar/simular": "Sacar a la raíz (vista previa)",
-                   "/api/aplanar/ejecutar": "Sacando a la raíz", "/api/espacio": "Analizando espacio",
+                   "/api/aplanar/ejecutar": "Sacando a la raíz",
+                   "/api/reorganizar/simular": "Reorganizar (vista previa)", "/api/reorganizar/ejecutar": "Reorganizando", "/api/espacio": "Analizando espacio",
                    "/api/duplicados/combinar": "Combinando carpetas", "/api/prueba/aprobar": "Aplicando cambios aprobados",
                    "/api/copias/ejecutar": "Copia a USB", "/api/asistente/analizar": "Analizando carpeta",
                    "/api/deshacer": "Deshaciendo", "/api/mantenimiento/respaldar-base": "Respaldando la base de datos", "/api/papelera/vaciar": "Vaciando papelera",
@@ -852,6 +853,18 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta in ("/api/aplanar/simular", "/api/aplanar/ejecutar"):
             opciones = {k: datos[k] for k in ("nombre_con_carpeta", "borrar_vacias", "identicos") if k in datos}
             return nucleo.aplanar(datos.get("carpeta", ""), simular=ruta.endswith("simular"), **opciones)
+        if ruta in ("/api/reorganizar/simular", "/api/reorganizar/ejecutar"):
+            opciones = {k: datos[k] for k in ("esquema", "por_subcarpeta", "borrar_vacias", "limpiar", "identicos")
+                        if k in datos}
+            return nucleo.reorganizar(datos.get("carpeta", ""), simular=ruta.endswith("simular"), **opciones)
+        if ruta == "/api/reorganizar/deshacer":
+            with nucleo.Bloqueo():
+                r = nucleo.deshacer(nucleo.ID_REORGANIZAR)
+                if r.get("ok") and datos.get("carpeta"):
+                    r["carpetas_quitadas"] = nucleo.quitar_carpetas_vacias(r.get("carpetas_destino", []), datos["carpeta"])
+                return r
+        if ruta == "/api/reorganizar/esquemas":
+            return {"esquemas": [{"clave": k, "patron": v[0], "nombre": v[1]} for k, v in nucleo.ESQUEMAS.items()]}
         if ruta == "/api/aplanar/deshacer":
             with nucleo.Bloqueo():
                 return nucleo.deshacer(nucleo.ID_APLANAR)

@@ -1025,6 +1025,15 @@ def _limpiar_nombre(texto):
     return re.sub(r'[<>:"/\\|?*]', "_", texto).strip() or "_"
 
 
+def _primer_nivel(ruta, origen):
+    """La subcarpeta de primer nivel del origen en la que está el archivo ("" si está suelto en el origen)."""
+    try:
+        rel = os.path.relpath(os.path.dirname(ruta), origen)
+    except ValueError:
+        return ""
+    return "" if rel in (".", "") or rel.startswith("..") else rel.split(os.sep)[0]
+
+
 def expandir(patron, ruta, origen, fecha, regla=None):
     nombre = os.path.basename(ruta)
     base, extension = os.path.splitext(nombre)
@@ -1037,6 +1046,7 @@ def expandir(patron, ruta, origen, fecha, regla=None):
         "nombre": base,
         "carpeta_origen": os.path.basename(os.path.normpath(origen)),
         "carpeta_padre": os.path.basename(os.path.dirname(ruta)),
+        "subcarpeta": _primer_nivel(ruta, origen),
         "origen": os.path.normpath(origen),
     }
     if re.search(r"\{(procedencia|camara|sitio)\}", patron):
@@ -1064,6 +1074,8 @@ def expandir(patron, ruta, origen, fecha, regla=None):
             return m.group(0)
         if clave == "origen":
             return valores[clave]
+        if clave == "subcarpeta":
+            return valores[clave]  # ya es el nombre de una carpeta que existe
         return _limpiar_nombre(valores[clave])
 
     return re.sub(r"\{([a-zñ_]+)\}", sustituir, patron)
@@ -1547,6 +1559,78 @@ def aplanar(carpeta, simular=True, **opciones):
     return dict(r, ok=True, subcarpetas=subcarpetas)
 
 
+# --------------------------------------------------------------------------- reorganizar una carpeta ya ordenada
+
+ID_REORGANIZAR = "_reorganizar"
+# clave → (subcarpetas que se crean, nombre para el panel)
+ESQUEMAS = {
+    "tipo": ("{categoria}", "Por tipo"),
+    "tipo_año": ("{categoria}/{año}", "Por tipo y año"),
+    "tipo_año_mes": ("{categoria}/{año}/{mes}", "Por tipo, año y mes"),
+    "año": ("{año}", "Por año"),
+    "año_mes": ("{año}/{mes}", "Por año y mes"),
+    "año_tipo": ("{año}/{categoria}", "Por año y tipo"),
+    "extension": ("{extension}", "Por extensión"),
+    "tipo_extension": ("{categoria}/{extension}", "Por tipo y extensión"),
+    "procedencia": ("{procedencia}", "Por procedencia"),
+}
+
+
+def servicio_reorganizar(carpeta, esquema="tipo", por_subcarpeta=False, borrar_vacias=True,
+                         limpiar=False, identicos="papelera", ignorar=None):
+    """Servicio de un solo uso que vuelve a ordenar una carpeta y todas sus subcarpetas con otro orden.
+
+    por_subcarpeta: cada subcarpeta de primer nivel (un proyecto, un viaje…) se conserva y se ordena por dentro;
+    los archivos sueltos de la carpeta principal no se mueven.
+    """
+    patron = ESQUEMAS.get(esquema, ESQUEMAS["tipo"])[0].replace("/", os.sep)
+    destino = os.path.join("{origen}", "{subcarpeta}", patron) if por_subcarpeta else os.path.join("{origen}", patron)
+    si = {"solo_subcarpetas": True} if por_subcarpeta else {}
+    return {
+        "id": ID_REORGANIZAR, "nombre": f"Reorganizar: {os.path.basename(os.path.normpath(carpeta)) or carpeta}",
+        "activo": False, "origenes": [carpeta], "subcarpetas": True, "conflicto": "renombrar",
+        "identicos": identicos if identicos in ("papelera", "carpeta", "conflicto") else "papelera",
+        "borrar_carpetas_vacias": bool(borrar_vacias), "esperar_minutos": 0, "mover_hermanos": True,
+        "fecha_captura_fotos": True, "carpeta_mantener": "Mantener", "ignorar": list(ignorar or []),
+        "limpiar_nombres": bool(limpiar),
+        "reglas": [{"id": "reorganizar", "si": si, "accion": "mover", "destino": destino,
+                    "fecha": "modificacion", "nuevo_nombre": ""}],
+    }
+
+
+def _resumen_destinos(carpeta, operaciones, maximo=14):
+    """Cuántos archivos quedarían en cada carpeta, relativas a la carpeta elegida, de la más llena a la menos."""
+    cuentas = {}
+    for o in operaciones:
+        if o.get("accion") != "mover" or not o.get("destino"):
+            continue
+        try:
+            rel = os.path.relpath(os.path.dirname(o["destino"]), carpeta)
+        except ValueError:
+            continue
+        clave = "" if rel == "." else rel.replace(os.sep, " › ")
+        c = cuentas.setdefault(clave, {"carpeta": clave, "n": 0, "bytes": 0})
+        c["n"] += 1
+        c["bytes"] += o.get("bytes") or 0
+    lista = sorted(cuentas.values(), key=lambda c: (-c["n"], c["carpeta"]))
+    return lista[:maximo], max(0, len(lista) - maximo)
+
+
+def reorganizar(carpeta, simular=True, **opciones):
+    problema = problema_aplanar(carpeta)
+    if problema:
+        return {"ok": False, "mensaje": problema.replace("sacar a la raíz", "reorganizar")}
+    servicio = servicio_reorganizar(carpeta, **opciones)
+    if simular:
+        r = ejecutar_servicio(servicio, simular=True)
+    else:
+        with Bloqueo():
+            r = ejecutar_servicio(servicio)
+        indexar(servicio, r["operaciones"])
+    resumen, otras = _resumen_destinos(carpeta, r["operaciones"])
+    return dict(r, ok=True, resumen=resumen, otras_carpetas=otras)
+
+
 def _operacion_hermana(principal, ruta, st, servicio, destinos_previstos):
     """El hermano sigue al principal: misma carpeta, mismo nombre nuevo, su propia extensión."""
     if principal.get("duplicado"):
@@ -1946,8 +2030,24 @@ def deshacer(servicio_id, archivo=None):
         registro["deshecho_fecha"] = dt.datetime.now().isoformat(timespec="seconds")
         registro["fallos_deshacer"] = fallos
         escribir_json(ruta, registro)
-        return {"ok": True, "devueltos": devueltos, "fallos": fallos}
+        destinos = sorted({os.path.dirname(op["destino"]) for op in registro["operaciones"]
+                           if op.get("accion") in ("mover", "renombrar") and op.get("destino")})
+        return {"ok": True, "devueltos": devueltos, "fallos": fallos, "carpetas_destino": destinos}
     return {"ok": False, "mensaje": "No hay ninguna ejecución pendiente de deshacer."}
+
+
+def quitar_carpetas_vacias(carpetas, hasta):
+    """Tras deshacer, borra las carpetas que GESTOR creó y quedaron vacías (sin subir más allá de «hasta»)."""
+    borradas, tope = 0, _norm(hasta)
+    for c in sorted(set(carpetas), key=len, reverse=True):
+        while c and _norm(c) != tope and _dentro_de(c, hasta):
+            try:
+                os.rmdir(c)
+                borradas += 1
+            except OSError:
+                break
+            c = os.path.dirname(c)
+    return borradas
 
 
 # --------------------------------------------------------------------------- horarios
@@ -2979,6 +3079,18 @@ _SUGERENCIAS = [
 ]
 
 
+# Cuando solo hay uno: «1 instalador reciente», no «1 instaladores recientes».
+_SUGERENCIAS_UNO = {
+    "whatsapp": "1 foto o vídeo de WhatsApp", "telegram": "1 foto o vídeo de Telegram",
+    "capturas": "1 captura de pantalla", "camara": "1 foto o vídeo de cámara o móvil",
+    "escaner": "1 documento escaneado", "imagenes": "1 imagen más",
+    "documentos": "1 documento, hoja de cálculo o presentación",
+    "instaladores_viejos": "1 instalador de hace más de un mes (ya no suele hacer falta)",
+    "instaladores": "1 instalador reciente", "comprimidos": "1 archivo comprimido", "videos": "1 vídeo",
+    "musica": "1 canción o audio", "viejos": "1 archivo más sin tocar en 6 meses: archivarlo en un ZIP mensual",
+}
+
+
 def analizar_carpeta(carpeta, ahora=None):
     """Cuenta lo que hay en una carpeta y propone reglas, de la más concreta a la más general."""
     ahora = ahora or time.time()
@@ -3018,7 +3130,7 @@ def analizar_carpeta(carpeta, ahora=None):
             regla["destino"] = regla["destino"].replace(k, v)
         if os.sep != "\\":
             regla["destino"] = regla["destino"].replace("\\", os.sep)
-        sugerencias.append({"clave": clave, "texto": texto.format(n=n), "n": n,
+        sugerencias.append({"clave": clave, "texto": _SUGERENCIAS_UNO.get(clave, texto) if n == 1 else texto.format(n=n), "n": n,
                             "bytes": cuentas[clave]["bytes"], "regla": regla})
     return {"total": total, "sugerencias": sugerencias, "copias": copias}
 
