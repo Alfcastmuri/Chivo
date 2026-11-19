@@ -34,7 +34,7 @@ import vencimientos
 PUERTO = int(os.environ.get("GESTOR_PUERTO", "8765"))
 PUERTO_RED = int(os.environ.get("GESTOR_PUERTO_RED", "8770"))  # panel para el celular (lo sirve el residente)
 SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/disco/borrar", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes",
-                 "/api/abrir-archivo", "/api/actualizacion/instalar"}
+                 "/api/abrir-archivo", "/api/actualizacion/instalar", "/api/crear-clave", "/api/clave-al-abrir"}
 TOKEN = secrets.token_urlsafe(24)
 INACTIVIDAD_SEGUNDOS = 5 * 60
 ultima_actividad = time.time()
@@ -51,6 +51,16 @@ candado = threading.Lock()
 
 def hay_clave():
     return os.path.exists(ARCHIVO_CLAVE)
+
+
+def pedir_clave():
+    """Si el panel de esta PC pide la contraseña al abrirse. El del celular la pide siempre.
+
+    Sin el ajuste guardado: la pide solo si ya hay una contraseña (así quien actualiza sigue igual
+    y quien instala por primera vez entra directo)."""
+    ajustes = nucleo.cargar_ajustes()
+    valor = ajustes.get("pedir_clave")
+    return hay_clave() if valor is None else bool(valor) and hay_clave()
 
 
 def _derivar(clave, sal, iteraciones):
@@ -339,10 +349,12 @@ class Manejador(BaseHTTPRequestHandler):
         host = (self.headers.get("Host") or "").split(":")[0]
         return host in ("127.0.0.1", "localhost")
 
-    def _responder(self, codigo, cuerpo, tipo="application/json; charset=utf-8"):
+    def _responder(self, codigo, cuerpo, tipo="application/json; charset=utf-8", cookie=None):
         datos = cuerpo if isinstance(cuerpo, bytes) else json.dumps(cuerpo, ensure_ascii=False).encode("utf-8")
         self.send_response(codigo)
         self.send_header("Content-Type", tipo)
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
         self.send_header("Content-Length", str(len(datos)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -359,13 +371,18 @@ class Manejador(BaseHTTPRequestHandler):
         ultima_actividad = time.time()
         ruta = urlparse(self.path).path
         if ruta in ("/", "/index.html"):
-            if not self._sesion_valida():
+            nueva_sesion = None
+            if not self._sesion_valida() and not self.en_red and not pedir_clave():
+                nueva_sesion = secrets.token_urlsafe(32)  # sin contraseña: se entra directo
+                SESIONES.add(nueva_sesion)
+            if not self._sesion_valida() and not nueva_sesion:
                 with open(os.path.join(nucleo.BASE, "login.html"), "rb") as f:
                     html = f.read().replace(b"__MODO__", b"entrar" if hay_clave() else b"crear")
                 return self._responder(200, idioma.inyectar(html), "text/html; charset=utf-8")
             with open(os.path.join(nucleo.BASE, "panel.html"), "rb") as f:
                 html = f.read().replace(b"__TOKEN__", TOKEN.encode())
-            return self._responder(200, idioma.inyectar(html), "text/html; charset=utf-8")
+            cookie = f"gestor_sesion={nueva_sesion}; HttpOnly; SameSite=Strict; Path=/" if nueva_sesion else None
+            return self._responder(200, idioma.inyectar(html), "text/html; charset=utf-8", cookie)
         return self._responder(404, {"error": "No encontrado"})
 
     def _sesion_valida(self):
@@ -414,7 +431,7 @@ class Manejador(BaseHTTPRequestHandler):
             return self._login(ruta)
         if not self._host_valido() or self.headers.get("X-Gestor-Token") != TOKEN:
             return self._responder(403, {"error": "Acceso no permitido"})
-        if not self._sesion_valida():
+        if not self._sesion_valida() and (self.en_red or pedir_clave()):
             return self._responder(401, {"error": "Sesión caducada: vuelve a entrar."})
         if self.en_red and ruta in SOLO_EN_EL_PC:
             return self._responder(403, {"error": "Esto solo se puede hacer desde el PC."})
@@ -437,7 +454,7 @@ class Manejador(BaseHTTPRequestHandler):
                     "programacion": nucleo.estado_programacion(), "windows": nucleo.ES_WINDOWS,
                     "residente": nucleo.residente_activo(), "primera_vez": primera_vez(),
                     "version": nucleo.VERSION, "discos": nucleo.unidades_fijas(), "aprendido": len(aprendizaje.propuestas()),
-                    "en_red": self.en_red}
+                    "en_red": self.en_red, "hay_clave": hay_clave(), "pedir_clave": pedir_clave()}
         if ruta == "/api/latido":
             return {"ok": True}
         if ruta == "/api/servicios":
@@ -509,6 +526,32 @@ class Manejador(BaseHTTPRequestHandler):
                 return {"ok": False, "mensaje": f"Usa al menos {LARGO_MINIMO} caracteres."}
             guardar_clave(nueva)
             return {"ok": True, "mensaje": "Contraseña cambiada."}
+        if ruta == "/api/crear-clave":
+            if hay_clave():
+                return {"ok": False, "mensaje": "Ya hay una contraseña: usa Cambiar."}
+            nueva = str(datos.get("nueva", ""))
+            if len(nueva) < LARGO_MINIMO:
+                return {"ok": False, "mensaje": f"Usa al menos {LARGO_MINIMO} caracteres."}
+            guardar_clave(nueva)
+            ajustes = nucleo.cargar_ajustes()
+            ajustes["pedir_clave"] = bool(datos.get("activar"))  # crearla para el celular no obliga a usarla aquí
+            nucleo.guardar_ajustes(ajustes)
+            return {"ok": True, "hay_clave": True, "pedir_clave": pedir_clave(),
+                    "mensaje": "Contraseña creada. GESTOR la pedirá al abrirse." if ajustes["pedir_clave"] else "Contraseña creada."}
+        if ruta == "/api/clave-al-abrir":
+            activar = bool(datos.get("activar"))
+            if activar and not hay_clave():
+                return {"ok": False, "mensaje": "Primero crea una contraseña."}
+            if not activar and hay_clave():
+                ok, mensaje = comprobar_con_espera(str(datos.get("actual", "")))
+                if not ok:
+                    return {"ok": False, "mensaje": mensaje}
+            ajustes = nucleo.cargar_ajustes()
+            ajustes["pedir_clave"] = activar
+            nucleo.guardar_ajustes(ajustes)
+            return {"ok": True, "pedir_clave": pedir_clave(), "hay_clave": hay_clave(),
+                    "mensaje": "GESTOR pedirá la contraseña al abrirse." if activar
+                    else "Listo: GESTOR se abrirá sin contraseña en esta PC."}
         if ruta == "/api/salir":
             cookie = SimpleCookie(self.headers.get("Cookie") or "")
             SESIONES.discard(cookie["gestor_sesion"].value)

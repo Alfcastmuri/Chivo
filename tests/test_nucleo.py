@@ -1070,6 +1070,47 @@ class PruebaPanelCelularSeguro(unittest.TestCase):
             servidor.server_close()
 
 
+class PruebaContrasenaOpcional(unittest.TestCase):
+    """En esta PC la contraseña es opcional; el panel del celular la pide siempre."""
+
+    def setUp(self):
+        import panel
+        self.panel = panel
+        self.ajustes = nucleo.cargar_ajustes()
+        self.habia = panel.hay_clave()
+        if self.habia:
+            with open(panel.ARCHIVO_CLAVE, "rb") as f:
+                self.copia = f.read()
+            os.remove(panel.ARCHIVO_CLAVE)
+
+    def tearDown(self):
+        nucleo.guardar_ajustes(self.ajustes)
+        if os.path.exists(self.panel.ARCHIVO_CLAVE):
+            os.remove(self.panel.ARCHIVO_CLAVE)
+        if self.habia:
+            with open(self.panel.ARCHIVO_CLAVE, "wb") as f:
+                f.write(self.copia)
+
+    def _con(self, **cambios):
+        a = nucleo.cargar_ajustes()
+        a.pop("pedir_clave", None)
+        a.update(cambios)
+        nucleo.guardar_ajustes(a)
+
+    def test_reglas(self):
+        p = self.panel
+        self._con()
+        self.assertFalse(p.pedir_clave())                 # instalación nueva: entra directo
+        p.guardar_clave("clave-de-prueba-123")
+        self.assertTrue(p.pedir_clave())                  # quien ya tenía contraseña la sigue usando
+        self._con(pedir_clave=False)
+        self.assertFalse(p.pedir_clave())                 # la quitó en Ajustes
+        self._con(pedir_clave=True)
+        self.assertTrue(p.pedir_clave())
+        os.remove(p.ARCHIVO_CLAVE)
+        self.assertFalse(p.pedir_clave())                 # sin contraseña no se puede pedir
+
+
 class PruebaIdiomas(unittest.TestCase):
     """Traducción de la interfaz: diccionarios completos y plantillas con valores."""
 

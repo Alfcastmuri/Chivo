@@ -671,7 +671,7 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
       <button type="button" data-tab="inteligencia">Inteligencia</button><button type="button" data-tab="celular">Celular</button>
       <button type="button" data-tab="datos">Datos</button></div>
     <div data-pest="ajustes:general" class="on">
-    <div class="tarjeta-op"><h4>Funcionamiento</h4>
+    <div class="tarjeta-op" style="grid-row: span 2"><h4>Funcionamiento</h4>
     <div class="fila"><label><input type="checkbox" id="prefIcono"> Mostrar el icono junto al reloj</label></div>
     <div class="fila"><label><input type="checkbox" id="prefVentana"> Abrir el panel en su propia ventana (si no, en el navegador)</label></div>
     <div class="fila"><label><input type="checkbox" id="prefNotif"> Notificaciones de Windows al ordenar</label></div>
@@ -685,6 +685,16 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
     <div class="fila"><label title="Si mueves a mano archivos a una carpeta de Documentos, GESTOR te propone una regla"><input type="checkbox" id="prefAprender"> Aprender de lo que muevo a mano</label>
       <label><input type="checkbox" id="prefVence"> Avisarme de vencimientos</label>
       <label title="2026-10 CFE $1,234.50.pdf"><input type="checkbox" id="prefRenFact"> Renombrar facturas con fecha, proveedor y total</label></div>
+    </div>
+    <div class="tarjeta-op"><h4>Contraseña</h4>
+    <div class="fila"><label><input type="checkbox" id="prefClave"> Pedir contraseña al abrir GESTOR</label></div>
+    <p class="ayuda" id="clAyuda"></p>
+    <div class="fila" id="clFila">
+      <input type="password" id="clActual" placeholder="Contraseña actual" autocomplete="current-password" style="flex:1;min-width:120px">
+      <input type="password" id="clNueva" placeholder="Nueva (mín. 6)" autocomplete="new-password" style="flex:1;min-width:120px">
+      <input type="password" id="clRepetir" placeholder="Repite la nueva" autocomplete="new-password" style="flex:1;min-width:120px">
+      <button id="clCambiar">Cambiar</button>
+    </div>
     </div>
     <div class="tarjeta-op"><h4>Encendido</h4>
     <div class="fila"><button class="peligro" id="btnDetener">Detener GESTOR por completo</button>
@@ -744,13 +754,6 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
       <button id="btnExportar">Exportar servicios y ajustes</button>
       <label class="chip" style="cursor:pointer">Importar… <input type="file" id="archivoImportar" accept=".json" hidden></label>
       <label><input type="checkbox" id="importarReemplazar"> Reemplazar los actuales al importar</label>
-    </div>
-    </div>
-    <div class="tarjeta-op"><h4>Contraseña del panel</h4>
-    <div class="fila">
-      <input type="password" id="clActual" placeholder="Contraseña actual" autocomplete="current-password" style="flex:1;min-width:140px">
-      <input type="password" id="clNueva" placeholder="Nueva (mín. 6)" autocomplete="new-password" style="flex:1;min-width:140px">
-      <button id="clCambiar">Cambiar</button>
     </div>
     </div>
     </div>
@@ -1365,11 +1368,47 @@ $("#ajGuardar").onclick = async () => {
 $("#ajQuitar").onclick = async () => {
   const res = await api("/api/quitar-programacion"); datos.programacion = res.programacion; pintarProgramacion(); aviso(res.mensaje);
 };
+// Contraseña opcional: en esta PC se puede abrir sin ella; el panel del celular la pide siempre.
+let clPendiente = null;  // "activar" o "quitar": el interruptor espera a que escribas la contraseña
+function pintarClave() {
+  const hay = !!datos.hay_clave, pide = !!datos.pedir_clave;
+  $("#prefClave").checked = clPendiente === "activar" || (pide && clPendiente !== "quitar");
+  $("#btnSalir").hidden = !pide;
+  $("#clActual").hidden = !hay || clPendiente === "activar";
+  $("#clNueva").hidden = $("#clRepetir").hidden = clPendiente === "quitar";
+  $("#clRepetir").hidden = $("#clRepetir").hidden || hay;
+  $("#clCambiar").textContent = clPendiente === "quitar" ? "Quitar contraseña"
+    : clPendiente === "activar" && !hay ? "Crear y activar" : hay ? "Cambiar" : "Crear contraseña";
+  $("#clAyuda").textContent = clPendiente === "quitar" ? "Escribe tu contraseña actual para dejar de pedirla."
+    : clPendiente === "activar" && !hay ? "Crea una contraseña de al menos 6 letras o números."
+    : pide ? "GESTOR te la pide cada vez que lo abres. El panel del celular también la usa."
+    : hay ? "GESTOR se abre directo en esta PC. La contraseña solo se usa en el panel del celular."
+    : "GESTOR se abre directo en esta PC. Si alguien más usa tu cuenta de Windows, actívala.";
+}
+function limpiarClave() { ["#clActual", "#clNueva", "#clRepetir"].forEach(s => $(s).value = ""); }
+$("#prefClave").onchange = async e => {
+  if (!e.target.checked && datos.pedir_clave) { clPendiente = "quitar"; pintarClave(); $("#clActual").focus(); return; }
+  if (e.target.checked && !datos.hay_clave) { clPendiente = "activar"; pintarClave(); $("#clNueva").focus(); return; }
+  clPendiente = null;
+  const res = await api("/api/clave-al-abrir", { activar: e.target.checked }).catch(err => ({ mensaje: err.message }));
+  if (res.ok) { datos.pedir_clave = res.pedir_clave; datos.hay_clave = res.hay_clave; }
+  aviso(res.mensaje); pintarClave();
+};
 $("#clCambiar").onclick = async () => {
   try {
-    const res = await api("/api/cambiar-clave", { actual: $("#clActual").value, nueva: $("#clNueva").value });
+    let res;
+    if (clPendiente === "quitar") res = await api("/api/clave-al-abrir", { activar: false, actual: $("#clActual").value });
+    else if (!datos.hay_clave) {
+      if ($("#clNueva").value !== $("#clRepetir").value) { aviso("Las dos contraseñas no coinciden."); return; }
+      res = await api("/api/crear-clave", { nueva: $("#clNueva").value, activar: clPendiente === "activar" });
+    } else res = await api("/api/cambiar-clave", { actual: $("#clActual").value, nueva: $("#clNueva").value });
     aviso(res.mensaje);
-    if (res.ok) { $("#clActual").value = ""; $("#clNueva").value = ""; }
+    if (res.ok) {
+      if ("hay_clave" in res) datos.hay_clave = res.hay_clave;
+      if ("pedir_clave" in res) datos.pedir_clave = res.pedir_clave;
+      clPendiente = null; limpiarClave();
+    }
+    pintarClave();
   } catch (e) { aviso("Error: " + e.message); }
 };
 $("#btnSalir").onclick = async () => {
@@ -2290,6 +2329,7 @@ function pintarPreferencias() {
   $("#prefVence").checked = a.vencimientos !== false;
   $("#prefRenFact").checked = a.renombrar_facturas !== false;
   $("#prefRed").checked = !!a.acceso_red;
+  clPendiente = null; limpiarClave(); pintarClave();
   $("#prefSemanal").checked = a.aviso_semanal !== false;
   $("#prefUmbral").value = a.umbral_disco ?? 10;
   $("#prefRfc").value = a.mis_rfc || "";
@@ -2327,7 +2367,7 @@ $("#prefPagos").onchange = e => guardarPreferencias({ pagos: e.target.checked })
 $("#prefActu").onchange = e => guardarPreferencias({ buscar_actualizaciones: e.target.checked });
 $("#prefRed").onchange = async e => {
   const r0 = await api("/api/red");
-  if (e.target.checked && !r0.hay_clave) { e.target.checked = false; aviso("Primero crea una contraseña."); return; }
+  if (e.target.checked && !r0.hay_clave) { e.target.checked = false; aviso("Primero crea una contraseña en Ajustes › General."); return; }
   await guardarPreferencias({ acceso_red: e.target.checked }); pintarRed();
 };
 async function pintarRed() {
