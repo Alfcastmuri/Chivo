@@ -13,6 +13,7 @@ que era lo que pasaba con los .json cuando Windows o el antivirus los tenían ab
 
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -20,6 +21,7 @@ import unicodedata
 
 _hilo = threading.local()
 _ruta = None
+_preparada = {}
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS datos (clave TEXT PRIMARY KEY, valor TEXT NOT NULL, t REAL);
@@ -54,12 +56,21 @@ def con():
     if c is None or getattr(_hilo, "ruta", None) != _ruta:
         c = sqlite3.connect(_ruta, timeout=60, isolation_level=None, check_same_thread=False)
         c.execute("PRAGMA busy_timeout=60000")
-        try:
-            c.execute("PRAGMA journal_mode=WAL")
-        except sqlite3.OperationalError:
-            pass
+        if not _preparada.get(_ruta):
+            # Solo la primera conexión de cada proceso: cambiar el modo y crear tablas necesita la base
+            # entera para sí, y hacerlo en cada conexión (una por cada petición del panel) la bloqueaba.
+            for intento in range(20):
+                try:
+                    if c.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal":
+                        c.execute("PRAGMA journal_mode=WAL")
+                    tablas = {f[0] for f in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                    if not set(re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)", ESQUEMA)) <= tablas:
+                        c.executescript(ESQUEMA)
+                    break
+                except sqlite3.OperationalError:
+                    time.sleep(0.5)
+            _preparada[_ruta] = True
         c.execute("PRAGMA synchronous=NORMAL")
-        c.executescript(ESQUEMA)
         _hilo.c, _hilo.ruta = c, _ruta
     return c
 
@@ -69,11 +80,22 @@ class transaccion:
 
     def __enter__(self):
         self.c = con()
+        if self.c.in_transaction:          # una transacción que quedó abierta por un error anterior
+            self.c.execute("ROLLBACK")
         self.c.execute("BEGIN IMMEDIATE")
         return self.c
 
     def __exit__(self, tipo, *_):
-        self.c.execute("ROLLBACK" if tipo else "COMMIT")
+        if tipo:
+            self.c.execute("ROLLBACK")
+            return
+        try:
+            self.c.execute("COMMIT")
+        except sqlite3.OperationalError:
+            # Nunca dejar la transacción abierta: bloquearía la base para el panel, el motor y el icono.
+            if self.c.in_transaction:
+                self.c.execute("ROLLBACK")
+            raise
 
 
 # --------------------------------------------------------------------------- datos (clave → JSON)

@@ -1402,6 +1402,19 @@ def limpiar_nombre(base, fecha=None):
 
 # --------------------------------------------------------------------------- ejecutar un servicio
 
+def _origenes_de_otros(servicio):
+    """Carpetas de los demás servicios activos (para repartir por jerarquía). Las acciones de un solo uso
+    del panel (reorganizar, sacar a la raíz…) no se reparten: actúan sobre lo que eliges."""
+    if str(servicio.get("id", "")).startswith("_"):
+        return []
+    try:
+        servicios = cargar_servicios()
+    except Exception:
+        return []
+    return [o for x in servicios if x.get("activo") and x.get("id") != servicio.get("id")
+            for o in x.get("origenes", []) if o]
+
+
 def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
     """Lista de operaciones que haría el servicio, sin tocar nada.
 
@@ -1417,6 +1430,7 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
     reglas = servicio.get("reglas", [])
     plan, avisos = [], []
     destinos_previstos = _Previstos()
+    ajenos = _origenes_de_otros(servicio)
 
     for origen in servicio.get("origenes", []):
         permitida, aviso = revisar_carpeta(origen)
@@ -1432,6 +1446,8 @@ def planificar(servicio, ahora=None, esperar_segundos=None, ya_hechos=None):
         if servicio.get("identicos") == "carpeta":
             excluir.append(_norm(_raiz_fija((servicio.get("carpeta_duplicados") or os.path.join(
                 "{origen}", "Duplicados")).replace("{origen}", origen))))
+        # Jerarquía: si otro servicio activo se encarga de una subcarpeta, esa subcarpeta es suya y aquí no se toca.
+        excluir += [_norm(o) for o in ajenos if _dentro_de(o, origen)]
         excluir = [e for e in excluir if e != _norm(origen)]
         mantener = (servicio.get("carpeta_mantener") or "Mantener").strip().lower()
         for carpeta, subcarpetas, archivos in os.walk(origen):
@@ -1908,7 +1924,7 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
     plan, avisos = planificar(servicio, esperar_segundos=esperar_segundos, ya_hechos=ya_hechos)
     if simular:
         return {"simulado": True, "operaciones": plan, "avisos": avisos}
-    hechas, errores, retenidos = [], [], []
+    hechas, errores, retenidos, omitidos = [], [], [], []
     avance(hechos=0, total=len(plan), etapa="Moviendo archivos")
     for op in plan:
         avance(sumar=1)
@@ -1920,12 +1936,21 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
         try:
             aplicar(op)
             hechas.append(op)
-        except Exception as e:  # archivo en uso, sin permisos, ruta demasiado larga...
+        except (FileNotFoundError, PermissionError) as e:
+            # Abierto en otro programa, ya no está o sin permiso: se deja para la próxima vez, sin contarlo como error.
+            omitidos.append(dict(op, error=str(e)))
+        except OSError as e:
+            if getattr(e, "winerror", None) in (32, 33, 5, 2, 3):   # en uso, bloqueado, acceso denegado, no existe
+                omitidos.append(dict(op, error=str(e)))
+            else:
+                errores.append(dict(op, error=str(e)))
+        except Exception as e:  # ruta demasiado larga, disco lleno...
             errores.append(dict(op, error=str(e)))
     registro = {
         "servicio": servicio["id"], "nombre": servicio.get("nombre", ""),
         "fecha": dt.datetime.now().isoformat(timespec="seconds"),
         "operaciones": hechas, "errores": errores, "avisos": avisos, "deshecho": False,
+        "omitidos": len(omitidos),
     }
     if retenidos:
         avisar("Papelera inteligente", f"No envié a la papelera {len(retenidos)} archivo(s) que usaste hace poco o que "
@@ -2156,6 +2181,30 @@ def proxima_ejecucion(servicio, estado_servicio, ahora=None):
 
 # --------------------------------------------------------------------------- bloqueo
 
+def pid_vivo(pid):
+    """¿Sigue en marcha el proceso con ese número?"""
+    if not pid or pid <= 0:
+        return False
+    if ES_WINDOWS:
+        import ctypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return ctypes.GetLastError() == 5      # acceso denegado: existe, pero es de otro usuario
+        try:
+            codigo = ctypes.c_ulong()
+            return not (k.GetExitCodeProcess(h, ctypes.byref(codigo)) and codigo.value != 259)  # 259 = sigue activo
+        finally:
+            k.CloseHandle(h)
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+
+
 class Bloqueo:
     """Evita que el motor y el panel ordenen archivos a la vez."""
 
@@ -2168,7 +2217,15 @@ class Bloqueo:
                 return self
             except FileExistsError:
                 try:
-                    if time.time() - os.path.getmtime(ARCHIVO_BLOQUEO) > 7200:
+                    with open(ARCHIVO_BLOQUEO, encoding="utf-8") as f:
+                        dueno = int(f.read().strip() or 0)
+                except (OSError, ValueError):
+                    dueno = 0
+                try:
+                    # Si GESTOR se cerró a la fuerza (o se actualizó) a media ejecución, el bloqueo se queda
+                    # huérfano: se quita en cuanto se ve que su proceso ya no existe, sin esperar horas.
+                    if (dueno and dueno != os.getpid() and not pid_vivo(dueno)) or \
+                            time.time() - os.path.getmtime(ARCHIVO_BLOQUEO) > 7200:
                         os.remove(ARCHIVO_BLOQUEO)
                         continue
                 except OSError:
@@ -2250,6 +2307,8 @@ def procesos():
     for k, p in bd.leer_grupo("proceso").items():
         if p.get("fin") and ahora - p["fin"] > 60 or not p.get("fin") and ahora - p.get("inicio", 0) > 12 * 3600:
             viejos.append(k)
+        elif not p.get("fin") and p.get("pid") and p["pid"] != os.getpid() and not pid_vivo(p["pid"]):
+            viejos.append(k)       # el proceso que lo hacía se cerró sin terminar
         else:
             salida.append(p)
     try:
@@ -3393,6 +3452,7 @@ def _comando_motor(extra=""):
 
 
 def programar_motor(minutos):
+    _PROGRAMACION.clear()
     """Crea (o actualiza) la tarea que lanza el motor cada N minutos, y el arranque al iniciar sesión."""
     if ES_TIENDA:
         # Dentro de un paquete MSIX la ruta del .exe cambia con cada actualización y la carpeta Inicio no se
@@ -3419,18 +3479,26 @@ def programar_motor(minutos):
     return {"ok": True, "mensaje": f"El motor se revisará cada {int(minutos)} minutos."}
 
 
+_PROGRAMACION = {}
+
+
 def estado_programacion():
     if ES_TIENDA:
         return {"instalada": bool(cargar_ajustes().get("motor_automatico", True)), "tienda": True}
     if not ES_WINDOWS:
         return {"instalada": False, "mensaje": "Solo disponible en Windows."}
+    # schtasks tarda casi un segundo y el panel lo pregunta a menudo: se recuerda medio minuto.
+    if time.time() - _PROGRAMACION.get("t", 0) < 30:
+        return {"instalada": _PROGRAMACION["instalada"]}
     import subprocess
     r = subprocess.run(["schtasks", "/Query", "/TN", NOMBRE_TAREA], capture_output=True,
                        text=True, creationflags=0x08000000)
+    _PROGRAMACION.update(t=time.time(), instalada=r.returncode == 0)
     return {"instalada": r.returncode == 0}
 
 
 def quitar_programacion():
+    _PROGRAMACION.clear()
     if ES_TIENDA:
         ajustes = cargar_ajustes()
         ajustes["motor_automatico"] = False

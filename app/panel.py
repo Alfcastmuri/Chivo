@@ -100,14 +100,8 @@ def dialogo_carpeta(salida, inicial=""):
 
     El resultado se escribe en un archivo porque el .exe sin consola no tiene salida estándar.
     """
-    import tkinter as tk
-    from tkinter import filedialog
-    raiz = tk.Tk()
-    raiz.withdraw()
-    raiz.attributes("-topmost", True)
-    ruta = filedialog.askdirectory(title="Elige una carpeta para GESTOR",
-                                   initialdir=inicial or None, mustexist=True)
-    raiz.destroy()
+    import selector_carpeta
+    ruta = selector_carpeta.elegir(idioma.t("Elige una carpeta para GESTOR"), inicial)
     with open(salida, "w", encoding="utf-8") as f:
         f.write(ruta or "")
 

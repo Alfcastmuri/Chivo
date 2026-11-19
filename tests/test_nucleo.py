@@ -1233,3 +1233,34 @@ class PruebaDevolverMovimiento(unittest.TestCase):
             f.write("x")
         self.assertEqual(nucleo.quitar_carpetas_vacias([hondo], raiz), 2)
         self.assertTrue(os.path.isdir(os.path.join(raiz, "A")))
+
+
+class PruebaJerarquia(PruebaServicio):
+    """Si otro servicio activo se encarga de una subcarpeta, el de la carpeta de arriba no la toca."""
+
+    def test_la_subcarpeta_de_otro_servicio_no_se_toca(self):
+        sub = os.path.join(self.origen, "Facturas")
+        os.makedirs(sub)
+        for ruta in (os.path.join(self.origen, "a.pdf"), os.path.join(sub, "b.pdf")):
+            with open(ruta, "w") as f:
+                f.write("x")
+        arriba = self.servicio([{"si": {}, "accion": "mover", "destino": self.destino}], subcarpetas=True)
+        abajo = dict(self.servicio([{"si": {}, "accion": "mover", "destino": self.destino}]),
+                     id="abajo", origenes=[sub])
+        nucleo.guardar_servicios([arriba, abajo])
+        plan, _ = nucleo.planificar(arriba, esperar_segundos=0)
+        self.assertEqual([os.path.basename(o["origen"]) for o in plan], ["a.pdf"])
+        nucleo.guardar_servicios([arriba, dict(abajo, activo=False)])
+        plan, _ = nucleo.planificar(arriba, esperar_segundos=0)
+        self.assertEqual(sorted(os.path.basename(o["origen"]) for o in plan), ["a.pdf", "b.pdf"])
+
+
+class PruebaBloqueoHuerfano(unittest.TestCase):
+    def test_se_quita_si_su_proceso_ya_no_existe(self):
+        with open(nucleo.ARCHIVO_BLOQUEO, "w") as f:
+            f.write("999999")                      # un proceso que no existe
+        inicio = time.time()
+        with nucleo.Bloqueo():
+            pass
+        self.assertLess(time.time() - inicio, 3)
+        self.assertFalse(os.path.exists(nucleo.ARCHIVO_BLOQUEO))
