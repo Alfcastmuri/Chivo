@@ -1158,3 +1158,78 @@ class PruebaIdiomas(unittest.TestCase):
         self.assertEqual(self.idioma.guardar_eleccion("fr"), "fr")
         self.assertEqual(self.idioma.eleccion(), "fr")
         self.assertEqual(self.idioma.guardar_eleccion("klingon"), "auto")
+
+
+class PruebaReorganizar(unittest.TestCase):
+    """Volver a ordenar una carpeta que ya tenía subcarpetas, con otro orden, y poder deshacerlo."""
+
+    def setUp(self):
+        self.raiz = tempfile.mkdtemp()
+        viejo = time.time() - 3 * 86400
+        for rel in ["Viejo/a.jpg", "Viejo/Sub/b.pdf", "c.txt", "Mantener/d.jpg", "Proyecto/e.jpg"]:
+            ruta = os.path.join(self.raiz, *rel.split("/"))
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            with open(ruta, "w") as f:
+                f.write(rel)
+            os.utime(ruta, (viejo, viejo))
+        self.año = str(dt.datetime.fromtimestamp(viejo).year)
+
+    def _existe(self, *partes):
+        return os.path.exists(os.path.join(self.raiz, *partes))
+
+    def test_simular_no_mueve_nada(self):
+        r = nucleo.reorganizar(self.raiz, simular=True, esquema="año")
+        self.assertTrue(r["ok"])
+        self.assertTrue(self._existe("Viejo", "a.jpg"))
+        self.assertTrue(r["resumen"])
+        self.assertEqual(r["resumen"][0]["carpeta"], self.año)
+
+    def test_por_año_mueve_subcarpetas_y_respeta_mantener(self):
+        r = nucleo.reorganizar(self.raiz, simular=False, esquema="año")
+        self.assertTrue(r["ok"])
+        for n in ["a.jpg", "b.pdf", "c.txt", "e.jpg"]:
+            self.assertTrue(self._existe(self.año, n), n)
+        self.assertTrue(self._existe("Mantener", "d.jpg"))
+        self.assertFalse(self._existe("Viejo"))            # quedó vacía y se quitó
+
+        d = nucleo.deshacer(nucleo.ID_REORGANIZAR)
+        self.assertTrue(d["ok"])
+        nucleo.quitar_carpetas_vacias(d["carpetas_destino"], self.raiz)
+        self.assertTrue(self._existe("Viejo", "Sub", "b.pdf"))
+        self.assertTrue(self._existe("c.txt"))
+        self.assertFalse(self._existe(self.año))            # la carpeta que creó GESTOR ya no está
+
+    def test_por_subcarpeta_conserva_proyectos(self):
+        r = nucleo.reorganizar(self.raiz, simular=False, esquema="extension", por_subcarpeta=True)
+        self.assertTrue(r["ok"])
+        self.assertTrue(self._existe("c.txt"))              # lo suelto de la raíz no se toca
+        self.assertTrue(any(self._existe("Proyecto", d, "e.jpg") for d in os.listdir(os.path.join(self.raiz, "Proyecto"))))
+        self.assertTrue(any(self._existe("Viejo", d, "b.pdf") for d in os.listdir(os.path.join(self.raiz, "Viejo"))))
+
+    def test_no_deja_reorganizar_una_carpeta_del_sistema(self):
+        r = nucleo.reorganizar(os.path.splitdrive(self.raiz)[0] + os.sep, simular=True)
+        self.assertFalse(r["ok"])
+
+
+class PruebaDevolverMovimiento(unittest.TestCase):
+    def test_devuelve_un_archivo_del_diario(self):
+        raiz = tempfile.mkdtemp()
+        origen, destino = os.path.join(raiz, "x.txt"), os.path.join(raiz, "Docs", "x.txt")
+        os.makedirs(os.path.dirname(destino))
+        with open(destino, "w") as f:
+            f.write("x")
+        nucleo.indexar({"id": "prueba_dev", "nombre": "Prueba"},
+                       [{"accion": "mover", "origen": origen, "destino": destino, "bytes": 1, "categoria": "Documentos"}])
+        self.assertTrue(nucleo.devolver_movimiento(origen, destino)["ok"])
+        self.assertTrue(os.path.exists(origen))
+        self.assertFalse(nucleo.devolver_movimiento(origen, destino)["ok"])   # ya no está donde lo dejó
+        self.assertFalse(nucleo.devolver_movimiento(origen, os.path.join(raiz, "otro.txt"))["ok"])
+
+    def test_quitar_carpetas_vacias_no_sube_de_mas(self):
+        raiz = tempfile.mkdtemp()
+        hondo = os.path.join(raiz, "A", "B", "C")
+        os.makedirs(hondo)
+        with open(os.path.join(raiz, "A", "lleno.txt"), "w") as f:
+            f.write("x")
+        self.assertEqual(nucleo.quitar_carpetas_vacias([hondo], raiz), 2)
+        self.assertTrue(os.path.isdir(os.path.join(raiz, "A")))

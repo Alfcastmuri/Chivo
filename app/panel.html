@@ -622,15 +622,45 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
 .arbol-raiz { font-weight: 700; padding: 4px 10px 6px; }
 .arbol-fila { display: grid; grid-template-columns: 1fr auto 70px; gap: 12px; align-items: center; padding: 5px 10px 5px 28px; border-top: 1px solid color-mix(in srgb, var(--texto) 7%, transparent); }
 .arbol-fila .ayuda { text-align: right; }
+
+/* Inicio: invitación en vez de ceros, diario y reseña */
+.panelito.invita { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.diario .dia-diario { font-weight: 700; font-size: 12px; text-transform: capitalize; color: var(--texto-suave, inherit); opacity: .75; margin: 10px 0 2px; }
+.diario .lista-diario { max-height: calc(100vh - 250px); overflow-y: auto; padding-right: 4px; }
+.diario .hora-diario { font-variant-numeric: tabular-nums; opacity: .6; min-width: 44px; }
+.banda.resena { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 2px 12px; border-radius: 12px; }
+.banda.resena span { flex: 1; min-width: 220px; }
+
+/* Bienvenida */
+.modal.bienvenida { background: color-mix(in srgb, var(--fondo, #f4f5f7) 70%, rgba(0,0,0,.35)); backdrop-filter: blur(6px); }
+.modal.bienvenida .caja { max-width: 640px; padding: 34px 36px 26px; text-align: center; border-radius: 22px; overflow: visible; }
+.bv-pasos { display: flex; gap: 6px; justify-content: center; margin-bottom: 18px; }
+.bv-pasos span { width: 28px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--texto) 15%, transparent); }
+.bv-pasos span.on { background: var(--acento); }
+.bv-hola { font-size: 46px; line-height: 1; margin-bottom: 8px; }
+.bienvenida h2 { font-size: 26px; margin: 4px 0 8px; }
+.bv-lead { font-size: 15px; opacity: .8; margin: 0 auto 18px; max-width: 460px; }
+.bv-puntos { list-style: none; padding: 0; margin: 0 auto 22px; max-width: 440px; text-align: left; display: grid; gap: 10px; }
+.bv-puntos li { padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--acento) 8%, transparent); }
+.bv-botones { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; margin: 6px 0 8px; }
+.bv-botones .grande { padding: 12px 26px; font-size: 15px; }
+.bv-carpetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.bv-carpeta { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 10px; border-radius: 16px; }
+.bv-carpeta .bv-ico { font-size: 30px; }
+.bv-carpeta:hover { outline: 2px solid var(--acento); }
+.bv-previa { text-align: left; display: grid; gap: 8px; margin: 0 0 16px; max-height: 46vh; overflow: auto; }
+.bv-fila { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--texto) 4%, transparent); }
+.bv-fila .ayuda { display: block; }
+.bv-n { font-weight: 700; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body class="en-inicio ajustada">
 <header>
   <h1>GESTOR <span class="ayuda" id="version" style="font-weight:400"></span></h1>
   <span class="espacio"></span>
-  <span class="estado" id="estadoProg"></span>
+  <span class="estado" id="estadoProg" style="display:none"></span>
   <button id="btnCuaderno" title="Modo cuaderno: el panel como una libreta de papel">📓 <span>Cuaderno</span></button>
-  <button id="btnPausaTodo" title="Pausa o reanuda todos los servicios automáticos">⏸ Pausar todo</button>
+  <button id="btnPausaTodo" style="display:none" title="Pausa o reanuda todos los servicios automáticos">⏸ Pausar todo</button>
   <details class="mas"><summary title="Más">⋯</summary><div class="caja">
     <button id="btnSalir">Cerrar sesión</button><button id="btnCerrar">Cerrar panel</button></div></details>
 </header>
@@ -669,6 +699,7 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
 </div>
 </div>
 
+<div class="modal bienvenida" id="bienvenida"><div class="caja" id="bvCaja"></div></div>
 <div class="modal" id="modalAjustes">
   <div class="caja">
     <div class="cab-modal"><h2>Ajustes</h2><button id="ajCerrarX" title="Cerrar">✕</button></div>
@@ -678,6 +709,7 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
       <button type="button" data-tab="datos">Datos</button></div>
     <div data-pest="ajustes:general" class="on">
     <div class="tarjeta-op" style="grid-row: span 2"><h4>Funcionamiento</h4>
+    <div class="fila"><label>Idioma <span id="lugarIdioma"></span></label></div>
     <div class="fila"><label><input type="checkbox" id="prefIcono"> Mostrar el icono junto al reloj</label></div>
     <div class="fila"><label><input type="checkbox" id="prefVentana"> Abrir el panel en su propia ventana (si no, en el navegador)</label></div>
     <div class="fila"><label><input type="checkbox" id="prefNotif"> Notificaciones de Windows al ordenar</label></div>
@@ -1462,14 +1494,14 @@ const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : b >= 104
 const NOMBRE_VARIABLE = { "año": "año", anio: "año", mes: "mes", mes_num: "mes", dia: "día", categoria: "tipo", extension: "extensión",
   procedencia: "procedencia", camara: "cámara", sitio: "sitio", proveedor: "proveedor", rfc: "RFC", nombre: "nombre",
   carpeta_origen: "carpeta de origen", carpeta_padre: "carpeta", subcarpeta: "subcarpeta", tipo_acceso: "tipo de acceso", dato: "dato" };
-function destinoLegible(destino) {
+function destinoLegible(destino, nombreOrigen) {
   if (!destino) return "";
   let d = String(destino), raiz = "";
   const rapidas = Object.entries((datos && datos.carpetas_rapidas) || {}).sort((a, b) => b[1].length - a[1].length);
   for (const [nombre, ruta] of rapidas) {
     if (ruta && d.toLowerCase().startsWith(ruta.toLowerCase()) && /^([\\/]|$)/.test(d.slice(ruta.length))) { raiz = nombre; d = d.slice(ruta.length); break; }
   }
-  if (!raiz && d.startsWith("{origen}")) { raiz = "la misma carpeta"; d = d.slice(8); }
+  if (!raiz && d.startsWith("{origen}")) { raiz = nombreOrigen || "la misma carpeta"; d = d.slice(8); }
   const partes = d.split(/[\\/]+/).filter(Boolean).map(p => p.replace(/\{([a-zñ_]+)\}/g, (m, k) => NOMBRE_VARIABLE[k] || k));
   if (!raiz && /^([A-Za-z]:|\/)/.test(String(destino)) && partes.length > 3) return "… › " + partes.slice(-3).join(" › ");
   return [raiz, ...partes].filter(Boolean).join(" › ");
@@ -1629,6 +1661,7 @@ function pintarInicio() {
   if (e.detenido) { color = "mal"; titulo = "GESTOR está detenido"; }
   else if (e.pausado) { color = "pausa"; titulo = "En pausa"; }
   else if (e.no_molestar) { color = "pausa"; titulo = "Esperando: " + e.no_molestar; }
+  else if (!sv.activos) { color = "pausa"; titulo = "Todavía no ordeno nada solo"; }
   else if (e.windows && !e.programacion.instalada) { color = "pausa"; titulo = "Sin programación automática"; }
   if (!e.detenido) {
     detalle.push(e.windows ? (e.programacion.instalada ? `Revisa cada ${e.minutos} min` : "Solo con «Ejecutar ahora»") : "Programación solo en Windows");
@@ -1645,7 +1678,8 @@ function pintarInicio() {
     <div class="ayuda">${detalle.map(esc).join(" · ")}</div>
     <div class="fila" style="margin-top:12px;margin-bottom:0">
       ${e.detenido ? `<button class="prim" data-ini="encender">Encender GESTOR</button>`
-        : e.pausado ? `<button class="prim" data-ini="reanudar">▶ Reanudar</button>` : `<button data-ini="pausar">⏸ Pausar todo</button>`}
+        : e.pausado ? `<button class="prim" data-ini="reanudar">▶ Reanudar</button>`
+        : !sv.activos ? `<button class="prim" data-ini="bienvenida">Empezar a ordenar</button>` : `<button data-ini="pausar">⏸ Pausar todo</button>`}
       <button data-ir="Servicios">Ver servicios</button>
     </div></div>`;
 
@@ -1672,7 +1706,7 @@ function pintarInicio() {
   const enPruebaSinCambios = sv.en_prueba.filter(x => !x.n);
   const tarjetaPend = `<div class="panelito ${pendientes ? "destacado" : ""}">
     <h3>Pendiente de tu aprobación ${pendientes ? `<span class="etiqueta ambar">${pendientes}</span>` : ""}</h3>
-    ${filasPend.length ? filasPend.join("") : `<div class="ayuda">Nada pendiente. 👍</div>`}
+    ${filasPend.length ? filasPend.join("") : `<div class="ayuda">Nada pendiente. Cuando un servicio en modo prueba proponga cambios, los verás aquí antes de que se muevan.</div>`}
     ${enPruebaSinCambios.length ? `<div class="ayuda" style="margin-top:8px">En modo prueba sin cambios por ahora: ${enPruebaSinCambios.map(x => esc(x.nombre)).join(", ")}.</div>` : ""}
   </div>`;
 
@@ -1681,7 +1715,7 @@ function pintarInicio() {
     ${d.vencimientos.length ? d.vencimientos.map(v => `<div class="renglon">
       <span class="etiqueta ${v.dias <= 7 ? "rojo" : v.dias <= 30 ? "ambar" : ""}">${esc(diasTexto(v.dias))}</span>
       <span class="txt" title="${esc(v.ruta || v.nombre)}"><b>${esc(v.tipo)}</b> · ${esc(v.nombre)}</span></div>`).join("")
-      : `<div class="ayuda">Nada vence en los próximos 60 días.</div>`}
+      : `<div class="ayuda">Nada vence en los próximos 60 días. Te aviso con tiempo cuando algo esté por vencer.</div>`}
   </div>`;
 
   const tarjetaPagos = `<div class="panelito ${d.pagos.some(p => p.dias <= 3) ? "destacado" : ""}">
@@ -1689,7 +1723,7 @@ function pintarInicio() {
     ${d.pagos.length ? d.pagos.map(p => `<div class="renglon">
       <span class="etiqueta ${p.dias < 0 ? "rojo" : p.dias <= 3 ? "ambar" : ""}">${p.dias < 0 ? `venció hace ${-p.dias} d` : p.dias === 0 ? "hoy" : p.dias === 1 ? "mañana" : `en ${p.dias} días`}</span>
       <span class="txt" title="${esc(p.ruta || "")}"><b>${esc(p.proveedor)}</b></span><span class="der"><b>${p.total != null ? "$" + Number(p.total).toLocaleString("es-MX", { minimumFractionDigits: 2 }) : ""}</b></span></div>`).join("")
-      : `<div class="ayuda">No hay pagos pendientes.</div>`}
+      : `<div class="ayuda">No hay pagos pendientes. Cuando lleguen facturas, te aviso antes de que venzan.</div>`}
   </div>`;
 
   const tarjetaDiscos = `<div class="panelito ${discosBajos.length ? "destacado" : ""}">
@@ -1720,14 +1754,28 @@ function pintarInicio() {
       : `<div class="ayuda">Aún no respaldas Documentos. Con un respaldo con versiones, si algo se borra o se estropea, lo recuperas tal como estaba.</div>`}
   </div>`;
 
-  const accion = { mover: "→", copiar: "copiado →", papelera: "a la papelera", renombrar: "renombrado →" };
-  const tarjetaUltimos = `<div class="panelito ancha">
-    <h3>Últimos movimientos <button class="chico ir" data-ir="Buscar">Buscar un archivo</button></h3>
-    ${d.ultimos.length ? d.ultimos.map(u => `<div class="renglon">
-      <div class="txt" style="white-space:normal"><b>${esc(u.nombre)}</b> <span class="ayuda">${esc(accion[u.accion] || u.accion)} ${u.destino && u.accion !== "papelera" ? esc(nombreCorto(u.destino.replace(/[\\/][^\\/]+$/, ""))) : ""}</span>
-        <div class="ayuda">${esc(fechaBonita(u.fecha))} · ${esc(u.servicio)}</div></div>
-      ${u.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(u.destino)}">Abrir carpeta</button>` : ""}</div>`).join("")
-      : `<div class="ayuda">Todavía no se ha movido nada.</div>`}
+  // Frase traducida con huecos: T("Moví {} a {}", a, b). El texto ya armado no se vuelve a traducir trozo a trozo.
+  const T = (plantilla, ...v) => (window.t ? window.t(plantilla) : plantilla).replace(/\{\}/g, () => v.length ? v.shift() : "");
+  // Diario: lo que hizo GESTOR, contado como lo contaría una persona, con Deshacer al lado.
+  const carpetaDe = r => (r || "").replace(/[\\/][^\\/]+$/, "");
+  const frase = u => {
+    const n = `<b>${esc(u.nombre)}</b>`, donde = esc(destinoLegible(carpetaDe(u.destino)) || nombreCorto(carpetaDe(u.destino)));
+    return { mover: T("Moví {} a {}", n, donde), copiar: T("Copié {} a {}", n, donde), papelera: T("Mandé {} a la papelera", n),
+      renombrar: T("Renombré {} como {}", n, `<b>${esc(nombreCorto(u.destino))}</b>`), archivar: T("Guardé {} en un ZIP de {}", n, donde) }[u.accion] || `${n}: ${esc(u.accion)}`;
+  };
+  const diaDe = iso => { const f = new Date(iso), h = new Date(); const dd = Math.round((new Date(h.toDateString()) - new Date(f.toDateString())) / 86400000);
+    return dd === 0 ? "Hoy" : dd === 1 ? "Ayer" : f.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" }); };
+  let diaPrevio = "";
+  const tarjetaUltimos = `<div class="panelito ancha diario">
+    <h3>Lo que hice <button class="chico ir" data-ir="Buscar">Buscar un archivo</button></h3>
+    ${d.ultimos.length ? `<div class="lista-diario">` + d.ultimos.map(u => { const dia = diaDe(u.fecha), cab = dia !== diaPrevio ? `<div class="dia-diario">${esc(dia)}</div>` : ""; diaPrevio = dia;
+      return `${cab}<div class="renglon">
+      <span class="hora-diario">${esc(new Date(u.fecha).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" }))}</span>
+      <div class="txt" style="white-space:normal">${frase(u)}<div class="ayuda">${esc(u.servicio)}</div></div>
+      ${u.existe && !datos.en_red ? `<button class="chico" data-abrir-ruta="${esc(u.destino)}">Abrir carpeta</button>` : ""}
+      ${u.existe && ["mover", "renombrar"].includes(u.accion) ? `<button class="chico" data-devolver="${esc(u.origen)}" data-devolver-a="${esc(u.destino)}">Deshacer</button>` : ""}
+      ${u.accion === "papelera" ? `<button class="chico" data-ir="Papelera">Recuperar</button>` : ""}</div>`; }).join("") + `</div>`
+      : `<div class="ayuda">Todavía no he movido nada. Aquí te contaré cada cosa que haga, y podrás deshacerla.</div>`}
   </div>`;
 
   const atajos = [["Plantillas", "plantilla", "Plantillas"], ["Buscar", "buscar", "Buscar"], ["Duplicados", "copias", "Duplicados"],
@@ -1744,7 +1792,9 @@ function pintarInicio() {
   const corto = iso => new Date(iso + "T12:00").toLocaleDateString("es", { day: "numeric", month: "short" });
   const kpi = (num, txt, sub, linea, cls = "") => `<div class="panelito kpi ${cls}"><div class="sub">${txt}</div><div class="num">${num}</div>
     <div class="sub">${sub}</div>${linea || ""}</div>`;
-  const kpis = `<div class="kpis ancha">
+  const kpis = !d.totales.archivos && !d.semana.movidos ? `<div class="panelito ancha invita">
+    <div><b>Aún no he ordenado nada.</b><div class="ayuda">Elige una carpeta y te enseño cómo quedaría antes de mover un solo archivo.</div></div>
+    <div class="fila" style="margin:0"><button class="prim" data-ini="bienvenida">Empezar</button><button data-ir="Plantillas">Ver plantillas</button></div></div>` : `<div class="kpis ancha">
     ${kpi(d.hoy.movidos.toLocaleString("es"), "Ordenados hoy", `${d.hoy.papelera} a la papelera`, minilinea(serie.slice(-14)))}
     ${kpi(d.semana.movidos.toLocaleString("es"), "Últimos 7 días", tend === null ? "&nbsp;" : `<span class="tend ${tend < 0 ? "baja" : ""}">${tend >= 0 ? "▲" : "▼"} ${Math.abs(tend)}%</span> frente a la semana anterior`, minilinea(serie.slice(-7)))}
     ${kpi(mb(d.semana.bytes_papelera), "Liberado esta semana", `${d.semana.papelera} archivos a la papelera`, minilinea(seriePap.slice(-14)))}
@@ -1776,8 +1826,13 @@ function pintarInicio() {
   if (pendientes) avisos.push(`${plural(pendientes, "cosa espera", "cosas esperan")} tu aprobación.`);
   $("#inicio").innerHTML = `
     <div style="margin:0 2px 14px"><div class="saludo">${saludo}${datos.ajustes.nombre ? ", " + esc(datos.ajustes.nombre) : ""}</div>
-      <div class="ayuda">${avisos.length ? avisos.map(esc).join(" ") : "Todo en orden. GESTOR sigue trabajando por ti."}</div></div>
-    ${pestanas("inicio", [["resumen", "Resumen"], ["actividad", "Actividad y gráficas"], ["equipo", "Discos, respaldo y papelera"], ["movimientos", "Últimos movimientos"]])}
+      <div class="ayuda">${avisos.length ? avisos.map(esc).join(" ")
+        : !sv.activos ? "Dime qué carpeta quieres que ordene y empiezo."
+        : d.semana.movidos ? T("Esta semana ordené {}{}. Sigo pendiente.", T(plural(d.semana.movidos, "archivo", "archivos")), d.semana.bytes_papelera ? " " + T("y liberé {}", `<b>${mb(d.semana.bytes_papelera)}</b>`) : "")
+        : "Todo en orden. Te aviso en cuanto ordene algo."}</div></div>
+    ${d.pedir_resena && d.totales.archivos >= 50 ? `<div class="banda on resena"><span>Ya ordené ${d.totales.archivos.toLocaleString("es")} archivos por ti. Si GESTOR te está sirviendo, una reseña en la Store me ayuda muchísimo.</span>
+      <button class="chico prim" data-ini="resena">Dejar una reseña</button><button class="chico" data-ini="resena-no">Ahora no</button></div>` : ""}
+    ${pestanas("inicio", [["resumen", "Resumen"], ["actividad", "Actividad y gráficas"], ["equipo", "Discos, respaldo y papelera"], ["movimientos", "Lo que hice"]])}
     <div ${enPest("inicio", "resumen")}><div class="tablero">
       ${heroEstado}${tarjetaPend}${tarjetaPagos}
       ${kpis}
@@ -1797,6 +1852,15 @@ $("#inicio").addEventListener("click", async e => {
   e.preventDefault();
   try {
     if (t.dataset.ir) mostrarVista(t.dataset.ir);
+    else if (t.dataset.ini === "bienvenida") abrirBienvenida(true);
+    else if (t.dataset.ini === "resena" || t.dataset.ini === "resena-no") {
+      await api("/api/resena", { abrir: t.dataset.ini === "resena" });
+      if (t.dataset.ini === "resena") aviso("¡Gracias! Se abrió la Store para que dejes tu reseña.");
+      tablero.pedir_resena = false; pintarInicio();
+    } else if (t.dataset.devolver) {
+      const res = await api("/api/devolver", { origen: t.dataset.devolver, destino: t.dataset.devolverA });
+      aviso(res.mensaje); if (res.ok) cargarInicio();
+    }
     else if (t.dataset.servicio) {
       const x = datos.servicios.find(x => x.servicio.id === t.dataset.servicio);
       mostrarVista("Servicios"); if (x) abrir(JSON.parse(JSON.stringify(x.servicio)));
@@ -2375,7 +2439,7 @@ function pintarPreferencias() {
   $("#nmDesde").value = nm.desde || "22:00"; $("#nmHasta").value = nm.hasta || "07:00";
   const faltan = [["pillow", "Pillow (fotos HEIC/PNG e icono)"], ["pypdf", "pypdf (leer PDF)"], ["watchdog", "watchdog (al instante)"]]
     .filter(([k]) => !datos[k]).map(([, t]) => t);
-  $("#prefDependencias").textContent = faltan.length ? "Faltan librerías opcionales: " + faltan.join(", ") + ". El .exe ya las incluye." : "";
+  $("#prefDependencias").textContent = "";  // detalle interno: no se enseña (el .exe ya las incluye)
 }
 async function guardarPreferencias(cambios) {
   try {
@@ -2527,6 +2591,104 @@ $("#raiz").addEventListener("click", async e => {
   if (["apElegir", "apVer", "apHacer", "apDeshacer"].includes(t.id)) {
     try { await accionAplanar(t); } catch (err) { aviso("Error: " + err.message); $("#aplanar").innerHTML = pintarAplanar(); }
   }
+});
+// ---------------------------------------------------------------- bienvenida (primera vez): 3 pasos y un primer logro
+let bv = { paso: 1, carpeta: "", nombre: "", analisis: null, cuentas: {}, registro: null, id: null };
+const ICONO_CARPETA = { Descargas: "⬇️", Escritorio: "🖥️", Documentos: "📄", "Imágenes": "🖼️", "Vídeos": "🎬", "Música": "🎵" };
+function abrirBienvenida(desdeInicio) {
+  bv = { paso: desdeInicio ? 2 : 1, carpeta: "", nombre: "", analisis: null, cuentas: {}, registro: null, id: null };
+  $("#bienvenida").classList.add("on"); pintarBienvenida();
+}
+async function cerrarBienvenida() {
+  $("#bienvenida").classList.remove("on");
+  await api("/api/preferencias", { asistente_visto: true }).catch(() => { });
+  datos.primera_vez = false; cargarInicio();
+}
+function pasosBv() { return `<div class="bv-pasos">${[1, 2, 3].map(n => `<span class="${bv.paso >= n ? "on" : ""}"></span>`).join("")}</div>`; }
+function pintarBienvenida() {
+  const c = $("#bvCaja"), carpetas = Object.entries(datos.carpetas_rapidas || {}).filter(([n]) => ICONO_CARPETA[n]).slice(0, 4);
+  if (bv.paso === 1) {
+    c.innerHTML = `${pasosBv()}<div class="bv-hola">👋</div><h2>Hola, soy GESTOR</h2>
+      <p class="bv-lead">Ordeno tu computadora por ti, para que encuentres todo sin buscar.</p>
+      <ul class="bv-puntos"><li><b>Te enseño antes de mover.</b> Siempre ves cómo quedaría primero.</li>
+        <li><b>Todo se puede deshacer.</b> Nunca borro nada sin preguntarte.</li>
+        <li><b>Todo se queda en tu PC.</b> No subo tus archivos a ningún lado.</li></ul>
+      <div class="bv-botones"><button class="prim grande" data-bv="2">Empezar</button><button class="chico" data-bv="saltar">Ya sé usarlo</button></div>`;
+  } else if (bv.paso === 2) {
+    c.innerHTML = `${pasosBv()}<h2>¿Qué te gustaría ordenar primero?</h2>
+      <p class="bv-lead">Elige una carpeta. Solo voy a mirar; todavía no muevo nada.</p>
+      <div class="bv-carpetas">${carpetas.map(([n, ruta]) => `<button class="bv-carpeta" data-bv-carpeta="${esc(ruta)}" data-bv-nombre="${esc(n)}">
+        <span class="bv-ico">${ICONO_CARPETA[n]}</span><b>${esc(n)}</b><span class="ayuda" data-bv-cuenta="${esc(ruta)}">${bv.cuentas[ruta] != null ? plural(bv.cuentas[ruta], "archivo suelto", "archivos sueltos") : "Mirando…"}</span></button>`).join("")}</div>
+      <div class="bv-botones"><button class="chico" data-bv="otra">Otra carpeta…</button><button class="chico" data-bv="saltar">Lo hago después</button></div>`;
+    carpetas.forEach(async ([n, ruta]) => {
+      if (bv.cuentas[ruta] != null) return;
+      try { bv.cuentas[ruta] = (await api("/api/asistente/contar", { carpeta: ruta })).total; } catch (e) { bv.cuentas[ruta] = 0; }
+      const el = document.querySelector(`[data-bv-cuenta="${CSS.escape(ruta)}"]`);
+      if (el) el.textContent = bv.cuentas[ruta] ? plural(bv.cuentas[ruta], "archivo suelto", "archivos sueltos") : "Ya está ordenada";
+    });
+  } else if (bv.paso === 3) {
+    const a = bv.analisis;
+    if (!a) { c.innerHTML = `${pasosBv()}<h2>Mirando ${esc(bv.nombre)}…</h2><p class="bv-lead">Un momento.</p>`; return; }
+    if (!a.sugerencias.length) {
+      c.innerHTML = `${pasosBv()}<h2>${esc(bv.nombre)} ya está en orden</h2><p class="bv-lead">No encontré nada que mover. Prueba con otra carpeta.</p>
+        <div class="bv-botones"><button class="prim" data-bv="2">Elegir otra</button><button class="chico" data-bv="saltar">Ir al inicio</button></div>`; return;
+    }
+    const total = a.sugerencias.reduce((t, x) => t + x.n, 0);
+    c.innerHTML = `${pasosBv()}<h2>Así quedaría ${esc(bv.nombre)}</h2>
+      <p class="bv-lead">Tienes ${plural(a.total, "archivo suelto", "archivos sueltos")}. Los pondría así:</p>
+      <div class="bv-previa">${a.sugerencias.map(x => `<div class="bv-fila"><span>${x.regla.accion === "papelera" ? "🗑️" : x.regla.accion === "archivar" ? "🗜️" : "📁"}</span>
+        <span><b>${esc(x.regla.accion === "papelera" ? "A la papelera" : x.regla.accion === "archivar" ? "En ZIP mensuales" : destinoLegible(x.regla.destino, bv.nombre))}</b><span class="ayuda">${esc(x.texto)}</span></span>
+        <span class="bv-n">${x.n}</span></div>`).join("")}</div>
+      <div class="bv-botones"><button class="prim grande" data-bv="ordenar">Ordénalo así (${plural(total, "archivo", "archivos")})</button>
+        <button class="chico" data-bv="prueba">Solo enséñame, todavía no muevas nada</button></div>
+      <p class="ayuda" style="text-align:center">Después seguiré ordenando esta carpeta cada 8 horas. Lo puedes cambiar cuando quieras.</p>`;
+  } else if (bv.paso === 4) {
+    const r = bv.registro || { operaciones: [], errores: [] }, n = r.operaciones.length;
+    const libre = r.operaciones.filter(o => o.accion === "papelera").reduce((t, o) => t + (o.bytes || 0), 0);
+    if (!n) { c.innerHTML = `<h2>No pude mover nada todavía</h2><p class="bv-lead">${r.errores.length ? "Los archivos estaban abiertos o protegidos. Ciérralos y lo intento de nuevo." : "Los archivos ya estaban en su lugar."} Seguiré revisando ${esc(bv.nombre)} cada 8 horas.</p>
+      <div class="bv-botones"><button class="prim grande" data-bv="fin">Ir al inicio</button></div>`; return; }
+    c.innerHTML = `<div class="bv-hola">🎉</div><h2>¡Listo! Ordené ${plural(n, "archivo", "archivos")}</h2>
+      <p class="bv-lead">${esc(bv.nombre)} quedó en orden${libre ? ` y liberé ${mb(libre)}` : ""}.${r.errores.length ? ` ${plural(r.errores.length, "archivo no se pudo mover", "archivos no se pudieron mover")} (quizá estaban abiertos).` : ""} Si algo no te gusta, lo devuelvo todo como estaba.</p>
+      <div class="bv-botones"><button class="prim grande" data-bv="fin">Ir al inicio</button><button class="chico" data-bv="deshacer">Deshacer</button></div>`;
+  }
+}
+$("#bienvenida").addEventListener("click", async e => {
+  const t = e.target.closest("button"); if (!t) return;
+  try {
+    if (t.dataset.bvCarpeta) { bv.carpeta = t.dataset.bvCarpeta; bv.nombre = t.dataset.bvNombre; }
+    else if (t.dataset.bv === "otra") {
+      const res = await api("/api/elegir-carpeta", { inicial: "" });
+      if (!res.carpeta) return;
+      if (res.permitida === false) { aviso(res.aviso); return; }
+      bv.carpeta = res.carpeta; bv.nombre = nombreCorto(res.carpeta);
+    } else if (t.dataset.bv === "saltar" || t.dataset.bv === "fin") { await cerrarBienvenida(); return; }
+    else if (t.dataset.bv === "2" || t.dataset.bv === "1") { bv.paso = +t.dataset.bv; pintarBienvenida(); return; }
+    else if (t.dataset.bv === "ordenar" || t.dataset.bv === "prueba") {
+      const prueba = t.dataset.bv === "prueba";
+      t.disabled = true; t.textContent = prueba ? "Preparando…" : "Ordenando…";
+      const reglas = bv.analisis.sugerencias.map(x => x.regla);
+      const res = await api("/api/asistente/crear", { carpeta: bv.carpeta, reglas, limpiar: bv.analisis.copias > 0, prueba });
+      datos.servicios = res.servicios; bv.id = res.id;
+      if (prueba) {
+        $("#bienvenida").classList.remove("on");
+        await api("/api/preferencias", { asistente_visto: true }).catch(() => { });
+        datos.primera_vez = false; mostrarVista("Servicios");
+        abrir(JSON.parse(JSON.stringify(res.servicios.find(x => x.servicio.id === res.id).servicio)));
+        const r = await api("/api/prueba/revisar", { id: res.id });
+        datos.servicios = r.servicios; pintarLista(); pintarEditor();
+        aviso("Está en modo prueba: revisa lo que haría y apruébalo cuando te convenza.");
+        return;
+      }
+      const r = await api("/api/ejecutar", { id: res.id, ya: true });
+      datos.servicios = r.servicios; bv.registro = r.registro; bv.paso = 4; pintarBienvenida(); return;
+    } else if (t.dataset.bv === "deshacer") {
+      const r = await api("/api/deshacer", { id: bv.id });
+      aviso(r.ok ? `Listo: ${plural(r.devueltos, "archivo volvió", "archivos volvieron")} a su lugar.` : r.mensaje);
+      await cerrarBienvenida(); return;
+    } else return;
+    bv.paso = 3; bv.analisis = null; pintarBienvenida();
+    bv.analisis = await api("/api/asistente/analizar", { carpeta: bv.carpeta }); pintarBienvenida();
+  } catch (err) { aviso("Error: " + err.message); }
 });
 // ---------------------------------------------------------------- reorganizar una carpeta ya ordenada
 let reo = { carpeta: "", esquema: "tipo", por_subcarpeta: false, borrar_vacias: true, limpiar: false, identicos: "papelera", res: null, hecho: null, esquemas: null };
@@ -3750,7 +3912,8 @@ $("#tipos").addEventListener("input", e => {
   if (datos.en_red) document.querySelectorAll("#btnCerrar, #ajGuardar, #ajQuitar").forEach(b => b.style.display = "none");
   pintarLista(); pintarProgramacion(); pintarPreferencias(); cargarAprendido();
   if (datos.servicios.length) abrir(JSON.parse(JSON.stringify(datos.servicios[0].servicio)));
-  if (datos.primera_vez) mostrarVista("Asistente"); else cargarInicio();
+  cargarInicio();
+  if (datos.primera_vez) abrirBienvenida();
   if (!datos.en_red) comprobarActualizacion(false);
   setInterval(() => { if (vistaActual === "Inicio" && !document.hidden) cargarInicio(); }, 60000);
 })();

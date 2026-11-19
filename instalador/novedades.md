@@ -1,3 +1,13 @@
+## Novedades de GESTOR 0.9.8
+
+- **Contraseña opcional**: en Ajustes › General eliges si GESTOR la pide al abrirlo en esta PC. Si es nuevo, entra directo; si ya tenías una, la sigue pidiendo hasta que la quites (para eso se pide la actual). Desde el celular siempre se pide.
+- **Bienvenida en 3 pasos**: eliges una carpeta, ves cómo quedaría antes de mover nada y, si te convence, se ordena al momento. Todo se puede deshacer.
+- **Un Inicio que dice la verdad**: si todavía no ordena nada solo, lo dice y te ofrece empezar; en vez de ceros, te invita a ordenar tu primera carpeta.
+- **«Lo que hice»**: un diario en palabras sencillas, agrupado por día, con un botón para deshacer cada movimiento.
+- **Más formas de ordenar**: en el Asistente eliges cómo quedan las carpetas: por tipo, por año, por año y mes, por tipo y año, por extensión, por procedencia o todo junto. Los destinos se ven como «Imágenes › año › mes» en lugar de variables.
+- **Reorganizar carpetas ya ordenadas**: vuelve a ordenar una carpeta con todas sus subcarpetas usando otro orden. Puedes conservar las subcarpetas principales (un proyecto, un viaje) y ordenar dentro de cada una. Ves cómo quedaría antes, «Mantener» no se toca y se puede deshacer.
+- **Menos ruido**: el idioma pasó a Ajustes, se quitaron botones repetidos de la barra superior y los textos usan singular cuando es uno solo.
+
 ## Novedades de GESTOR 0.9.7
 
 - **Traducción completa en inglés, portugués y francés**: se tradujeron los textos que se habían quedado en español, como las barras de progreso («Buscando duplicados», «Comparando contenido»…), las propuestas del Asistente, el recuento por tipo de archivo, los nombres de las armonías de color, los mensajes de «Guardado», los avisos de Windows (resumen de la semana, pagos, vencimientos, copias) y el informe mensual en PDF, que ahora sale en tu idioma.

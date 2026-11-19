@@ -297,8 +297,11 @@
       } catch (e) { /* si falla, se recarga igual */ }
       location.reload();
     });
+    const lugar = document.getElementById("lugarIdioma");  // en Ajustes › General (0.9.8)
     const barra = document.querySelector("header");
-    if (barra) {
+    if (lugar) {
+      lugar.appendChild(sel);
+    } else if (barra) {
       const antes = barra.querySelector("#btnCuaderno") || barra.querySelector("details.mas");
       barra.insertBefore(sel, antes || null);
     } else {

@@ -34,7 +34,7 @@ import vencimientos
 PUERTO = int(os.environ.get("GESTOR_PUERTO", "8765"))
 PUERTO_RED = int(os.environ.get("GESTOR_PUERTO_RED", "8770"))  # panel para el celular (lo sirve el residente)
 SOLO_EN_EL_PC = {"/api/elegir-carpeta", "/api/disco/borrar", "/api/cerrar", "/api/abrir", "/api/quitar-programacion", "/api/ajustes",
-                 "/api/abrir-archivo", "/api/actualizacion/instalar", "/api/crear-clave", "/api/clave-al-abrir"}
+                 "/api/abrir-archivo", "/api/actualizacion/instalar", "/api/crear-clave", "/api/clave-al-abrir", "/api/resena"}
 TOKEN = secrets.token_urlsafe(24)
 INACTIVIDAD_SEGUNDOS = 5 * 60
 ultima_actividad = time.time()
@@ -223,7 +223,8 @@ def dashboard():
         "discos": nucleo.unidades_fijas(), "umbral": ajustes.get("umbral_disco", 10),
         "papelera": {"n": len(papelera), "bytes": sum(p.get("bytes", 0) for p in papelera)},
         "respaldos": respaldos,
-        "ultimos": nucleo.ultimos_movimientos(8),
+        "ultimos": nucleo.ultimos_movimientos(30),
+        "pedir_resena": bool(nucleo.ES_TIENDA and not nucleo.cargar_ajustes().get("resena_pedida")),
         "pagos": [p for p in pagos.lista()["pagos"] if p["estado"] == "pendiente"][:6],
         "retenidos": len(nucleo.retenidos()),
         "actualizacion": actualizar.estado(),
@@ -500,7 +501,8 @@ class Manejador(BaseHTTPRequestHandler):
             return nucleo.ejecutar_servicio(datos["servicio"], simular=True)
         if ruta == "/api/ejecutar":
             servicio = next(s for s in nucleo.cargar_servicios() if s["id"] == datos["id"])
-            registro = nucleo.ejecutar_y_anotar(servicio)
+            # «Ordénalo así» de la bienvenida: lo que viste en la vista previa se ordena ya, aunque sea reciente
+            registro = nucleo.ejecutar_y_anotar(servicio, esperar_segundos=0 if datos.get("ya") else None)
             return {"registro": registro, "servicios": servicios_con_estado()}
         if ruta == "/api/registros":
             return {"registros": nucleo.listar_registros(datos["id"])}
@@ -888,6 +890,16 @@ class Manejador(BaseHTTPRequestHandler):
             return {"servicios": servicios_con_estado()}
         if ruta == "/api/buscar":
             return nucleo.buscar_movidos(datos.get("texto", ""), datos.get("desde"), datos.get("hasta"))
+        if ruta == "/api/devolver":
+            return nucleo.devolver_movimiento(str(datos.get("origen", "")), str(datos.get("destino", "")))
+        if ruta == "/api/resena":
+            ajustes = nucleo.cargar_ajustes()
+            ajustes["resena_pedida"] = True
+            nucleo.guardar_ajustes(ajustes)
+            familia = nucleo.familia_paquete()
+            if datos.get("abrir") and familia and nucleo.ES_WINDOWS:
+                os.startfile(f"ms-windows-store://review/?PFN={familia}")
+            return {"ok": True}
         if ruta == "/api/abrir":
             nucleo.abrir_en_explorador(datos.get("ruta", ""))
             return {"ok": True}
@@ -912,8 +924,11 @@ class Manejador(BaseHTTPRequestHandler):
             return {"ok": True, "hechos": hechos, "errores": errores, "liberado": liberado}
         if ruta == "/api/asistente/analizar":
             return nucleo.analizar_carpeta(datos.get("carpeta") or nucleo.carpeta_conocida("Descargas"))
+        if ruta == "/api/asistente/contar":  # sin barra de progreso: solo cuántos archivos sueltos hay
+            return {"total": nucleo.analizar_carpeta(datos.get("carpeta", ""))["total"]}
         if ruta == "/api/asistente/crear":
-            servicio = nucleo.crear_desde_asistente(datos["carpeta"], datos.get("reglas", []), datos.get("limpiar"))
+            servicio = nucleo.crear_desde_asistente(datos["carpeta"], datos.get("reglas", []), datos.get("limpiar"),
+                                                    prueba=datos.get("prueba", True) is not False)
             return {"ok": True, "id": servicio["id"], "servicios": servicios_con_estado()}
         if ruta == "/api/exportar":
             ajustes = nucleo.cargar_ajustes()

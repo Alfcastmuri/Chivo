@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.9.7"
+VERSION = "0.9.8"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -2415,11 +2415,35 @@ def ultimos_movimientos(n=10):
     salida = []
     for r in bd.movimientos(limite=n, recientes_primero=True):
         salida.append({"fecha": dt.datetime.fromtimestamp(r["t"]).isoformat(timespec="minutes"),
-                       "servicio": r.get("s", ""), "accion": r["a"], "nombre": os.path.basename(r["o"]),
+                       "servicio": r.get("s", ""), "accion": r["a"], "nombre": os.path.basename(r["o"]), "origen": r["o"],
                        "destino": r.get("d") or "", "existe": bool(r.get("d")) and os.path.exists(r["d"])})
         if len(salida) >= n:
             break
     return salida
+
+
+def devolver_movimiento(origen, destino):
+    """Deshace un solo movimiento del diario: el archivo vuelve a donde estaba."""
+    if not any(m["origen"] == origen and m["destino"] == destino and m["accion"] in ("mover", "renombrar")
+               for m in ultimos_movimientos(200)):
+        return {"ok": False, "mensaje": "No encuentro ese movimiento."}
+    if not os.path.exists(destino):
+        return {"ok": False, "mensaje": "El archivo ya no está donde lo dejé."}
+    if os.path.exists(origen):
+        return {"ok": False, "mensaje": "Ya hay otro archivo con ese nombre donde estaba."}
+    with Bloqueo():
+        os.makedirs(os.path.dirname(origen), exist_ok=True)
+        shutil.move(destino, origen)
+        indexar({"id": "_devolver", "nombre": "Deshecho a mano"},
+                [{"accion": "mover", "origen": destino, "destino": origen,
+                  "bytes": os.path.getsize(origen), "categoria": categoria_de(os.path.splitext(origen)[1].lower())}])
+    return {"ok": True, "mensaje": "Listo: volvió a su lugar."}
+
+
+def familia_paquete():
+    """Nombre de familia del paquete de la Store (Nombre_IdEditor), para abrir su página de reseñas."""
+    partes = (PAQUETE_TIENDA or "").split("_")
+    return f"{partes[0]}_{partes[-1]}" if len(partes) >= 5 else ""
 
 
 def resumen_desde(desde):
@@ -3142,10 +3166,11 @@ def _nombre_amigable(carpeta):
     return os.path.basename(os.path.normpath(carpeta)) or carpeta
 
 
-def crear_desde_asistente(carpeta, reglas, limpiar=False):
+def crear_desde_asistente(carpeta, reglas, limpiar=False, prueba=True):
+    """prueba=False cuando eliges «Ordénalo así» en la bienvenida: ordena de verdad (y se puede deshacer)."""
     servicio = {
         "id": nuevo_id(), "nombre": f"Ordenar {_nombre_amigable(carpeta)}",
-        "activo": True, "modo_prueba": True, "origenes": [carpeta], "subcarpetas": False,
+        "activo": True, "modo_prueba": bool(prueba), "origenes": [carpeta], "subcarpetas": False,
         "horario": {"tipo": "intervalo", "cada": 8, "unidad": "horas"},
         "conflicto": "renombrar", "identicos": "papelera", "fecha_captura_fotos": True,
         "limpiar_nombres": bool(limpiar), "fecha_al_inicio": False, "borrar_carpetas_vacias": False,
