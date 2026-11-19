@@ -6,6 +6,11 @@
 - **«Lo que hice»**: un diario en palabras sencillas, agrupado por día, con un botón para deshacer cada movimiento.
 - **Más formas de ordenar**: en el Asistente eliges cómo quedan las carpetas: por tipo, por año, por año y mes, por tipo y año, por extensión, por procedencia o todo junto. Los destinos se ven como «Imágenes › año › mes» en lugar de variables.
 - **Reorganizar carpetas ya ordenadas**: vuelve a ordenar una carpeta con todas sus subcarpetas usando otro orden. Puedes conservar las subcarpetas principales (un proyecto, un viaje) y ordenar dentro de cada una. Ves cómo quedaría antes, «Mantener» no se toca y se puede deshacer.
+- **Ves cómo se mueven las cosas**: mientras GESTOR ordena, la tarjeta de Estado en Inicio enseña en grande el servicio, el porcentaje, el archivo que va de una carpeta a otra y los últimos que movió. En las demás secciones aparece una tarjeta con su barra de progreso, y ahora sale siempre al analizar, ordenar, deshacer o recuperar, aunque sea rápido.
+- **Servicios por jerarquía**: si un servicio ordena una carpeta y otro se encarga de una subcarpeta, cada uno respeta lo suyo y no chocan.
+- **Archivos abiertos**: si un archivo está abierto en otro programa o ya no está, se deja para la próxima vez sin contarlo como error.
+- **Arreglado**: el error «Tcl data directory not found» al abrir GESTOR, el aviso «database is locked», y que a veces dejaba de mover archivos tras cerrarse a la fuerza (quedaba un bloqueo que ahora se quita solo). También abre más rápido.
+- **Todo cabe en la pantalla**, también en modo cuaderno y en pantallas chicas (Actividad y Línea de tiempo).
 - **Menos ruido**: el idioma pasó a Ajustes, se quitaron botones repetidos de la barra superior y los textos usan singular cuando es uno solo.
 
 ## Novedades de GESTOR 0.9.7

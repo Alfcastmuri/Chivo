@@ -180,6 +180,44 @@ details.mas .caja button { text-align: left; border-color: transparent; }
 .barra.indef > div { width: 35% !important; animation: indef 1.3s ease-in-out infinite; }
 @keyframes indef { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
 .cuenta { font-variant-numeric: tabular-nums; }
+.proc-archivo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+/* Inicio › Ahora y después: barra grande y archivos en movimiento */
+.en-marcha { margin-top: 14px; }
+.nada-marcha { display: flex; align-items: center; gap: 8px; font-size: 13px; opacity: .8; }
+.punto-quieto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .5; }
+body.en-inicio #procesos { display: none !important; }   /* en Inicio el progreso va en grande dentro de Estado */
+/* Dentro de la tarjeta azul de Estado: todo en blanco sobre el degradado */
+.estado-hero.hay-marcha > .semaforo, .estado-hero.hay-marcha > .ayuda, .estado-hero.hay-marcha > .fila { display: none !important; }
+.estado-hero.hay-marcha .en-marcha { margin-top: 2px; }
+.estado-hero .marcha { background: rgba(255,255,255,.14); color: var(--acento-texto); border: 0; }
+.estado-hero .marcha.hecha { background: rgba(255,255,255,.08); border: 0; }
+.estado-hero .marcha-pct { color: var(--acento-texto); }
+.estado-hero .marcha-pie, .estado-hero .marcha .ayuda { color: color-mix(in srgb, var(--acento-texto) 82%, transparent) !important; }
+.estado-hero .barra { background: rgba(255,255,255,.25); }
+.estado-hero .barra > div { background-color: var(--acento-texto); }
+.estado-hero .vuelo .pista { border-bottom-color: rgba(255,255,255,.45); }
+.estado-hero .vuelo .ficha { background: var(--acento-texto); color: var(--acento); border: 0; font-weight: 600; }
+.punto-vivo { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin-right: 8px; vertical-align: middle; animation: latir 1.2s ease-in-out infinite; }
+@keyframes latir { 0%, 100% { box-shadow: 0 0 0 0 rgba(34,160,90,.5); } 50% { box-shadow: 0 0 0 6px rgba(34,160,90,0); } }
+.marcha { padding: 10px 12px; border-radius: 12px; background: var(--acento-suave); margin-bottom: 8px; }
+.marcha.hecha { background: transparent; border: 1px solid var(--borde); }
+.marcha-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.marcha-pct { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--acento); }
+.barra.grande { height: 12px; }
+.barra.viva > div { background-image: linear-gradient(45deg, rgba(255,255,255,.25) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.25) 50%, rgba(255,255,255,.25) 75%, transparent 75%); background-size: 20px 20px; animation: rayas .8s linear infinite; }
+@keyframes rayas { to { background-position: 20px 0; } }
+.marcha-pie { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--suave); margin-top: 4px; }
+.vuelo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
+.vuelo .carp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vuelo .carp:last-child { text-align: right; }
+.vuelo .pista { position: relative; height: 26px; border-bottom: 2px dashed var(--borde); overflow: hidden; }
+.vuelo .ficha { position: absolute; top: 2px; left: 0; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--panel);
+  border: 1px solid var(--borde); border-radius: 999px; padding: 1px 8px; animation: volar 1.1s ease-in-out infinite; }
+@keyframes volar { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: 30%; opacity: 0; } }
+.recientes { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; max-height: 132px; overflow: hidden; }
+.reciente { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: entrar .35s ease-out both; }
+@keyframes entrar { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .vuelo .ficha, .barra.viva > div, .punto-vivo, .reciente { animation: none; } }
 .qr { display: flex; gap: 14px; align-items: center; margin-top: 8px; }
 .qr-img svg { display: block; width: 150px; height: 150px; border-radius: 8px; }
 .chip.tag { font-size: 12px; padding: 1px 8px; margin: 2px 4px 0 0; background: var(--acento-suave); border-color: transparent; color: var(--acento); }
@@ -447,7 +485,10 @@ body:not(.cuaderno) button.peligro-lleno, button.peligro-lleno { background: var
   body.en-inicio #inicio > [data-pest].on { flex: 1; min-height: 0 !important; }
   body.en-inicio #inicio .tablero { height: 100%; grid-auto-rows: minmax(0, 1fr); gap: 14px; }
   body.en-inicio #inicio [data-pest="inicio:resumen"] .tablero { grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); }
-  body.en-inicio #inicio [data-pest="inicio:actividad"] .tablero { grid-template-rows: minmax(0, 1fr) minmax(0, 1.35fr); }
+  body.en-inicio #inicio [data-pest="inicio:actividad"] .tablero { grid-template-rows: minmax(0, 1fr) minmax(0, 1.35fr); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.en-inicio #inicio [data-pest="inicio:actividad"] .tablero > .ancha { grid-column: 1 / -1; }
+  @media (max-width: 1200px) { body.en-inicio #inicio .dona-caja { grid-template-columns: 96px minmax(0, 1fr); gap: 10px; } }
+  body.ajustada main.vista.simple.on > .caja.editor > .linea { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
   /* recortan por dentro (el último bloque) y no el marco, que recortaría su resplandor */
   body.en-inicio #inicio .tablero > .panelito { display: flex; flex-direction: column; }
   body.en-inicio #inicio .tablero > .panelito > * { flex-shrink: 0; }
@@ -850,13 +891,14 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 
 async function api(ruta, cuerpo = {}) {
   // Si la llamada tarda, se muestra su barra de progreso con cronómetro.
-  const espera = ruta === "/api/procesos" ? null : setTimeout(() => sondearProcesos(), 700);
+  const espera = ruta === "/api/procesos" ? null : setTimeout(() => sondearProcesos(), 300);
   let r;
   try { r = await fetch(ruta, { method: "POST", headers: { "Content-Type": "application/json", "X-Gestor-Token": TOKEN }, body: JSON.stringify(cuerpo) }); }
   finally { clearTimeout(espera); }
   const j = await r.json();
   if (r.status === 401) { sinGuardar = false; location.reload(); }
   if (!r.ok) throw new Error(j.error || "Error");
+  if (j && j._proceso) sondearProcesos();
   return j;
 }
 function aviso(texto) { const t = $("#toast"); t.textContent = texto; t.classList.add("on"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 2500); t._desde = Date.now(); }
@@ -1653,7 +1695,11 @@ async function cargarInicio() {
 }
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 function diasTexto(d) { return d < 0 ? `venció hace ${-d} d` : d === 0 ? "vence hoy" : d === 1 ? "vence mañana" : `en ${d} días`; }
-function pintarInicio() {
+function pintarInicio(...a) {
+  _pintarInicio(...a);
+  enMarchaFirma = ""; pintarEnMarcha((Date.now() + procs.desfase) / 1000);
+}
+function _pintarInicio() {
   const d = tablero, e = d.estado, sv = d.servicios;
   const hora = new Date().getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 20 ? "Buenas tardes" : "Buenas noches";
@@ -1681,7 +1727,7 @@ function pintarInicio() {
         : e.pausado ? `<button class="prim" data-ini="reanudar">▶ Reanudar</button>`
         : !sv.activos ? `<button class="prim" data-ini="bienvenida">Empezar a ordenar</button>` : `<button data-ini="pausar">⏸ Pausar todo</button>`}
       <button data-ir="Servicios">Ver servicios</button>
-    </div></div>`;
+    </div><div id="enMarcha" class="en-marcha"></div></div>`;
 
   const cifra = (n, t) => `<div><b>${n}</b><span>${t}</span></div>`;
   const tarjetaActividad = `<div class="panelito">
@@ -2361,7 +2407,7 @@ async function sondearProcesos() {
   clearTimeout(procs.sondeo);
   try { const r = await api("/api/procesos"); procs.lista = r.procesos; procs.desfase = r.ahora * 1000 - Date.now(); pintarProcesos(); } catch (e) { }
   const activos = procs.lista.some(p => p.estado === "en marcha");
-  procs.sondeo = setTimeout(sondearProcesos, document.hidden ? 15000 : activos ? 1000 : 4000);
+  procs.sondeo = setTimeout(sondearProcesos, document.hidden ? 15000 : activos ? 700 : 3000);
 }
 const reloj = seg => {
   seg = Math.max(0, Math.round(seg));
@@ -2370,7 +2416,7 @@ const reloj = seg => {
 };
 function pintarProcesos() {
   const ahora = (Date.now() + procs.desfase) / 1000;
-  const html = procs.lista.filter(p => !procs.cerrados.has(p.id) && (!p.fin || ahora - p.fin < 3)).map(p => {
+  const html = procs.lista.filter(p => !procs.cerrados.has(p.id) && (!p.fin || ahora - p.fin < 5)).map(p => {
     const marcha = p.estado === "en marcha", trans = (p.fin || ahora) - (p.inicio || ahora);
     const pct = p.total ? Math.min(100, 100 * p.hechos / p.total) : null;
     const falta = marcha && pct > 3 && pct < 100 && trans > 3 ? trans * (100 - pct) / pct : null;
@@ -2380,9 +2426,47 @@ function pintarProcesos() {
     return `<div class="proc ${marcha ? "" : "listo"} ${p.estado === "error" ? "mal" : ""}" data-proc="${esc(p.id)}" title="Toca para ocultar${marcha ? " (sigue trabajando)" : ""}">
       <div class="proc-cab"><b>${esc(p.nombre)}</b><span class="reloj" title="Tiempo transcurrido">⏱ ${reloj(trans)}</span></div>
       <div class="barra ${marcha && pct === null ? "indef" : ""}"><div style="width:${marcha ? (pct ?? 35) : 100}%"></div></div>
-      <div class="ayuda">${detalle}</div></div>`;
+      <div class="ayuda">${detalle}</div>
+      ${marcha && p.actual ? `<div class="ayuda proc-archivo">${emojiDe(p.actual.categoria)} ${esc(p.actual.nombre)} → ${p.actual.accion === "papelera" ? "Papelera" : carpetaCorta(p.actual.a)}</div>` : ""}
+      ${!marcha && p.movidos ? `<div class="ayuda">${plural(p.movidos, "archivo movido", "archivos movidos")}</div>` : ""}</div>`;
   }).join("");
   $("#procesos").innerHTML = html; $("#procesos").classList.toggle("on", !!html);
+  pintarEnMarcha(ahora);
+}
+// Inicio: lo que GESTOR está haciendo ahora, en grande, con los archivos pasando de una carpeta a otra.
+const EMOJI_CAT = { "Imágenes": "🖼️", "Vídeos": "🎬", "Música": "🎵", "Documentos": "📄", "Hojas de cálculo": "📊", "Presentaciones": "📽️",
+  "Comprimidos": "🗜️", "Instaladores": "💿", "Código": "🧩", "Diseño": "🎨", "Libros": "📚", "Fuentes": "🔤" };
+const emojiDe = c => EMOJI_CAT[c] || "📁";
+const carpetaCorta = r => esc(destinoLegible(r || "") || nombreCorto(r || "") || "");
+let enMarchaFirma = "";
+function pintarEnMarcha(ahora) {
+  const caja = $("#enMarcha");
+  if (!caja) return;
+  const lista = procs.lista.filter(p => p.estado === "en marcha" || (p.fin && ahora - p.fin < 45 && (p.movidos || p.recientes)));
+  const firma = JSON.stringify(lista.map(p => [p.id, p.estado, p.hechos, p.total, p.etapa, (p.actual || {}).nombre, (p.recientes || []).length, p.movidos]));
+  if (firma === enMarchaFirma) { caja.querySelectorAll("[data-reloj]").forEach(el => { const p = lista.find(x => x.id === el.dataset.reloj); if (p) el.textContent = "⏱ " + reloj((p.fin || ahora) - p.inicio); }); return; }
+  enMarchaFirma = firma;
+  const hero = caja.closest(".estado-hero");
+  if (hero) hero.classList.toggle("hay-marcha", lista.length > 0);   // mientras trabaja, la tarjeta de Estado lo enseña en grande
+  if (!lista.length) { caja.innerHTML = `<div class="nada-marcha"><span class="punto-quieto"></span>Ahora mismo no estoy moviendo nada.</div>`; return; }
+  caja.innerHTML = lista.map(p => {
+    const marcha = p.estado === "en marcha", pct = p.total ? Math.min(100, 100 * p.hechos / p.total) : null;
+    const a = p.actual;
+    const vuelo = marcha && a ? `<div class="vuelo">
+        <span class="carp" title="${esc(a.de)}">📂 ${carpetaCorta(a.de)}</span>
+        <span class="pista"><span class="ficha" title="${esc(a.nombre)}">${emojiDe(a.categoria)} ${esc(a.nombre)}</span></span>
+        <span class="carp" title="${esc(a.a)}">${a.accion === "papelera" ? "🗑️ Papelera" : "📁 " + carpetaCorta(a.a)}</span></div>` : "";
+    const recientes = (p.recientes || []).slice(0, 2).map((r, i) => `<div class="reciente" style="animation-delay:${i * 40}ms">${emojiDe(r.categoria)} <b>${esc(r.nombre)}</b>
+        <span class="ayuda">→ ${r.accion === "papelera" ? "Papelera" : carpetaCorta(r.a)}</span></div>`).join("");
+    const pie = marcha ? `${esc(p.etapa || "Trabajando")}${p.total ? ` · ${p.hechos.toLocaleString("es")} de ${p.total.toLocaleString("es")}` : p.hechos ? ` · ${p.hechos.toLocaleString("es")} archivos` : ""}`
+      : p.estado === "error" ? "Error: " + esc(p.error || "") : `✓ Listo: ${plural(p.movidos || 0, "archivo movido", "archivos movidos")}`;
+    return `<div class="marcha ${marcha ? "" : "hecha"}">
+      <div class="marcha-cab"><b>${marcha ? `<span class="punto-vivo"></span>` : ""}${esc(p.nombre)}</b>
+        <span class="marcha-pct">${marcha ? (pct === null ? "" : Math.floor(pct) + " %") : "100 %"}</span></div>
+      <div class="barra grande ${marcha && pct === null ? "indef" : ""} ${marcha ? "viva" : ""}"><div style="width:${marcha ? (pct ?? 35) : 100}%"></div></div>
+      <div class="marcha-pie"><span>${pie}</span><span class="reloj" data-reloj="${esc(p.id)}">⏱ ${reloj((p.fin || ahora) - p.inicio)}</span></div>
+      ${vuelo}${recientes ? `<div class="recientes">${recientes}</div>` : ""}</div>`;
+  }).join("");
 }
 // Cuentas atrás: cualquier elemento con data-cuenta="2026-10-29T12:00:00" muestra cuánto falta.
 function actualizarCuentas() {

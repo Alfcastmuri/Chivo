@@ -142,7 +142,11 @@ PROCESOS_LARGOS = {"/api/simular": "Simulando", "/api/ejecutar": "Ordenando", "/
                    "/api/duplicados/combinar": "Combinando carpetas", "/api/prueba/aprobar": "Aplicando cambios aprobados",
                    "/api/copias/ejecutar": "Copia a USB", "/api/asistente/analizar": "Analizando carpeta",
                    "/api/deshacer": "Deshaciendo", "/api/mantenimiento/respaldar-base": "Respaldando la base de datos", "/api/papelera/vaciar": "Vaciando papelera",
-                   "/api/informe/generar": "Creando el informe mensual", "/api/actualizacion/comprobar": "Buscando actualizaciones"}
+                   "/api/informe/generar": "Creando el informe mensual", "/api/actualizacion/comprobar": "Buscando actualizaciones",
+                   "/api/reorganizar/deshacer": "Deshaciendo", "/api/aplanar/deshacer": "Deshaciendo", "/api/devolver": "Devolviendo",
+                   "/api/duplicados/quitar": "Quitando duplicados", "/api/papelera/restaurar": "Recuperando de la papelera",
+                   "/api/retenidos/decidir": "Aplicando tu decisión", "/api/disco/borrar": "Borrando",
+                   "/api/respaldos/restaurar": "Restaurando respaldo", "/api/prueba/terminar": "Aplicando cambios"}
 TRABAJOS = {}  # tareas largas en segundo plano: escanear vencimientos, respaldar...
 
 
@@ -436,7 +440,10 @@ class Manejador(BaseHTTPRequestHandler):
             datos = self._leer()
             if ruta in PROCESOS_LARGOS:
                 with nucleo.proceso(PROCESOS_LARGOS[ruta]):
-                    return self._responder(200, self._api(ruta, datos))
+                    r = self._api(ruta, datos)
+                if isinstance(r, dict):
+                    r["_proceso"] = True       # el panel enseña su barra aunque haya sido muy rápido
+                return self._responder(200, r)
             return self._responder(200, self._api(ruta, datos))
         except Exception as e:
             return self._responder(500, {"error": str(e)})

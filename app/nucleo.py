@@ -1927,7 +1927,10 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
     hechas, errores, retenidos, omitidos = [], [], [], []
     avance(hechos=0, total=len(plan), etapa="Moviendo archivos")
     for op in plan:
-        avance(sumar=1)
+        ficha = {"nombre": os.path.basename(op["origen"]), "de": os.path.dirname(op["origen"]),
+                 "a": os.path.dirname(op["destino"]) if op.get("destino") else "", "accion": op["accion"],
+                 "categoria": op.get("categoria") or categoria_de(os.path.splitext(op["origen"])[1].lower())}
+        avance(sumar=1, actual=ficha)
         motivo = motivo_para_retener(op)
         if motivo:
             if retener(op, servicio, motivo):
@@ -1936,6 +1939,7 @@ def ejecutar_servicio(servicio, simular=False, esperar_segundos=None, ya_hechos=
         try:
             aplicar(op)
             hechas.append(op)
+            avance(hecho=ficha)
         except (FileNotFoundError, PermissionError) as e:
             # Abierto en otro programa, ya no está o sin permiso: se deja para la próxima vez, sin contarlo como error.
             omitidos.append(dict(op, error=str(e)))
@@ -2284,11 +2288,19 @@ def _guardar_proceso(p, forzar=False):
         pass
 
 
-def avance(hechos=None, total=None, etapa=None, sumar=0):
-    """Lo llaman los bucles largos. Si no hay un proceso abierto en este hilo, no hace nada."""
+def avance(hechos=None, total=None, etapa=None, sumar=0, actual=None, hecho=None):
+    """Lo llaman los bucles largos. Si no hay un proceso abierto en este hilo, no hace nada.
+
+    actual: el archivo que se está moviendo ahora ({nombre, de, a, categoria}); hecho: uno que ya se movió
+    (los últimos se guardan para que el panel enseñe cómo van pasando los archivos)."""
     p = getattr(_hilo, "p", None)
     if not p:
         return
+    if actual is not None:
+        p["actual"] = actual
+    if hecho is not None:
+        p["recientes"] = ([hecho] + (p.get("recientes") or []))[:6]
+        p["movidos"] = p.get("movidos", 0) + 1
     if hechos is not None:
         p["hechos"] = hechos
     p["hechos"] += sumar
