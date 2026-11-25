@@ -54,6 +54,13 @@ jobs:
       - name: Construir el .exe
         run: python -m PyInstaller --noconfirm --clean --onedir --windowed --noupx --name GESTOR --version-file version_info.txt --icon recursos/gestor.ico --add-data "recursos/gestor.png;." --add-data "app/panel.html;." --add-data "app/login.html;." --add-data "app/idioma.js;." --add-data "app/idiomas;idiomas" --hidden-import pystray._win32 --hidden-import watchdog.observers.read_directory_changes --collect-submodules pillow_heif --collect-all webview --exclude-module tkinter --exclude-module _tkinter --paths app app/gestor.py
 
+      - name: Comprobar que el .exe no lleva tkinter (causaba «Tcl data directory not found»)
+        shell: pwsh
+        run: |
+          if (Select-String -Path dist\GESTOR\GESTOR.exe -Pattern "pyi_rth__tkinter" -SimpleMatch -Quiet) { throw "GESTOR.exe incluye el arranque de tkinter" }
+          if (Test-Path dist\GESTOR\_internal\_tcl_data) { throw "Se empaquetó Tcl" }
+          "Sin tkinter: correcto"
+
       - name: Comprobar que el motor arranca
         shell: pwsh
         run: |

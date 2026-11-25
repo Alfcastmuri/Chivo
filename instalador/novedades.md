@@ -1,3 +1,7 @@
+## Novedades de GESTOR 0.9.9
+
+- **Arreglado de verdad el error «Tcl data directory not found»**: al actualizar, el instalador ahora cierra cualquier GESTOR que siga abierto antes de copiar los archivos, para que ninguna copia vieja del programa se quede funcionando. Además deja preparadas las carpetas que buscaban las versiones anteriores, así que el aviso ya no puede salir aunque quede alguna copia antigua.
+
 ## Novedades de GESTOR 0.9.8
 
 - **Contraseña opcional**: en Ajustes › General eliges si GESTOR la pide al abrirlo en esta PC. Si es nuevo, entra directo; si ya tenías una, la sigue pidiendo hasta que la quites (para eso se pide la actual). Desde el celular siempre se pide.

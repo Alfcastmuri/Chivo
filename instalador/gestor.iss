@@ -45,6 +45,12 @@ Name: "escritorio"; Description: "Crear un acceso directo en el escritorio"; Fla
 ; Reinstalar o actualizar deja el programa limpio (tus datos están en %APPDATA%\GESTOR y no se tocan).
 Type: filesandordirs; Name: "{app}\_internal"
 
+[Dirs]
+; Red de seguridad: si alguna copia antigua de GESTOR.exe (con tkinter) se quedara abierta y no se
+; reemplazara, con estas carpetas no sale el error «Tcl data directory not found».
+Name: "{app}\_internal\_tcl_data"
+Name: "{app}\_internal\_tk_data"
+
 [Files]
 Source: "..\dist\GESTOR\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Una copia del propio instalador, para abrir las herramientas desde el menú Inicio.
@@ -213,13 +219,33 @@ begin
     Confirm := False;
 end;
 
+procedure CarpetasTclVacias(Ruta: String);
+begin
+  // Versiones de GESTOR anteriores a la 0.9.8 llevaban tkinter y se niegan a arrancar si falta
+  // _internal\_tcl_data («Tcl data directory not found»). Con las carpetas presentes (aunque vacías)
+  // arrancan, así que se pueden cerrar, respaldar y actualizar sin que salga ese error.
+  ForceDirectories(AddBackslash(Ruta) + '_internal\_tcl_data');
+  ForceDirectories(AddBackslash(Ruta) + '_internal\_tk_data');
+end;
+
+procedure CerrarTodoGestor;
+var
+  Codigo: Integer;
+begin
+  // Por si el GESTOR instalado no puede cerrarse solo: se cierra cualquier GESTOR.exe que quede abierto.
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM GESTOR.exe', '', SW_HIDE, ewWaitUntilTerminated, Codigo);
+  Sleep(800);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
   if Instalado then
   begin
     WizardForm.StatusLabel.Caption := 'Respaldando la base de datos y cerrando GESTOR...';
+    CarpetasTclVacias(RutaInstalada);
     Ejecutar('--respaldar-base');
     Ejecutar('--cerrar-procesos');
   end;
+  CerrarTodoGestor;
 end;
