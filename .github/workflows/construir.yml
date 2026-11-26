@@ -213,6 +213,7 @@ jobs:
           $pkg | Remove-AppxPackage
           $p = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\GESTOR\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -PassThru -ErrorAction SilentlyContinue
           if ($p) { $p.WaitForExit() }
+          exit 0  # el último schtasks /Query devolvió 1 (la tarea ya no existe), que es justo lo esperado
 
       - name: Comprimir
         shell: pwsh
