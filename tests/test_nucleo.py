@@ -1264,3 +1264,86 @@ class PruebaBloqueoHuerfano(unittest.TestCase):
             pass
         self.assertLess(time.time() - inicio, 3)
         self.assertFalse(os.path.exists(nucleo.ARCHIVO_BLOQUEO))
+
+
+class PruebaHuellasGuardadas(PruebaServicio):
+    """0.9.10: la segunda búsqueda de duplicados no vuelve a leer lo que no cambió."""
+
+    def test_reusa_huellas_y_recalcula_lo_cambiado(self):
+        a = self.crear("a.bin", b"igual" * 100)
+        b = self.crear("b.bin", b"igual" * 100)
+        c = self.crear("c.bin", b"otro!" * 100)
+        leidos = []
+        original = nucleo._huella
+
+        def contar(ruta):
+            leidos.append(os.path.basename(ruta))
+            return original(ruta)
+        nucleo._huella = contar
+        try:
+            self.assertEqual(len(nucleo.buscar_duplicados([self.origen], min_bytes=1)), 1)
+            self.assertEqual(sorted(leidos), ["a.bin", "b.bin"])
+            leidos.clear()
+            pasos = []
+            grupos = nucleo.buscar_duplicados([self.origen], min_bytes=1, progreso=lambda **k: pasos.append(k))
+            self.assertEqual(len(grupos), 1)
+            self.assertEqual(leidos, [])                       # nada se volvió a leer
+            self.assertEqual(pasos[-1].get("reusadas"), 3)     # a, b y c (c por su huella parcial)
+            with open(c, "wb") as f:                           # c cambia y ahora es igual a a y b
+                f.write(b"igual" * 100)
+            os.utime(c, (self.hace_una_hora + 5, self.hace_una_hora + 5))
+            grupos = nucleo.buscar_duplicados([self.origen], min_bytes=1)
+            self.assertEqual(len(grupos[0]["archivos"]), 3)
+            self.assertEqual(leidos, ["c.bin"])
+        finally:
+            nucleo._huella = original
+        self.assertTrue(os.path.exists(a) and os.path.exists(b))
+
+
+class PruebaEspacioDesdeMapa(unittest.TestCase):
+    """0.9.10: con el mapa al día, Espacio pide al mapa los archivos grandes en vez de recorrer todo."""
+
+    def test_usa_el_mapa_y_no_recorre(self):
+        raiz = tempfile.mkdtemp()
+        docs, desc = os.path.join(raiz, "Documentos"), os.path.join(raiz, "Descargas")
+        os.makedirs(docs)
+        os.makedirs(desc)
+        grande = os.path.join(docs, "video.mp4")
+        with open(grande, "wb") as f:
+            f.truncate(2 * 1024 * 1024)
+        chico = os.path.join(docs, "nota.txt")
+        with open(chico, "w") as f:
+            f.write("x")
+        inst = os.path.join(desc, "setup.exe")
+        with open(inst, "wb") as f:
+            f.write(b"MZ")
+        filas = [(r, os.path.getsize(r), os.path.getmtime(r)) for r in (grande, chico, inst)]
+        nucleo.bd.archivo_visto(filas)
+        guardadas = nucleo.carpetas_rapidas, nucleo._mapa_al_dia, os.walk
+        nucleo.carpetas_rapidas = lambda: {"Documentos": docs, "Descargas": desc}
+        nucleo._mapa_al_dia = lambda: [raiz]
+
+        def sin_recorrer(*a, **k):
+            raise AssertionError("no debía recorrer")
+        os.walk = sin_recorrer
+        try:
+            r = nucleo.analizar_espacio(min_mb=1)
+        finally:
+            nucleo.carpetas_rapidas, nucleo._mapa_al_dia, os.walk = guardadas
+        self.assertTrue(r["desde_mapa"])
+        self.assertEqual([f["ruta"] for f in r["grandes"]], [grande])
+        self.assertEqual([f["ruta"] for f in r["instaladores"]], [inst])
+        os.remove(grande)                                      # lo borrado ya no aparece aunque el mapa lo tenga
+        nucleo.carpetas_rapidas, nucleo._mapa_al_dia = (lambda: {"Documentos": docs, "Descargas": desc}), (lambda: [raiz])
+        try:
+            self.assertEqual(nucleo.analizar_espacio(min_mb=1)["grandes"], [])
+        finally:
+            nucleo.carpetas_rapidas, nucleo._mapa_al_dia = guardadas[0], guardadas[1]
+
+    def test_sin_mapa_recorre_como_siempre(self):
+        guardada = nucleo._mapa_al_dia
+        nucleo._mapa_al_dia = lambda: []
+        try:
+            self.assertFalse(nucleo.analizar_espacio()["desde_mapa"])
+        finally:
+            nucleo._mapa_al_dia = guardada

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS etiquetas (ruta TEXT, etiqueta TEXT, busqueda TEXT, t
 CREATE INDEX IF NOT EXISTS etq_busqueda ON etiquetas(busqueda);
 CREATE TABLE IF NOT EXISTS notas (ruta TEXT PRIMARY KEY, texto TEXT, busqueda TEXT, t REAL);
 CREATE TABLE IF NOT EXISTS textos (ruta TEXT PRIMARY KEY, mtime REAL, texto TEXT, t REAL);
+CREATE TABLE IF NOT EXISTS huellas (ruta TEXT PRIMARY KEY, bytes INTEGER, mtime REAL, parcial BLOB, completa BLOB, t REAL);
 """
 
 
@@ -349,6 +350,46 @@ def hay_otra_copia(ruta, nombre, tam):
     """¿El mapa conoce otro archivo con el mismo nombre y tamaño?"""
     return con().execute("SELECT 1 FROM archivos WHERE nombre=? AND bytes=? AND ruta<>? LIMIT 1",
                          (nombre, tam, ruta)).fetchone() is not None
+
+
+def grandes_y_bajo(raices, min_bytes, carpeta_entera):
+    """Del mapa: rutas de los archivos de al menos min_bytes dentro de raices, más todo lo de carpeta_entera."""
+    salida = set()
+    for raiz in raices:
+        sql, args = _dentro(raiz)
+        salida.update(r for (r,) in con().execute(f"SELECT ruta FROM archivos WHERE {sql} AND bytes >= ?", args + [min_bytes]))
+    if carpeta_entera:
+        sql, args = _dentro(carpeta_entera)
+        salida.update(r for (r,) in con().execute("SELECT ruta FROM archivos WHERE " + sql, args))
+    return sorted(salida)
+
+
+# --------------------------------------------------------------------------- huellas guardadas (duplicados)
+
+def huellas_de(rutas):
+    """{ruta: (bytes, mtime, parcial, completa)} de las huellas ya calculadas antes."""
+    salida = {}
+    rutas = list(rutas)
+    for i in range(0, len(rutas), 500):
+        trozo = rutas[i:i + 500]
+        filas = con().execute(f"SELECT ruta, bytes, mtime, parcial, completa FROM huellas WHERE ruta IN ({','.join('?' * len(trozo))})", trozo)
+        for r, b, m, p, c in filas:
+            salida[r] = (b, m, p, c)
+    return salida
+
+
+def guardar_huellas(filas):
+    """filas: [(ruta, bytes, mtime, parcial, completa)]. Se escriben en una sola transacción."""
+    if not filas:
+        return
+    ahora = time.time()
+    with transaccion() as c:
+        c.executemany("INSERT OR REPLACE INTO huellas VALUES (?,?,?,?,?,?)", [(*f, ahora) for f in filas])
+
+
+def olvidar_huellas_viejas(dias=180):
+    with transaccion() as c:
+        c.execute("DELETE FROM huellas WHERE t < ?", (time.time() - dias * 86400,))
 
 
 # --------------------------------------------------------------------------- etiquetas y notas

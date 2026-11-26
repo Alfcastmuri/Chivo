@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-VERSION = "0.9.9"
+VERSION = "0.9.10"
 ES_WINDOWS = os.name == "nt"
 EMPAQUETADO = getattr(sys, "frozen", False)  # convertido en .exe con PyInstaller
 
@@ -2688,38 +2688,72 @@ def revisar_disco(ahora=None):
     return avisados
 
 
+def _mapa_al_dia():
+    """Raíces del mapa de archivos si está completo y el vigía lo mantiene al día; si no, []."""
+    try:
+        import mapa
+        p = mapa.progreso()
+        if not mapa.config()["activo"] or p.get("estado") != "listo" or time.time() - (p.get("fin") or 0) > 26 * 3600:
+            return []
+        if not residente_activo():
+            return []          # sin el proceso residente nadie anota los cambios: el mapa puede estar viejo
+        return list(p.get("raices") or [])
+    except Exception:
+        return []
+
+
 def analizar_espacio(min_mb=50, maximo=100, limite_archivos=300_000):
-    """Sugerencias para liberar espacio en las carpetas del usuario."""
+    """Sugerencias para liberar espacio en las carpetas del usuario.
+
+    Si el mapa de archivos está al día, las carpetas que cubre no se recorren: se piden al mapa los archivos
+    grandes y lo que hay en Descargas, y solo esos se miran en el disco.
+    """
     carpetas = carpetas_rapidas()
     grandes, instaladores, viejos_descargas = [], [], []
     ahora = time.time()
     descargas = _norm(carpetas["Descargas"])
     vistos = 0
-    for nombre, raiz in carpetas.items():
-        if not os.path.isdir(raiz):
-            continue
+    del_mapa = _mapa_al_dia()
+
+    def rutas_de(nombre, raiz):
+        if any(_dentro_de(raiz, r) for r in del_mapa):
+            lista = bd.grandes_y_bajo([raiz], min_mb * 1024 * 1024,
+                                      carpetas["Descargas"] if _dentro_de(carpetas["Descargas"], raiz) else None)
+            avance(sumar=len(lista), etapa="Mirando " + nombre + " (ya conocida)")
+            yield from lista
+            return
         for carpeta, subcarpetas, archivos in os.walk(raiz):
             subcarpetas[:] = [d for d in subcarpetas if not d.startswith(".") and d.lower() != "appdata"]
             avance(sumar=len(archivos), etapa="Mirando " + nombre)
             for n in archivos:
-                vistos += 1
-                if vistos > limite_archivos:
-                    break
-                ruta = os.path.join(carpeta, n)
-                try:
-                    st = os.stat(ruta)
-                except OSError:
-                    continue
-                fila = {"ruta": ruta, "bytes": st.st_size,
-                        "dias": int((ahora - ultimo_uso(st)) / 86400)}
-                if st.st_size >= min_mb * 1024 * 1024:
-                    grandes.append(fila)
-                if _dentro_de(ruta, descargas):
-                    ext = os.path.splitext(n)[1].lower()
-                    if categoria_de(ext) == "Instaladores" or zip_descomprimido(ruta):
-                        instaladores.append(fila)
-                    elif fila["dias"] > 90:
-                        viejos_descargas.append(fila)
+                yield os.path.join(carpeta, n)
+
+    hechas = set()
+    for nombre, raiz in carpetas.items():
+        if not os.path.isdir(raiz) or _norm(raiz) in hechas:
+            continue
+        hechas.add(_norm(raiz))
+        for ruta in rutas_de(nombre, raiz):
+            vistos += 1
+            if vistos > limite_archivos:
+                break
+            try:
+                st = os.stat(ruta)
+            except OSError:
+                continue
+            n = os.path.basename(ruta)
+            fila = {"ruta": ruta, "bytes": st.st_size,
+                    "dias": int((ahora - ultimo_uso(st)) / 86400)}
+            if st.st_size >= min_mb * 1024 * 1024:
+                grandes.append(fila)
+            if _dentro_de(ruta, descargas):
+                ext = os.path.splitext(n)[1].lower()
+                if categoria_de(ext) == "Instaladores" or zip_descomprimido(ruta):
+                    instaladores.append(fila)
+                elif fila["dias"] > 90:
+                    viejos_descargas.append(fila)
+    vistas = set()
+    grandes = [f for f in grandes if not (_norm(f["ruta"]) in vistas or vistas.add(_norm(f["ruta"])))]
     grandes.sort(key=lambda f: -f["bytes"])
     papelera = listar_papelera()
     return {
@@ -2730,6 +2764,7 @@ def analizar_espacio(min_mb=50, maximo=100, limite_archivos=300_000):
         "viejos_descargas": sorted(viejos_descargas, key=lambda f: -f["bytes"])[:maximo],
         "papelera": {"n": len(papelera), "bytes": sum(p.get("bytes", 0) for p in papelera)},
         "incompleto": vistos > limite_archivos,
+        "desde_mapa": bool(del_mapa),
     }
 
 
@@ -2815,6 +2850,46 @@ def _huella_parcial(ruta, tam=64 * 1024):
     return h.digest()
 
 
+class _HuellasGuardadas:
+    """Huellas de la última búsqueda: si un archivo tiene el mismo tamaño y fecha, no se vuelve a leer."""
+
+    def __init__(self, fechas):
+        self.fechas = fechas                      # {ruta: (bytes, mtime)} del recorrido de ahora
+        try:
+            self.previas = bd.huellas_de(fechas)
+        except Exception:
+            self.previas = {}
+        self.nuevas, self.reusadas = {}, set()
+
+    def _de(self, ruta, cual, calcular):
+        b, m = self.fechas[ruta]
+        fila = self.nuevas.get(ruta) or self.previas.get(ruta)
+        if not fila or fila[0] != b or fila[1] != m:
+            fila = (b, m, None, None)
+        if fila[cual]:
+            self.reusadas.add(ruta)
+            return bytes(fila[cual])
+        valor = calcular(ruta)
+        fila = list(fila)
+        fila[cual] = valor
+        self.nuevas[ruta] = tuple(fila)
+        return valor
+
+    def parcial(self, ruta):
+        return self._de(ruta, 2, _huella_parcial)
+
+    def completa(self, ruta):
+        return self._de(ruta, 3, _huella)
+
+    def guardar(self):
+        try:
+            bd.guardar_huellas([(r, *v) for r, v in self.nuevas.items()])
+            if self.nuevas:
+                bd.olvidar_huellas_viejas()
+        except Exception:
+            pass
+
+
 _NO_DUPLICADOS = ("appdata", "node_modules", "__pycache__", "gestor-papelera", "system volume information",
                   "windows.old", "$recycle.bin", "msocache", "recovery")
 
@@ -2824,6 +2899,7 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
 
     Se filtra en tres pasos para no leer de más: mismo tamaño, mismos primeros 64 KB y
     misma huella SHA-256 completa. Devuelve los grupos ordenados por espacio recuperable.
+    Las huellas se guardan: la próxima vez solo se leen los archivos nuevos o cambiados.
     """
     externo = progreso or (lambda **k: None)
 
@@ -2831,7 +2907,7 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
         externo(**k)
         avance(hechos=k.get("comparados", k.get("revisados")), total=k.get("total") if "comparados" in k else None,
                etapa=k.get("fase"))
-    por_tamano, vistos, revisados = {}, set(), 0
+    por_tamano, vistos, revisados, fechas = {}, set(), 0, {}
     por_carpeta = por_carpeta if por_carpeta is not None else {}
     # Los respaldos son copias a propósito: no se cuentan como duplicados.
     respaldos = [r.get("destino") for r in cargar_ajustes().get("respaldos") or [] if r.get("destino")]
@@ -2857,6 +2933,7 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
                 if clave in vistos:
                     continue
                 vistos.add(clave)
+                fechas[ruta] = (st.st_size, st.st_mtime)
                 por_tamano.setdefault(st.st_size, []).append(ruta)
                 por_carpeta[carpeta] = por_carpeta.get(carpeta, 0) + 1
                 revisados += 1
@@ -2865,13 +2942,15 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
     candidatos = [g for g in por_tamano.values() if len(g) > 1]
     total = sum(len(g) for g in candidatos)
     hechos, grupos = 0, []
+    huellas = _HuellasGuardadas({r: fechas[r] for g in candidatos for r in g})
     for grupo in candidatos:
         por_parcial = {}
         for ruta in grupo:
             if cancelado():
+                huellas.guardar()
                 return []
             try:
-                por_parcial.setdefault(_huella_parcial(ruta), []).append(ruta)
+                por_parcial.setdefault(huellas.parcial(ruta), []).append(ruta)
             except OSError:
                 pass
             hechos += 1
@@ -2883,7 +2962,7 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
             por_huella = {}
             for ruta in sub:
                 try:
-                    por_huella.setdefault(_huella(ruta), []).append(ruta)
+                    por_huella.setdefault(huellas.completa(ruta), []).append(ruta)
                 except OSError:
                     pass
             for iguales in por_huella.values():
@@ -2892,8 +2971,9 @@ def buscar_duplicados(carpetas, min_bytes=1024, progreso=None, cancelado=lambda:
                     iguales.sort(key=lambda r: os.path.getmtime(r) if os.path.exists(r) else 0)
                     tam = os.path.getsize(iguales[0])
                     grupos.append({"bytes": tam, "archivos": iguales, "recuperable": tam * (len(iguales) - 1)})
+    huellas.guardar()
     grupos.sort(key=lambda g: g["recuperable"], reverse=True)
-    progreso(fase="Terminado", revisados=revisados, comparados=hechos, total=total)
+    progreso(fase="Terminado", revisados=revisados, comparados=hechos, total=total, reusadas=len(huellas.reusadas))
     return grupos
 
 

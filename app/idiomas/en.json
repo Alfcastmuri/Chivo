@@ -2050,5 +2050,9 @@
 "🤖 GESTOR movió": "🤖 GESTOR moved",
 "🤖 GESTOR movió {}": "🤖 GESTOR moved {}",
 "🧭 Asistente": "🧭 Assistant",
-"🧭 Crear con el asistente": "🧭 Create with the assistant"
+"🧭 Crear con el asistente": "🧭 Create with the assistant",
+"Rápido: tus carpetas ya estaban en el mapa de archivos, así que solo se revisaron los archivos grandes y Descargas.": "Fast: your folders were already in the file map, so only large files and Downloads were checked.",
+"{} archivos ya se conocían de una búsqueda anterior y no hizo falta volver a leerlos.": "{} files were already known from a previous search and didn't need to be read again.",
+"archivos ya se conocían de una búsqueda anterior y no hizo falta volver a leerlos.": "files were already known from a previous search and didn't need to be read again.",
+"Mirando {} (ya conocida)": "Looking at {} (already known)"
 }

@@ -1,3 +1,8 @@
+## Novedades de GESTOR 0.9.10
+
+- **Duplicados mucho más rápido la segunda vez**: GESTOR guarda la huella de cada archivo que compara. En la siguiente búsqueda solo lee los archivos nuevos o que cambiaron; los demás los reconoce al instante por su tamaño y fecha.
+- **Espacio sin recorrer todo otra vez**: si el mapa de archivos está al día, Espacio ya sabe qué hay en tus carpetas y solo revisa los archivos grandes y Descargas.
+
 ## Novedades de GESTOR 0.9.9
 
 - **Arreglado de verdad el error «Tcl data directory not found»**: al actualizar, el instalador ahora cierra cualquier GESTOR que siga abierto antes de copiar los archivos, para que ninguna copia vieja del programa se quede funcionando. Además deja preparadas las carpetas que buscaban las versiones anteriores, así que el aviso ya no puede salir aunque quede alguna copia antigua.

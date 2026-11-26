@@ -2985,6 +2985,7 @@ async function cargarEspacio(recargar) {
     ${lista("Descargas sin usar en más de 3 meses", r.viejos_descargas, "")}
     ${lista("Archivos grandes (más de 50 MB)", r.grandes, "Los 100 más grandes de tus carpetas.")}
     ${r.incompleto ? `<p class="ayuda">Hay muchísimos archivos: el análisis se detuvo antes de terminar.</p>` : ""}
+    ${r.desde_mapa ? `<p class="ayuda">Rápido: tus carpetas ya estaban en el mapa de archivos, así que solo se revisaron los archivos grandes y Descargas.</p>` : ""}
     <div class="acciones">
       <button class="peligro" id="espQuitar" ${espacio.marcadas.size ? "" : "disabled"}>Enviar ${espacio.marcadas.size} a la papelera de GESTOR (${mb(total)})</button>
       <button id="espRecargar">Volver a analizar</button>
@@ -3132,6 +3133,7 @@ async function pintarDuplicados() {
             <div style="margin-top:4px"><button class="chico" data-combinar="${i}" data-en="a" title="Todo lo de B pasa a A; lo repetido se quita">Combinar en A</button> <button class="chico" data-combinar="${i}" data-en="b" title="Todo lo de A pasa a B; lo repetido se quita">Combinar en B</button></div></td></tr>`).join("")}
         </table></div></section>` : ""}
       <section><h3>${est.total_grupos} grupos de duplicados · ${mb(est.recuperable || 0)} recuperables</h3>
+        ${p.reusadas ? `<p class="ayuda">${(window.t ? window.t("{} archivos ya se conocían de una búsqueda anterior y no hizo falta volver a leerlos.") : "{} archivos ya se conocían de una búsqueda anterior y no hizo falta volver a leerlos.").replace("{}", p.reusadas)}</p>` : ""}
         ${grupos.length ? `<p class="ayuda">Se propone conservar el más antiguo de cada grupo (sin marcar). Lo marcado va a la papelera.</p>
         ${grupos.map(g => `<div class="grupo-dup"><div class="ayuda">${g.archivos.length} copias de ${mb(g.bytes)}</div>
           ${g.archivos.map(r => `<label><input type="checkbox" data-dup-ruta="${esc(r)}" ${dupElegidos.has(r) ? "checked" : ""}> ${esc(r)}</label>`).join("")}</div>`).join("")}

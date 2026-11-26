@@ -2050,5 +2050,9 @@
 "🤖 GESTOR movió": "🤖 GESTOR a déplacé",
 "🤖 GESTOR movió {}": "🤖 GESTOR a déplacé {}",
 "🧭 Asistente": "🧭 Assistant",
-"🧭 Crear con el asistente": "🧭 Créer avec l'assistant"
+"🧭 Crear con el asistente": "🧭 Créer avec l'assistant",
+"Rápido: tus carpetas ya estaban en el mapa de archivos, así que solo se revisaron los archivos grandes y Descargas.": "Rapide : vos dossiers étaient déjà dans la carte des fichiers, seuls les gros fichiers et Téléchargements ont été vérifiés.",
+"{} archivos ya se conocían de una búsqueda anterior y no hizo falta volver a leerlos.": "{} fichiers étaient déjà connus d’une recherche précédente : inutile de les relire.",
+"archivos ya se conocían de una búsqueda anterior y no hizo falta volver a leerlos.": "fichiers étaient déjà connus d’une recherche précédente : inutile de les relire.",
+"Mirando {} (ya conocida)": "Examen de {} (déjà connu)"
 }
