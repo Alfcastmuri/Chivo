@@ -1347,3 +1347,30 @@ class PruebaEspacioDesdeMapa(unittest.TestCase):
             self.assertFalse(nucleo.analizar_espacio()["desde_mapa"])
         finally:
             nucleo._mapa_al_dia = guardada
+
+
+class PruebaVersionClasicaEnTienda(unittest.TestCase):
+    """0.9.10: la versión de la Store apaga la tarea y el arranque que dejó una instalación normal vieja."""
+
+    def test_quita_tarea_y_arranque_de_la_clasica(self):
+        import subprocess
+        llamadas = []
+        guardado = (nucleo.ES_WINDOWS, nucleo.ES_TIENDA, nucleo.comando_programado, nucleo._archivo_inicio, subprocess.run)
+        vbs = os.path.join(tempfile.mkdtemp(), "GESTOR-inicio.vbs")
+        open(vbs, "w").close()
+
+        class R:
+            returncode = 0
+        nucleo.ES_WINDOWS, nucleo.ES_TIENDA = True, True
+        nucleo.comando_programado = lambda: r"C:\\Users\\a\\AppData\\Local\\Programs\\GESTOR\\GESTOR.exe"
+        nucleo._archivo_inicio = lambda: vbs
+        subprocess.run = lambda args, **k: (llamadas.append(args), R())[1]
+        try:
+            self.assertTrue(nucleo.retirar_version_clasica())
+        finally:
+            nucleo.ES_WINDOWS, nucleo.ES_TIENDA, nucleo.comando_programado, nucleo._archivo_inicio, subprocess.run = guardado
+        self.assertEqual(llamadas[0][:2], ["schtasks", "/Delete"])
+        self.assertFalse(os.path.exists(vbs))
+
+    def test_fuera_de_la_tienda_no_toca_nada(self):
+        self.assertFalse(nucleo.retirar_version_clasica())

@@ -3513,13 +3513,42 @@ def actualizar_programacion():
     return programar_motor(int(cargar_ajustes().get("revisar_cada_minutos") or 5)).get("ok", False)
 
 
+def retirar_version_clasica():
+    """En la versión de la Store: apaga lo que dejó una instalación normal antigua.
+
+    Esa instalación deja una tarea programada (cada pocos minutos) y un arranque al iniciar sesión que
+    siguen lanzando su GESTOR.exe aunque ya uses el de la Store. Si ese .exe es de antes de la 0.9.8 lleva
+    tkinter y sale el error «Tcl data directory not found» una y otra vez. Devuelve True si quitó algo.
+    """
+    if not (ES_WINDOWS and ES_TIENDA):
+        return False
+    import subprocess
+    quitado = False
+    comando = comando_programado()
+    if comando and "windowsapps" not in comando.lower():
+        r = subprocess.run(["schtasks", "/Delete", "/F", "/TN", NOMBRE_TAREA], capture_output=True,
+                           creationflags=0x08000000)
+        quitado = r.returncode == 0
+    try:
+        os.remove(_archivo_inicio())
+        quitado = True
+    except OSError:
+        pass
+    _PROGRAMACION.clear()
+    return quitado
+
+
 def tomar_el_relevo():
     """Lo hace cada versión al abrirse: cierra la vieja, actualiza la tarea y arranca su residente."""
     cerrados = relevar_versiones_antiguas()
     cambiada = actualizar_programacion()
-    if cerrados or cambiada:
+    clasica = retirar_version_clasica()
+    if clasica:
+        avisar("GESTOR", "Apagué la versión antigua de GESTOR que seguía abriéndose sola. "
+                         "Puedes desinstalarla en Configuración › Aplicaciones.")
+    elif cerrados or cambiada:
         avisar("GESTOR actualizado", f"Ahora funciona la versión {VERSION}.")
-    return {"cerrados": cerrados, "programacion_actualizada": cambiada}
+    return {"cerrados": cerrados, "programacion_actualizada": cambiada, "version_clasica_retirada": clasica}
 
 
 NOMBRE_TAREA = "GESTOR\\Motor"
