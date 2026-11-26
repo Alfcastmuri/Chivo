@@ -1374,3 +1374,42 @@ class PruebaVersionClasicaEnTienda(unittest.TestCase):
 
     def test_fuera_de_la_tienda_no_toca_nada(self):
         self.assertFalse(nucleo.retirar_version_clasica())
+
+
+class PruebaDiagnostico(unittest.TestCase):
+    """0.9.10: Ajustes › Diagnóstico revisa y arregla lo que suele fallar."""
+
+    def test_quita_bloqueo_huerfano_y_anota_errores(self):
+        with open(nucleo.ARCHIVO_BLOQUEO, "w") as f:
+            f.write("999999")                                   # un proceso que no existe
+        d = nucleo.diagnostico()
+        fila = next(f for f in d["comprobaciones"] if f["id"] == "bloqueo")
+        self.assertEqual(fila["estado"], "aviso")
+        self.assertTrue(fila["arreglable"])
+        d = nucleo.diagnostico(reparar=True)
+        fila = next(f for f in d["comprobaciones"] if f["id"] == "bloqueo")
+        self.assertTrue(fila["arreglado"])
+        self.assertFalse(os.path.exists(nucleo.ARCHIVO_BLOQUEO))
+        base = next(f for f in d["comprobaciones"] if f["id"] == "base")
+        self.assertEqual(base["estado"], "ok")
+
+        try:
+            raise ValueError("fallo de prueba")
+        except ValueError:
+            nucleo.registrar_error("prueba")
+        informe = nucleo.informe_diagnostico()
+        self.assertIn(nucleo.VERSION, informe)
+        self.assertIn("fallo de prueba", informe)
+        errores = next(f for f in nucleo.diagnostico()["comprobaciones"] if f["id"] == "errores")
+        self.assertEqual(errores["estado"], "aviso")
+        os.remove(nucleo.ARCHIVO_ERRORES)
+
+    def test_detecta_exe_viejo_con_tkinter(self):
+        carpeta = tempfile.mkdtemp()
+        exe = os.path.join(carpeta, "GESTOR.exe")
+        with open(exe, "wb") as f:
+            f.write(b"MZ...pyi_rth__tkinter...")
+        self.assertTrue(nucleo._exe_con_tkinter(exe))
+        with open(exe, "wb") as f:
+            f.write(b"MZ...limpio...")
+        self.assertFalse(nucleo._exe_con_tkinter(exe))

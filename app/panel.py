@@ -173,6 +173,7 @@ def en_segundo_plano(nombre, funcion, *args):
             with nucleo.proceso(NOMBRES_TRABAJOS.get(nombre.split("-")[0], nombre)):
                 TRABAJOS[nombre] = {"estado": "terminado", "resultado": funcion(*args)}
         except Exception as e:
+            nucleo.registrar_error(f"panel trabajo {nombre}")
             TRABAJOS[nombre] = {"estado": "error", "error": str(e)}
 
     threading.Thread(target=trabajo, daemon=True).start()
@@ -310,6 +311,7 @@ def iniciar_duplicados(carpetas, min_kb):
             with nucleo.proceso("Buscando duplicados"):
                 _trabajo()
         except Exception as e:
+            nucleo.registrar_error("panel duplicados")
             TRABAJO_DUPLICADOS.update(estado="error", error=str(e))
 
     def _trabajo():
@@ -446,6 +448,7 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._responder(200, r)
             return self._responder(200, self._api(ruta, datos))
         except Exception as e:
+            nucleo.registrar_error(f"panel {ruta}")
             return self._responder(500, {"error": str(e)})
 
     def _api(self, ruta, datos):
@@ -901,6 +904,10 @@ class Manejador(BaseHTTPRequestHandler):
             if datos.get("abrir") and familia and nucleo.ES_WINDOWS:
                 os.startfile(f"ms-windows-store://review/?PFN={familia}")
             return {"ok": True}
+        if ruta == "/api/diagnostico":
+            return nucleo.diagnostico(reparar=bool(datos.get("reparar")))
+        if ruta == "/api/diagnostico/informe":
+            return {"texto": nucleo.informe_diagnostico()}
         if ruta == "/api/abrir":
             nucleo.abrir_en_explorador(datos.get("ruta", ""))
             return {"ok": True}

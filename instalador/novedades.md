@@ -2,6 +2,8 @@
 
 - **Duplicados mucho más rápido la segunda vez**: GESTOR guarda la huella de cada archivo que compara. En la siguiente búsqueda solo lee los archivos nuevos o que cambiaron; los demás los reconoce al instante por su tamaño y fecha.
 - **Adiós por fin al error «Tcl data directory not found»**: venía de una instalación normal antigua que seguía abriéndose sola (cada pocos minutos y al iniciar Windows) aunque ya usaras la versión de la Store. GESTOR de la Store ahora apaga ese arranque viejo y te avisa para que desinstales la copia antigua.
+- **Diagnóstico y reparar** (Ajustes › Diagnóstico): revisa en un clic si hay otra versión de GESTOR instalada o abierta, una tarea que apunta a un programa viejo, bloqueos olvidados, la base de datos y los errores recientes, y arregla lo que puede.
+- **Registro de errores**: cada fallo queda anotado con fecha y versión. «Copiar informe» lo deja listo para pegarlo en un mensaje.
 - **Espacio sin recorrer todo otra vez**: si el mapa de archivos está al día, Espacio ya sabe qué hay en tus carpetas y solo revisa los archivos grandes y Descargas.
 
 ## Novedades de GESTOR 0.9.9

@@ -3635,3 +3635,154 @@ def quitar_programacion():
     except OSError:
         pass
     return {"ok": True, "mensaje": "Programación quitada."}
+
+
+# --------------------------------------------------------------------------- diagnóstico y reparación
+
+def registrar_error(contexto, detalle=None):
+    """Anota un fallo en errores.log (fecha, versión, dónde y el detalle). Nunca lanza excepciones."""
+    import traceback
+    try:
+        if os.path.exists(ARCHIVO_ERRORES) and os.path.getsize(ARCHIVO_ERRORES) > 1024 * 1024:
+            os.replace(ARCHIVO_ERRORES, ARCHIVO_ERRORES + ".1")
+        with open(ARCHIVO_ERRORES, "a", encoding="utf-8") as f:
+            f.write(f"--- {dt.datetime.now().isoformat(timespec='seconds')} {VERSION} {contexto}\n")
+            f.write(detalle if detalle is not None else traceback.format_exc())
+            f.write("\n")
+    except Exception:
+        pass
+
+
+def _version_clasica_instalada():
+    """Carpeta de la instalación normal (la del instalador) si existe y no es la que está corriendo."""
+    base = os.environ.get("LOCALAPPDATA")
+    if not base:
+        return ""
+    carpeta = os.path.join(base, "Programs", "GESTOR")
+    exe = os.path.join(carpeta, "GESTOR.exe")
+    return carpeta if os.path.isfile(exe) and _norm(exe) != _norm(sys.executable) else ""
+
+
+def _exe_con_tkinter(exe):
+    """¿Ese GESTOR.exe es de antes de la 0.9.8 (arranca tkinter y puede dar el error de Tcl)?"""
+    try:
+        with open(exe, "rb") as f:
+            return b"pyi_rth__tkinter" in f.read()
+    except OSError:
+        return False
+
+
+def diagnostico(reparar=False):
+    """Revisa lo que suele fallar al instalar o actualizar y, si reparar=True, lo arregla.
+
+    Devuelve una lista de comprobaciones {id, titulo, estado: ok|aviso|error, detalle, arreglable, arreglado}.
+    """
+    salida = []
+
+    def anotar(id_, titulo, estado, detalle="", arreglable=False, arreglar=None):
+        fila = {"id": id_, "titulo": titulo, "estado": estado, "detalle": detalle,
+                "arreglable": arreglable, "arreglado": False}
+        if reparar and arreglable and estado != "ok" and arreglar:
+            try:
+                fila["arreglado"] = bool(arreglar())
+                if fila["arreglado"]:
+                    fila["estado"] = "ok"
+            except Exception as e:
+                fila["detalle"] += f" (no se pudo arreglar: {e})"
+        salida.append(fila)
+
+    anotar("version", "Versión", "ok",
+           f"GESTOR {VERSION} · {'Microsoft Store' if ES_TIENDA else 'instalación normal' if EMPAQUETADO else 'código Python'}")
+
+    # 1. Otras copias de GESTOR abiertas (de otra versión)
+    try:
+        otras = otras_versiones()
+    except Exception:
+        otras = []
+    anotar("otras_abiertas", "Otras versiones abiertas", "aviso" if otras else "ok",
+           f"{len(otras)} abiertas desde otra carpeta" if otras else "Ninguna", bool(otras),
+           lambda: relevar_versiones_antiguas() >= 0)
+
+    # 2. Instalación normal vieja junto a la de la Store, o .exe viejo con tkinter
+    clasica = _version_clasica_instalada() if ES_WINDOWS else ""
+    if ES_TIENDA and clasica:
+        anotar("clasica", "Versión antigua instalada", "aviso",
+               f"También está la instalación normal en {clasica}. Se apaga su arranque; desinstálala en "
+               "Configuración › Aplicaciones.", True, retirar_version_clasica)
+    elif clasica and _exe_con_tkinter(os.path.join(clasica, "GESTOR.exe")):
+        anotar("clasica", "Versión antigua instalada", "error",
+               f"El GESTOR.exe de {clasica} es anterior a la 0.9.8 y puede dar el error de Tcl. "
+               "Abre el instalador nuevo y elige «Actualizar».")
+    else:
+        anotar("clasica", "Versión antigua instalada", "ok", "Ninguna")
+
+    # 3. Tarea programada que apunta a otro .exe
+    if ES_WINDOWS and EMPAQUETADO and not ES_TIENDA:
+        try:
+            comando = comando_programado()
+        except Exception:
+            comando = ""
+        mal = bool(comando) and _norm(comando) != _norm(sys.executable)
+        anotar("tarea", "Tarea programada", "aviso" if mal else "ok",
+               f"Apunta a {comando}" if mal else (f"Apunta a esta versión" if comando else "No hay tarea (motor manual)"),
+               mal, actualizar_programacion)
+
+    # 4. Bloqueo olvidado (impedía mover archivos)
+    huerfano = False
+    try:
+        with open(ARCHIVO_BLOQUEO, encoding="utf-8") as f:
+            dueno = int(f.read().strip() or 0)
+        huerfano = not dueno or not pid_vivo(dueno)
+    except (OSError, ValueError):
+        pass
+
+    def quitar_bloqueo():
+        os.remove(ARCHIVO_BLOQUEO)
+        return True
+    anotar("bloqueo", "Bloqueo del motor", "aviso" if huerfano else "ok",
+           "Quedó puesto de una ejecución que se cerró a la fuerza" if huerfano else "Libre", huerfano, quitar_bloqueo)
+
+    # 5. Base de datos: íntegra y que se pueda escribir
+    try:
+        c = bd.con()
+        integra = c.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        with bd.transaccion():
+            pass
+        anotar("base", "Base de datos", "ok" if integra else "error",
+               "Íntegra y disponible" if integra else "Tiene daños: restaura un respaldo en Ajustes › Datos y seguridad")
+    except Exception as e:
+        anotar("base", "Base de datos", "error", f"No responde: {e}")
+
+    # 6. Proceso residente (icono, modo al instante y, en la Store, el motor)
+    try:
+        hace_falta = necesita_residente() and not os.environ.get("GESTOR_SIN_RESIDENTE")
+        activo = residente_activo()
+    except Exception:
+        hace_falta, activo = False, False
+    anotar("residente", "Proceso en segundo plano", "aviso" if hace_falta and not activo else "ok",
+           "No está en marcha" if hace_falta and not activo else ("En marcha" if activo else "No hace falta"),
+           hace_falta and not activo, lanzar_residente)
+
+    # 7. Errores recientes
+    lineas = []
+    try:
+        with open(ARCHIVO_ERRORES, encoding="utf-8", errors="replace") as f:
+            lineas = f.read().splitlines()[-40:]
+        recientes = time.time() - os.path.getmtime(ARCHIVO_ERRORES) < 7 * 86400
+    except OSError:
+        recientes = False
+    anotar("errores", "Errores de los últimos 7 días", "aviso" if recientes else "ok",
+           "Hay errores anotados: usa «Copiar informe» y mándamelo" if recientes else "Ninguno")
+
+    return {"comprobaciones": salida, "errores": lineas, "reparado": reparar,
+            "todo_bien": all(f["estado"] == "ok" for f in salida)}
+
+
+def informe_diagnostico():
+    """Texto para copiar y pegar: versión, comprobaciones y los últimos errores."""
+    d = diagnostico()
+    partes = [f"GESTOR {VERSION} · {sys.platform} · {'Store' if ES_TIENDA else 'normal'} · {sys.executable}"]
+    partes += [f"[{f['estado']}] {f['titulo']}: {f['detalle']}" for f in d["comprobaciones"]]
+    if d["errores"]:
+        partes += ["", "Últimos errores:"] + d["errores"]
+    return "\n".join(partes)

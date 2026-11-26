@@ -694,6 +694,10 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
 .bv-fila { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--texto) 4%, transparent); }
 .bv-fila .ayuda { display: block; }
 .bv-n { font-weight: 700; font-variant-numeric: tabular-nums; }
+.lista-diag{max-height:46vh;overflow:auto;margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.renglon-diag{display:grid;grid-template-columns:26px 230px 1fr;gap:10px;align-items:baseline;padding:6px 10px;border-radius:10px;background:var(--fondo-suave, rgba(127,127,127,.08))}
+.renglon-diag .ayuda{margin:0}
+.errores-diag{max-height:22vh;overflow:auto;font-size:12px;white-space:pre-wrap;background:rgba(127,127,127,.1);padding:8px;border-radius:8px}
 </style>
 </head>
 <body class="en-inicio ajustada">
@@ -748,7 +752,7 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
     <div class="pestanas-int" data-tabs="ajustes">
       <button type="button" data-tab="general" class="on">General</button><button type="button" data-tab="horario">Programación</button>
       <button type="button" data-tab="inteligencia">Inteligencia</button><button type="button" data-tab="celular">Celular</button>
-      <button type="button" data-tab="datos">Datos</button></div>
+      <button type="button" data-tab="datos">Datos</button><button type="button" data-tab="diagnostico">Diagnóstico</button></div>
     <div data-pest="ajustes:general" class="on">
     <div class="tarjeta-op" style="grid-row: span 2"><h4>Funcionamiento</h4>
     <div class="fila"><label>Idioma <span id="lugarIdioma"></span></label></div>
@@ -835,6 +839,13 @@ body:not(.cuaderno) .pestanas-int button:active { transform: none; }
       <label class="chip" style="cursor:pointer">Importar… <input type="file" id="archivoImportar" accept=".json" hidden></label>
       <label><input type="checkbox" id="importarReemplazar"> Reemplazar los actuales al importar</label>
     </div>
+    </div>
+    </div>
+    <div data-pest="ajustes:diagnostico">
+    <div class="tarjeta-op" style="grid-column: 1 / -1"><h4>Diagnóstico y reparar</h4>
+    <p class="ayuda">Revisa en un momento lo que suele fallar al instalar o actualizar: otra versión de GESTOR instalada o abierta, una tarea que apunta a un programa viejo, bloqueos olvidados, la base de datos y los errores recientes.</p>
+    <div class="fila"><button class="prim" id="btnDiagRevisar">Revisar</button><button id="btnDiagArreglar" disabled>Arreglar lo que se pueda</button><button id="btnDiagCopiar">Copiar informe</button><span class="ayuda" id="diagInfo"></span></div>
+    <div class="lista-diag" id="diagLista"></div>
     </div>
     </div>
     <div class="fila" style="margin-top:14px;justify-content:flex-end">
@@ -2571,6 +2582,30 @@ async function pintarRed() {
       Pulsa «Configuración avanzada» y «Continuar». Si quieres comprobarlo, la huella del certificado empieza por <code>${esc((r.huella || "").slice(0, 23))}</code>.</div></div>`;
   } catch (e) { }
 }
+function pintarDiagnostico(d) {
+  const icono = { ok: "✅", aviso: "⚠️", error: "❌" };
+  $("#diagLista").innerHTML = d.comprobaciones.map(f => `<div class="renglon-diag ${f.estado}">
+      <span class="ico">${icono[f.estado] || "•"}</span><b>${esc(t(f.titulo))}</b>
+      <span class="ayuda">${esc(t(f.detalle))}${f.arreglado ? " · " + esc(t("arreglado")) : ""}</span></div>`).join("")
+    + (d.errores && d.errores.length ? `<details><summary>${esc(t("Últimos errores anotados"))}</summary><pre class="errores-diag">${esc(d.errores.join("\n"))}</pre></details>` : "");
+  $("#btnDiagArreglar").disabled = !d.comprobaciones.some(f => f.arreglable && f.estado !== "ok");
+  $("#diagInfo").textContent = d.todo_bien ? t("Todo en orden.") : d.reparado ? t("Listo: revisa lo que quede en amarillo o rojo.") : "";
+}
+$("#btnDiagRevisar").onclick = async () => {
+  $("#diagInfo").textContent = t("Revisando…");
+  try { pintarDiagnostico(await api("/api/diagnostico", {})); } catch (e) { $("#diagInfo").textContent = "Error: " + e.message; }
+};
+$("#btnDiagArreglar").onclick = async () => {
+  $("#diagInfo").textContent = t("Arreglando…");
+  try { pintarDiagnostico(await api("/api/diagnostico", { reparar: true })); } catch (e) { $("#diagInfo").textContent = "Error: " + e.message; }
+};
+$("#btnDiagCopiar").onclick = async () => {
+  try {
+    const r = await api("/api/diagnostico/informe", {});
+    await navigator.clipboard.writeText(r.texto);
+    $("#diagInfo").textContent = t("Informe copiado: pégalo en un mensaje para mandármelo.");
+  } catch (e) { $("#diagInfo").textContent = "Error: " + e.message; }
+};
 $("#btnRespBase").onclick = async () => {
   try { const r = await api("/api/mantenimiento/respaldar-base"); $("#respBaseInfo").textContent = r.ok ? "Guardada en " + r.ruta : r.mensaje; }
   catch (e) { aviso("Error: " + e.message); }

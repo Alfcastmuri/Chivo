@@ -132,6 +132,37 @@ jobs:
           for ($i = 0; $i -lt 60 -and (Test-Path "$app\GESTOR.exe"); $i++) { Start-Sleep -Seconds 2 }
           if (Test-Path "$app\GESTOR.exe") { throw "La desinstalación no quitó GESTOR.exe" }
 
+      - name: Probar la actualización desde una versión vieja (0.9.3, con tkinter) abierta
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          # Lo que le pasó a Alfonso: una versión vieja instalada, abierta y con su tarea programada.
+          $app = "$env:LOCALAPPDATA\Programs\GESTOR"
+          $env:GESTOR_DATOS = "$env:RUNNER_TEMP\gestor-actualizar"
+          $viejo = "$env:RUNNER_TEMP\GESTOR-Instalador-0.9.3.exe"
+          Invoke-WebRequest "https://github.com/Alfcastmuri/Chivo/releases/download/v0.9.3/GESTOR-Instalador-0.9.3.exe" -OutFile $viejo
+          $p = Start-Process -FilePath $viejo -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
+          $p.WaitForExit()
+          if (-not (Test-Path "$app\GESTOR.exe")) { throw "No se instaló la 0.9.3" }
+          if (Select-String -Path "$app\GESTOR.exe" -Pattern "pyi_rth__tkinter" -SimpleMatch -Quiet) { "La 0.9.3 lleva tkinter (como la de Alfonso)" }
+          Start-Process -FilePath "$app\GESTOR.exe" -ArgumentList "--residente", "--sin-icono"
+          Start-Sleep -Seconds 5
+          $p = Start-Process -FilePath "salida\GESTOR-Instalador-$env:GESTOR_VERSION.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { throw "La actualización falló ($($p.ExitCode))" }
+          if (Select-String -Path "$app\GESTOR.exe" -Pattern "pyi_rth__tkinter" -SimpleMatch -Quiet) { throw "Tras actualizar sigue el GESTOR.exe viejo (con tkinter)" }
+          if (-not (Test-Path "$app\_internal\_tcl_data")) { throw "Falta la carpeta de seguridad _tcl_data" }
+          $tarea = (schtasks /Query /TN "GESTOR\Motor" /XML 2>$null) -join "`n"
+          if ($tarea -and $tarea -notmatch [regex]::Escape("$app\GESTOR.exe")) { throw "La tarea programada no apunta al GESTOR.exe instalado" }
+          $p = Start-Process -FilePath "$app\GESTOR.exe" -ArgumentList "--motor" -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "El GESTOR.exe actualizado no terminó" }
+          if ($p.ExitCode -ne 0) { throw "El GESTOR.exe actualizado salió con error $($p.ExitCode)" }
+          Get-Process GESTOR -ErrorAction SilentlyContinue | Stop-Process -Force
+          # Para la prueba de la Store se deja una tarea y un arranque «viejos» como los de la 0.9.3.
+          schtasks /Create /F /TN "GESTOR\Motor" /SC MINUTE /MO 30 /TR "`"$app\GESTOR.exe`" --motor" | Out-Null
+          Set-Content -Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\GESTOR-inicio.vbs" -Value "' prueba"
+          "Actualización desde 0.9.3: correcta"
+
       - name: Paquete para la Microsoft Store (MSIX)
         shell: pwsh
         run: |
@@ -165,7 +196,23 @@ jobs:
           if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "El motor del paquete no terminó" }
           if (-not (Test-Path "$env:GESTOR_DATOS\gestor.db")) { throw "El motor del paquete no creó la base de datos" }
           if (Test-Path "$env:GESTOR_DATOS\errores.log") { Get-Content "$env:GESTOR_DATOS\errores.log"; throw "El motor del paquete registró errores" }
+          # La versión de la Store apaga la tarea y el arranque de la instalación normal vieja.
+          $env:GESTOR_PUERTO_RESIDENTE = "8798"
+          $r = Start-Process -FilePath $alias -ArgumentList "--residente", "--sin-icono" -PassThru
+          $vbs = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\GESTOR-inicio.vbs"
+          $apagada = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep -Seconds 1
+            schtasks /Query /TN "GESTOR\Motor" 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0 -and -not (Test-Path $vbs)) { $apagada = $true; break }
+          }
+          Stop-Process -Id $r.Id -Force -ErrorAction SilentlyContinue
+          Get-Process GESTOR -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $apagada) { if (Test-Path "$env:GESTOR_DATOS\errores.log") { Get-Content "$env:GESTOR_DATOS\errores.log" }; throw "La versión de la Store no apagó la tarea o el arranque de la versión vieja" }
+          "La Store apagó la versión vieja: correcto"
           $pkg | Remove-AppxPackage
+          $p = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\GESTOR\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -PassThru -ErrorAction SilentlyContinue
+          if ($p) { $p.WaitForExit() }
 
       - name: Comprimir
         shell: pwsh
